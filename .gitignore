@@ -1,0 +1,4 @@
+.DS_Store
+*.log
+# personal data export: import it, then delete it
+supabase/seed_from_claude.sql
