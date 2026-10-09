@@ -618,7 +618,7 @@ tr:hover td{background:var(--line2)}
 
     <div class="row" style="margin-top:1rem;justify-content:flex-end">
       <button class="btn ghost" id="btnDeleteRc" style="display:none">Delete</button>
-      <button class="btn ghost" id="btnDownloadRc">Download for client</button>
+      <button class="btn ghost" id="btnDownloadRc">Download PDF for client</button>
       <button class="btn" id="btnSaveRc">Save rate card</button>
     </div>
   </div>
@@ -1859,7 +1859,8 @@ tr:hover td{background:var(--line2)}
     } else if(run.status==='approved'){
       pill.className='tag ok'; pill.textContent='Approved';
       html += '<button class="btn ghost" id="btnCalcRun">Recalculate (will un-approve)</button>';
-      html += '<button class="btn" id="btnDownloadCsvRun">Download bank CSV</button>';
+      html += '<button class="btn" id="btnDownloadPdfRun">Download payroll register (PDF)</button>';
+      html += '<button class="btn ghost" id="btnDownloadCsvRun">Download bank CSV</button>';
     } else if(run.status==='rejected'){
       pill.className='tag bad'; pill.textContent='Rejected — needs changes';
       html += '<button class="btn" id="btnCalcRun">Recalculate</button>';
@@ -1872,6 +1873,7 @@ tr:hover td{background:var(--line2)}
     if((b=document.getElementById('btnApproveRun'))) b.addEventListener('click', function(){ approveRun(ym); });
     if((b=document.getElementById('btnRejectRun'))) b.addEventListener('click', function(){ rejectRun(ym); });
     if((b=document.getElementById('btnDownloadCsvRun'))) b.addEventListener('click', function(){ exportCsv(ym); });
+    if((b=document.getElementById('btnDownloadPdfRun'))) b.addEventListener('click', function(){ downloadPayrollRegister(ym); });
   }
 
   async function calculateRun(ym){
@@ -1951,38 +1953,7 @@ tr:hover td{background:var(--line2)}
     if(!run || run.status!=='approved'){ toast('This month\'s payroll must be approved before payslips can be downloaded.'); return; }
     var found = run.rows.find(function(x){return x.empId===empId;});
     if(!found) return;
-    var r=found;
-    var text = [
-      'PUBLIC FORCE SECURITY SERVICES',
-      'Payslip for '+ym,
-      '--------------------------------',
-      'Employee ID: '+(r.empCode||'—'),
-      'Name: '+r.name,
-      'Site: '+(r.site||'—'),
-      'Days present: '+r.present+' / '+r.dim,
-      '',
-      'Gross pay: '+fmtMoney(r.gross),
-      'PF deduction: '+fmtMoney(r.pf),
-      'ESI deduction: '+fmtMoney(r.esi),
-      'Professional Tax: '+fmtMoney(r.pt),
-      'Salary advance deduction: '+fmtMoney(r.advance||0),
-      '--------------------------------',
-      'NET PAY: '+fmtMoney(r.net),
-      '',
-      'Approved on '+(run.approvedAt? new Date(run.approvedAt).toLocaleString('en-IN'):'—')+' by '+(run.approvedByLabel||'—'),
-      '(This is a simplified estimate; confirm with your accountant before final payment.)'
-    ].join('\n');
-    if(downloadsCap){
-      try{
-        await downloadsCap.save({filename: 'payslip-'+r.name.replace(/\s+/g,'_')+'-'+ym+'.txt', data:text});
-        return;
-      }catch(err){ /* fall through to blob method */ }
-    }
-    var blob=new Blob([text],{type:'text/plain'});
-    var url=URL.createObjectURL(blob);
-    var a=document.createElement('a'); a.href=url; a.download='payslip-'+r.name.replace(/\s+/g,'_')+'-'+ym+'.txt';
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
+    await downloadPayslipPdf(found, run, ym);
   }
 
   async function exportCsv(ym){
@@ -2237,54 +2208,7 @@ tr:hover td{background:var(--line2)}
     var roles=currentRolesFromForm();
     if(!roles.length){ toast('Add at least one role first.'); return; }
     var computed = roles.map(function(r){ return computeRole(card,r); });
-    var colw=18;
-    function pad(s){ s=String(s); return s.length>=colw? s.slice(0,colw-1)+' ' : s+Array(colw-s.length+1).join(' '); }
-    var lines=[];
-    lines.push('PUBLIC FORCE SECURITY SERVICES');
-    lines.push((card.name||'WAGE BREAK-UP DETAILS').toUpperCase());
-    lines.push('Rates structure as per the Minimum Wages of '+card.state+' State');
-    lines.push('Working Pattern: '+card.hours+' Hours per Day x '+card.days+' Days per Month');
-    lines.push('');
-    var header = pad('Particulars')+roles.map(function(r){return pad(r.roleName||'Role');}).join('');
-    lines.push(header);
-    lines.push(Array(header.length+1).join('-'));
-    var rowDefs = [
-      ['Basic', function(r,c){return r.basic;}],
-      ['VDA', function(r,c){return r.vda;}],
-      ['Special Allowance', function(r,c){return r.specialAllowance;}],
-      ['Subtotal A', function(r,c){return c.subtotalA;}],
-      ['Extra Hours', function(r,c){return r.extraHours;}],
-      ['Washing Allowance', function(r,c){return r.washingAllowance;}],
-      ['Subtotal B', function(r,c){return c.subtotalB;}],
-      ['Employer PF @ '+card.pfPct+'%', function(r,c){return c.pf;}],
-      ['Employer ESIC @ '+card.esicPct+'%', function(r,c){return c.esic;}],
-      ['Medical', function(r,c){return c.medical;}],
-      ['Bonus @ '+card.bonusPct+'%', function(r,c){return c.bonus;}],
-      ['Leave charge', function(r,c){return c.leave;}],
-      ['National Holiday', function(r,c){return c.natHol;}],
-      ['Uniform', function(r,c){return c.uniform;}],
-      ['Training Charge', function(r,c){return c.training;}],
-      ['Subtotal C', function(r,c){return c.subtotalC;}],
-      ['Reliever Charge', function(r,c){return c.reliever;}],
-      ['GRAND TOTAL', function(r,c){return c.grandTotal;}],
-      ['Employee PF @ '+card.empPfPct+'%', function(r,c){return c.empPf;}],
-      ['Employee ESIC @ '+card.empEsicPct+'%', function(r,c){return c.empEsic;}],
-      ['Professional Tax', function(r,c){return c.pt;}],
-      ['IN-HAND SALARY', function(r,c){return c.inHand;}]
-    ];
-    rowDefs.forEach(function(def){
-      var row = pad(def[0])+roles.map(function(r,i){ return pad(fmtMoney(def[1](r,computed[i]))); }).join('');
-      lines.push(row);
-    });
-    lines.push('');
-    lines.push('Note: GST @ '+card.gstPct+'% and Service Charge @ '+card.servicePct+'% are charged additional on the Grand Total, as applicable.');
-    lines.push('Figures are estimates based on current state minimum wage notifications — verify before final client submission.');
-    var text = lines.join('\n');
-    var blob=new Blob([text],{type:'text/plain'});
-    var url=URL.createObjectURL(blob);
-    var a=document.createElement('a'); a.href=url; a.download='rate-card-'+(card.name||'untitled').replace(/\s+/g,'_')+'.txt';
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
+    await downloadRateCardPdf(card, roles, computed);
   }
 
   // ---------- CLIENTS & INVOICING ----------
@@ -3287,8 +3211,8 @@ tr:hover td{background:var(--line2)}
   function pdfStrBytes(s){ var b=new Uint8Array(s.length); for(var i=0;i<s.length;i++) b[i]=s.charCodeAt(i)&255; return b; }
   function pdfB64Bytes(b64){ var bin=atob(b64), a=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) a[i]=bin.charCodeAt(i); return a; }
 
-  function PdfBuilder(logoBytes, logoW, logoH){
-    var W=595.28, H=841.89, pages=[], cur=null, api={W:W,H:H};
+  function PdfBuilder(logoBytes, logoW, logoH, land){
+    var W=land?841.89:595.28, H=land?595.28:841.89, pages=[], cur=null, api={W:W,H:H};
     function rgb(h){ h=h.replace('#',''); return [0,2,4].map(function(i){return (parseInt(h.substr(i,2),16)/255).toFixed(3);}).join(' '); }
     function esc(s){ return s.replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)'); }
     api.tw=function(s,size,bold){ var t=bold?HELVB_W:HELV_W, w=0; for(var i=0;i<s.length;i++){ var c=s.charCodeAt(i); w+=(c>=32&&c<=126)?t[c-32]:556; } return w*size/1000; };
@@ -3350,17 +3274,7 @@ tr:hover td{background:var(--line2)}
     var C={ink:'#232323',gold:'#C9973A',goldDk:'#8E6A1E',mute:'#55524c',paper:'#F1EDE4',line:'#D8D1C2',white:'#FFFFFF'};
     var pb=PdfBuilder(pdfB64Bytes(LOGO_B64),198,214), ML=36, CW=pb.W-72, MR=ML+CW, LIMIT=pb.H-78;
     var inv=(state.settings&&state.settings.invoice)||{};
-    function head(){
-      pb.newPage();
-      pb.image(ML,28,58,62.7);
-      pb.text(104,46,COMPANY.tradeName,17,{bold:true,color:C.ink});
-      pb.text(104,60,'Security services  |  Manpower outsourcing  |  Housekeeping and facility services',8.2,{color:C.goldDk,bold:true});
-      var addr=pb.wrap(COMPANY.address,MR-104,8.4,false), yy=73;
-      addr.forEach(function(l){ pb.text(104,yy,l,8.4,{color:C.mute}); yy+=10.5; });
-      pb.text(104,yy,'Phone '+COMPANY.phone+'   |   '+COMPANY.email+'   |   publicforcesecurity.com',8.4,{color:C.mute});
-      pb.line(ML,98,MR,98,2.6,C.gold); pb.line(ML,102,MR,102,0.5,C.ink);
-      return 120;
-    }
+    function head(){ return pdfHead(pb); }
     function tableHead(y){
       pb.rect(ML,y,CW,19,{fill:C.ink});
       var t=function(x,s,al){ pb.text(x,y+12.5,s,8.3,{bold:true,color:C.white,align:al}); };
@@ -3433,15 +3347,7 @@ tr:hover td{background:var(--line2)}
     pb.line(MR-170,y+62,MR,y+62,0.6,C.ink);
     pb.text(MR,y+74,'Authorised signatory',8.6,{align:'right',color:C.mute});
     pb.text(MR,y+85,COMPANY.legalName+', Proprietor',8.6,{align:'right',color:C.mute});
-    // footers
-    var n=pb.count();
-    for(var i=0;i<n;i++){ pb.setPage(i);
-      pb.line(ML,pb.H-60,MR,pb.H-60,0.8,C.gold);
-      pb.text(pb.W/2,pb.H-47,'GSTIN '+COMPANY.gstin+'  |  PAN '+COMPANY.pan+'  |  Udyam '+COMPANY.udyam+'  |  EPF BGBNG3901490000  |  ESIC 49000731570001099',6.8,{align:'center',color:C.mute});
-      pb.text(ML,pb.H-33,'Your safety, our mission',8,{italic:true,color:C.goldDk});
-      pb.text(pb.W/2,pb.H-33,'Computer-generated invoice',7.2,{align:'center',color:C.mute});
-      pb.text(MR,pb.H-33,'Page '+(i+1)+' of '+n,8,{align:'right',color:C.mute});
-    }
+    pdfFoot(pb,'Computer-generated invoice');
     return pb.build();
   }
   function invoiceModelFromModal(){
@@ -3503,6 +3409,158 @@ tr:hover td{background:var(--line2)}
         items:[{description:'Security Guard: 60 man-days of 30 (2 posts contracted)', qty:60, rate:700, amount:42000, cat:'rcm'},{description:'Housekeeping: 30 man-days of 30 (1 post contracted)', qty:30, rate:533.33, amount:15999.9, cat:'normal'}],
         subtotal:57999.9, normalBase:15999.9, rcmBase:42000, gstPct:18, inter:false, pos:'Karnataka', posCode:'29', exempt:false});
     });
+  }
+
+  // ======== SHARED LETTERHEAD AND OTHER PDF DOCUMENTS ========
+  var PDFC={ink:'#232323',gold:'#C9973A',goldDk:'#8E6A1E',mute:'#55524c',paper:'#F1EDE4',line:'#D8D1C2',white:'#FFFFFF',goldLt:'#E9DDBF'};
+  function pdfNew(land){ return PdfBuilder(pdfB64Bytes(LOGO_B64),198,214,land); }
+  function pdfHead(pb){
+    var ML=36, MR=pb.W-36; pb.newPage();
+    pb.image(ML,28,58,62.7);
+    pb.text(104,46,COMPANY.tradeName,17,{bold:true,color:PDFC.ink});
+    pb.text(104,60,'Security services  |  Manpower outsourcing  |  Housekeeping and facility services',8.2,{color:PDFC.goldDk,bold:true});
+    var addr=pb.wrap(COMPANY.address,MR-104,8.4,false), yy=73;
+    addr.forEach(function(l){ pb.text(104,yy,l,8.4,{color:PDFC.mute}); yy+=10.5; });
+    pb.text(104,yy,'Phone '+COMPANY.phone+'   |   '+COMPANY.email+'   |   publicforcesecurity.com',8.4,{color:PDFC.mute});
+    pb.line(ML,98,MR,98,2.6,PDFC.gold); pb.line(ML,102,MR,102,0.5,PDFC.ink);
+    return 120;
+  }
+  function pdfFoot(pb,label){
+    var ML=36, MR=pb.W-36, n=pb.count();
+    for(var i=0;i<n;i++){ pb.setPage(i);
+      pb.line(ML,pb.H-60,MR,pb.H-60,0.8,PDFC.gold);
+      pb.text(pb.W/2,pb.H-47,'GSTIN '+COMPANY.gstin+'  |  PAN '+COMPANY.pan+'  |  Udyam '+COMPANY.udyam+'  |  EPF BGBNG3901490000  |  ESIC 49000731570001099',6.8,{align:'center',color:PDFC.mute});
+      pb.text(ML,pb.H-33,'Your safety, our mission',8,{italic:true,color:PDFC.goldDk});
+      pb.text(pb.W/2,pb.H-33,label||'Computer-generated document',7.2,{align:'center',color:PDFC.mute});
+      pb.text(MR,pb.H-33,'Page '+(i+1)+' of '+n,8,{align:'right',color:PDFC.mute});
+    }
+  }
+  function pdfFit(pb,s,w,size,bold){ s=pdfAscii(s); if(pb.tw(s,size,bold)<=w) return s; while(s.length>1&&pb.tw(s+'...',size,bold)>w) s=s.slice(0,-1); return s+'...'; }
+  function pdfNoSym(v){ return String(fmtMoney(v)).replace(/^\u20b9\s*/,''); }
+  function pdfSign(pb,y,ML,MR,left,right){
+    pb.line(MR-170,y+34,MR,y+34,0.6,PDFC.ink); pb.text(MR,y+46,right,8.6,{align:'right',color:PDFC.mute});
+    pb.text(MR,y+10,'For '+COMPANY.tradeName,9,{bold:true,align:'right'});
+    if(left){ pb.line(ML,y+34,ML+170,y+34,0.6,PDFC.ink); pb.text(ML,y+46,left,8.6,{color:PDFC.mute}); }
+  }
+  async function pdfSave(blob,fname){
+    if(downloadsCap){ try{ await downloadsCap.save({filename:fname,data:blob}); return; }catch(err){ if(err&&err.code==='declined') return; } }
+    var url=URL.createObjectURL(blob), a=document.createElement('a'); a.href=url; a.download=fname; document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(function(){ URL.revokeObjectURL(url); },4000);
+  }
+  function pdfName(s){ return String(s||'file').replace(/[^A-Za-z0-9_-]+/g,'_').replace(/^_+|_+$/g,'')||'file'; }
+
+  /* ---------- rate card ---------- */
+  function buildRateCardPdf(card,roles,computed){
+    var land=roles.length>4, pb=pdfNew(land), ML=36, CW=pb.W-72, MR=ML+CW, LIMIT=pb.H-78, C=PDFC;
+    var y=pdfHead(pb);
+    pb.text(ML,y+6,(card.name||'Wage break-up details').toUpperCase(),14,{bold:true});
+    pb.text(MR,y+6,'Date: '+pdfDate(xToday()),8.6,{align:'right',color:C.mute});
+    y+=22; pb.text(ML,y+4,'Rates structure as per the Minimum Wages of '+card.state+' State',9,{color:C.mute});
+    y+=13; pb.text(ML,y+4,'Working pattern: '+card.hours+' hours per day x '+card.days+' days per month. Amounts in Rs. per month.',9,{color:C.mute}); y+=20;
+    var pw=land?200:150, n=roles.length, cw=(CW-pw)/n, rh=land?15.5:16.5;
+    function thead(){ pb.rect(ML,y,CW,22,{fill:C.ink}); pb.text(ML+8,y+14.5,'Particulars',8.4,{bold:true,color:C.white});
+      roles.forEach(function(r,i){ pb.text(ML+pw+(i+1)*cw-8,y+14.5,pdfFit(pb,r.roleName||'Role',cw-12,8.4,true),8.4,{bold:true,color:C.white,align:'right'}); }); y+=22; }
+    thead();
+    var defs=[['Basic',function(r){return r.basic;}],['VDA',function(r){return r.vda;}],['Special allowance',function(r){return r.specialAllowance;}],['Subtotal A',function(r,c){return c.subtotalA;},'sub'],
+      ['Extra hours',function(r){return r.extraHours;}],['Washing allowance',function(r){return r.washingAllowance;}],['Subtotal B',function(r,c){return c.subtotalB;},'sub'],
+      ['Employer PF @ '+card.pfPct+'%',function(r,c){return c.pf;}],['Employer ESIC @ '+card.esicPct+'%',function(r,c){return c.esic;}],['Medical',function(r,c){return c.medical;}],
+      ['Bonus @ '+card.bonusPct+'%',function(r,c){return c.bonus;}],['Leave charge',function(r,c){return c.leave;}],['National holiday',function(r,c){return c.natHol;}],
+      ['Uniform',function(r,c){return c.uniform;}],['Training charge',function(r,c){return c.training;}],['Subtotal C',function(r,c){return c.subtotalC;},'sub'],
+      ['Reliever charge',function(r,c){return c.reliever;}],['GRAND TOTAL',function(r,c){return c.grandTotal;},'grand'],
+      ['Employee PF @ '+card.empPfPct+'%',function(r,c){return c.empPf;}],['Employee ESIC @ '+card.empEsicPct+'%',function(r,c){return c.empEsic;}],
+      ['Professional tax',function(r,c){return c.pt;}],['IN-HAND SALARY',function(r,c){return c.inHand;},'inhand']];
+    defs.forEach(function(d){
+      if(y+rh>LIMIT){ y=pdfHead(pb); thead(); }
+      var st=d[2], bold=!!st, col=C.ink;
+      if(st==='sub') pb.rect(ML,y,CW,rh,{fill:C.paper});
+      if(st==='grand'){ pb.rect(ML,y,CW,rh,{fill:C.ink}); col=C.white; }
+      if(st==='inhand') pb.rect(ML,y,CW,rh,{fill:C.goldLt});
+      pb.text(ML+8,y+rh-5,d[0],8.6,{bold:bold,color:col});
+      roles.forEach(function(r,i){ pb.text(ML+pw+(i+1)*cw-8,y+rh-5,pdfNoSym(d[1](r,computed[i])),8.8,{bold:bold,color:col,align:'right'}); });
+      y+=rh; pb.line(ML,y,MR,y,0.35,C.line);
+    });
+    y+=14;
+    var notes=pb.wrap('GST at '+card.gstPct+'% and service charge at '+card.servicePct+'% are charged additionally on the Grand Total, as applicable.',CW,8.4,false)
+      .concat(pb.wrap('Figures are based on current state minimum wage notifications and are subject to revision.',CW,8.4,false));
+    if(y+notes.length*11+70>LIMIT){ y=pdfHead(pb); }
+    notes.forEach(function(l){ pb.text(ML,y+8,l,8.4,{color:C.mute}); y+=11; });
+    pdfSign(pb,y+14,ML,MR,null,'Authorised signatory, '+COMPANY.legalName+', Proprietor');
+    pdfFoot(pb,'Computer-generated rate card');
+    return pb.build();
+  }
+
+  /* ---------- payslip ---------- */
+  function buildPayslipPdf(r,run,ym){
+    var pb=pdfNew(false), ML=36, CW=pb.W-72, MR=ML+CW, C=PDFC, y=pdfHead(pb);
+    pb.text(ML,y+8,'PAYSLIP',15,{bold:true}); pb.text(MR,y+8,xMonthLabel(ym),11,{bold:true,align:'right',color:C.goldDk});
+    y+=20; pb.rect(ML,y,CW,36,{fill:C.paper});
+    [['Employee ID',r.empCode||'-'],['Name',r.name||'-'],['Site',r.site||'-'],['Days present',r.present+' of '+r.dim]].forEach(function(c,i){
+      var x=ML+12+i*(CW/4); pb.text(x,y+13,c[0],7.6,{color:C.mute}); pb.text(x,y+27,pdfFit(pb,c[1],CW/4-16,10,true),10,{bold:true});
+    });
+    y+=36+22;
+    var half=(CW-20)/2, lx=ML, rx=ML+half+20;
+    function head2(x,t){ pb.rect(x,y,half,20,{fill:C.ink}); pb.text(x+8,y+13.5,t,8.6,{bold:true,color:C.white}); pb.text(x+half-8,y+13.5,'Amount (Rs.)',8.6,{bold:true,color:C.white,align:'right'}); }
+    head2(lx,'Earnings'); head2(rx,'Deductions');
+    var ded=[['Provident fund (PF)',r.pf||0],['ESI',r.esi||0],['Professional tax',r.pt||0],['Salary advance',r.advance||0]], earn=[['Gross pay',r.gross||0]];
+    var top=y+20, rows=Math.max(earn.length,ded.length);
+    function line(x,yy,a,v){ pb.text(x+8,yy+13.5,a,9); pb.text(x+half-8,yy+13.5,pdfMoney(v),9,{align:'right'}); pb.line(x,yy+20,x+half,yy+20,0.35,C.line); }
+    earn.forEach(function(e,i){ line(lx,top+i*20,e[0],e[1]); }); ded.forEach(function(d,i){ line(rx,top+i*20,d[0],d[1]); });
+    var ty=top+rows*20, totalDed=ded.reduce(function(s,d){return s+d[1];},0);
+    pb.rect(lx,ty,half,22,{fill:C.paper}); pb.text(lx+8,ty+14.5,'Total earnings',9,{bold:true}); pb.text(lx+half-8,ty+14.5,pdfMoney(r.gross||0),9,{bold:true,align:'right'});
+    pb.rect(rx,ty,half,22,{fill:C.paper}); pb.text(rx+8,ty+14.5,'Total deductions',9,{bold:true}); pb.text(rx+half-8,ty+14.5,pdfMoney(totalDed),9,{bold:true,align:'right'});
+    y=ty+22+16;
+    pb.rect(ML,y,CW,30,{fill:C.ink}); pb.text(ML+12,y+19.5,'Net pay',11,{bold:true,color:C.white}); pb.text(MR-12,y+19.5,'Rs. '+pdfMoney(r.net||0),12,{bold:true,color:'#E3BC6A',align:'right'});
+    y+=30+16; pb.text(ML,y,'Amount in words',8.2,{color:C.mute}); y+=12;
+    pb.wrap('Rupees '+pdfWords(r.net||0)+' only',CW,9,true).forEach(function(l){ pb.text(ML,y,l,9,{bold:true}); y+=11.5; });
+    y+=10;
+    var appr='Approved on '+(run&&run.approvedAt? new Date(run.approvedAt).toLocaleString('en-IN'):'-')+' by '+((run&&run.approvedByLabel)||'-')+'.';
+    pb.text(ML,y,appr,8.4,{color:C.mute}); y+=40;
+    pdfSign(pb,y,ML,MR,'Employee signature','Authorised signatory');
+    pdfFoot(pb,'Computer-generated payslip');
+    return pb.build();
+  }
+
+  /* ---------- payroll register (all employees for the month) ---------- */
+  function buildPayrollRegisterPdf(run,ym){
+    var pb=pdfNew(true), ML=36, CW=pb.W-72, MR=ML+CW, LIMIT=pb.H-78, C=PDFC, y=pdfHead(pb), rows=run.rows||[];
+    pb.text(ML,y+8,'PAYROLL REGISTER',15,{bold:true}); pb.text(MR,y+8,xMonthLabel(ym),11,{bold:true,align:'right',color:C.goldDk});
+    y+=18; pb.text(ML,y+8,rows.length+' employees. '+(run.status==='approved'?'Approved on '+(run.approvedAt?new Date(run.approvedAt).toLocaleString('en-IN'):'-')+' by '+(run.approvedByLabel||'-')+'.':'Status: '+(run.status||'draft')+'.'),8.8,{color:C.mute}); y+=22;
+    var cols=[['#',24,'l'],['Emp ID',62,'l'],['Name',140,'l'],['Site',130,'l'],['Days',50,'r'],['Gross',66,'r'],['PF',58,'r'],['ESI',58,'r'],['PT',50,'r'],['Advance',56,'r'],['Net pay',66,'r']];
+    function thead(){ pb.rect(ML,y,CW,20,{fill:C.ink}); var x=ML; cols.forEach(function(c){ pb.text(c[2]==='r'?x+c[1]-6:x+6,y+13.5,c[0],8.3,{bold:true,color:C.white,align:c[2]==='r'?'right':'left'}); x+=c[1]; }); y+=20; }
+    thead();
+    var tot={gross:0,pf:0,esi:0,pt:0,adv:0,net:0};
+    rows.forEach(function(r,i){
+      if(y+17>LIMIT){ y=pdfHead(pb); thead(); }
+      var vals=[String(i+1),r.empCode||'-',r.name||'-',r.site||'-',r.present+'/'+r.dim,pdfMoney(r.gross||0),pdfMoney(r.pf||0),pdfMoney(r.esi||0),pdfMoney(r.pt||0),pdfMoney(r.advance||0),pdfMoney(r.net||0)];
+      var x=ML; cols.forEach(function(c,k){ var t=(c[2]==='l')?pdfFit(pb,vals[k],c[1]-10,8.6,false):vals[k]; pb.text(c[2]==='r'?x+c[1]-6:x+6,y+12,t,8.6,{align:c[2]==='r'?'right':'left',bold:k===10}); x+=c[1]; });
+      tot.gross+=r.gross||0; tot.pf+=r.pf||0; tot.esi+=r.esi||0; tot.pt+=r.pt||0; tot.adv+=r.advance||0; tot.net+=r.net||0;
+      y+=17; pb.line(ML,y,MR,y,0.35,C.line);
+    });
+    if(y+22>LIMIT){ y=pdfHead(pb); thead(); }
+    pb.rect(ML,y,CW,22,{fill:C.paper}); var x2=ML; var tv=['','','Total','','',pdfMoney(tot.gross),pdfMoney(tot.pf),pdfMoney(tot.esi),pdfMoney(tot.pt),pdfMoney(tot.adv),pdfMoney(tot.net)];
+    cols.forEach(function(c,k){ if(tv[k]) pb.text(c[2]==='r'?x2+c[1]-6:x2+6,y+14.5,tv[k],8.8,{bold:true,align:c[2]==='r'?'right':'left'}); x2+=c[1]; });
+    y+=22+14;
+    if(y+60>LIMIT){ y=pdfHead(pb); }
+    pb.text(ML,y+4,'Amounts in Rs. This register is a simplified payroll estimate; confirm with your accountant before final payment.',8.2,{color:C.mute});
+    pdfSign(pb,y+18,ML,MR,'Prepared by','Approved by');
+    pdfFoot(pb,'Computer-generated payroll register');
+    return pb.build();
+  }
+
+  async function downloadPayslipPdf(r,run,ym){
+    var blob; try{ blob=buildPayslipPdf(r,run,ym); }catch(e){ toast('Could not build the payslip PDF.'); return; }
+    await pdfSave(blob,'payslip-'+pdfName(r.name)+'-'+ym+'.pdf');
+  }
+  async function downloadPayrollRegister(ym){
+    ym = ym || document.getElementById('payMonth').value || thisMonth();
+    var run=await getRun(ym);
+    if(!run || run.status!=='approved'){ toast('This month\'s payroll must be approved before the register can be downloaded.'); return; }
+    var blob; try{ blob=buildPayrollRegisterPdf(run,ym); }catch(e){ toast('Could not build the register PDF.'); return; }
+    await pdfSave(blob,'payroll-register-'+ym+'.pdf');
+  }
+  async function downloadRateCardPdf(card,roles,computed){
+    var blob; try{ blob=buildRateCardPdf(card,roles,computed); }catch(e){ toast('Could not build the rate card PDF.'); return; }
+    await pdfSave(blob,'rate-card-'+pdfName(card.name||'untitled')+'.pdf');
   }
 
   init();
