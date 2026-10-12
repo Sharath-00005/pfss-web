@@ -637,6 +637,10 @@ tr:hover td{background:var(--line2)}
       <div class="field"><label>Employee ESIC %</label><input type="number" id="rcEmpEsic" step="0.01"></div>
     </div>
     <div class="row">
+      <div class="field grow"><label><input type="checkbox" id="rcShareAgain" style="width:auto;margin-right:.4rem">Add employer PF and ESIC to the Grand Total again (as in the Karnataka Zone 4 sheet)</label>
+        <div class="muted">The sheet shows them inside Subtotal C as "Esic / Epf Employer Share" and again below it, and the Grand Total includes both. Untick to count them only once.</div></div>
+    </div>
+    <div class="row">
       <div class="field"><label>Service charge % (billed extra, not in Grand Total)</label><input type="number" id="rcService" step="0.01"></div>
       <div class="field"><label>GST % (billed extra, not in Grand Total)</label><input type="number" id="rcGst" step="0.01"></div>
     </div>
@@ -816,13 +820,15 @@ tr:hover td{background:var(--line2)}
     <div id="invLineItems"></div>
 
     <div class="row" style="margin-top:1rem">
+      <div class="field"><label>Service charge % (PFSS)</label><input type="number" id="invSvcPct" step="0.01" min="0"><div class="muted">On top of the line items. Enter 0 for none.</div></div>
       <div class="field"><label>GST %</label><input type="number" id="invGstPct" step="0.01"><div class="muted" id="invGstExemptNote" style="display:none;color:var(--ok)">This client is GST exempt — rate set to 0%.</div></div>
       <div class="field grow"><label>Notes</label><input id="invNotes" placeholder="e.g. payment terms, bank details"></div>
     </div>
 
     <div class="card" style="margin-top:1rem;background:var(--bg)">
       <div class="row" style="justify-content:flex-end;gap:2rem">
-        <div class="muted">Subtotal: <strong id="invPreviewSubtotal" style="color:var(--fg)">₹0</strong></div>
+        <div class="muted">Line items: <strong id="invPreviewSubtotal" style="color:var(--fg)">₹0</strong></div>
+        <div class="muted">Service charge: <strong id="invPreviewSvc" style="color:var(--fg)">₹0</strong></div>
         <div class="muted">GST: <strong id="invPreviewGst" style="color:var(--fg)">₹0</strong></div>
         <div>Total: <strong id="invPreviewTotal" style="color:var(--accent);font-size:1.2rem">₹0</strong></div>
       </div>
@@ -1119,6 +1125,20 @@ tr:hover td{background:var(--line2)}
     renderSiteRequirements();
   }
 
+  // Employee ID order: PFSS-0001, PFSS-0002 ... PFSS-0010 (numbers compared as numbers). Anyone without an ID goes last, by name.
+  function compareByEmpCode(a,b){
+    var ca=a.empCode||'', cb=b.empCode||'';
+    if(!ca && !cb) return (a.name||'').localeCompare(b.name||'');
+    if(!ca) return 1;
+    if(!cb) return -1;
+    var na=/(\d+)\s*$/.exec(ca), nb=/(\d+)\s*$/.exec(cb);
+    if(na && nb && ca.replace(/\d+\s*$/,'')===cb.replace(/\d+\s*$/,'')){
+      var d=parseInt(na[1],10)-parseInt(nb[1],10); if(d) return d;
+    }
+    var c=ca.localeCompare(cb, undefined, {numeric:true});
+    return c || (a.name||'').localeCompare(b.name||'');
+  }
+
   function renderEmployeeTable(){
     var q=(document.getElementById('empSearch').value||'').toLowerCase();
     var siteF=document.getElementById('empSiteFilter').value;
@@ -1127,9 +1147,9 @@ tr:hover td{background:var(--line2)}
       if(statusF==='active' && e.active===false) return false;
       if(statusF==='left' && e.active!==false) return false;
       if(siteF && e.site!==siteF) return false;
-      if(q && !((e.name||'').toLowerCase().indexOf(q)>-1 || (e.site||'').toLowerCase().indexOf(q)>-1)) return false;
+      if(q && !((e.name||'').toLowerCase().indexOf(q)>-1 || (e.site||'').toLowerCase().indexOf(q)>-1 || (e.empCode||'').toLowerCase().indexOf(q)>-1)) return false;
       return true;
-    }).sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); });
+    }).sort(compareByEmpCode);
 
     var tbody=document.querySelector('#empTable tbody');
     tbody.innerHTML='';
@@ -2058,29 +2078,31 @@ tr:hover td{background:var(--line2)}
   var ROLE_FIELDS = ['roleName','basic','vda','specialAllowance','extraHours','washingAllowance','medical','leaveCharge','nationalHoliday','uniform','trainingCharge','relieverCharge','pt'];
 
   function computeRole(card, role){
-    var basic=Number(role.basic)||0, vda=Number(role.vda)||0, special=Number(role.specialAllowance)||0;
-    var extraHours=Number(role.extraHours)||0, washing=Number(role.washingAllowance)||0;
+    var N=function(x){ return Number(x)||0; }, rnd=function(x){ return Math.round(x); };
+    var basic=N(role.basic), vda=N(role.vda), special=N(role.specialAllowance);
+    var extraHours=N(role.extraHours), washing=N(role.washingAllowance);
     var subtotalA = basic+vda+special;
-    var subtotalB = subtotalA+extraHours+washing;
+    var subtotalB = subtotalA+extraHours;
     var base = basic+vda;
-    var pf = base*(Number(card.pfPct)||0)/100;
-    var esic = base*(Number(card.esicPct)||0)/100;
-    var bonus = base*(Number(card.bonusPct)||0)/100;
-    var medical=Number(role.medical)||0, leave=Number(role.leaveCharge)||0, natHol=Number(role.nationalHoliday)||0;
-    var uniform=Number(role.uniform)||0, training=Number(role.trainingCharge)||0;
-    var subtotalC = subtotalB+pf+esic+medical+bonus+leave+natHol+uniform+training;
-    var reliever=Number(role.relieverCharge)||0;
-    var grandTotal = subtotalC+reliever;
-    var empPf = base*(Number(card.empPfPct)||0)/100;
-    var empEsic = base*(Number(card.empEsicPct)||0)/100;
-    var pt = Number(role.pt)||0;
-    var inHand = grandTotal-empPf-empEsic-pt;
-    var serviceCharge = grandTotal*(Number(card.servicePct)||0)/100;
-    var gstAmt = grandTotal*(Number(card.gstPct)||0)/100;
+    var pf = rnd(base*N(card.pfPct)/100);
+    var esic = rnd(base*N(card.esicPct)/100);
+    var share = pf+esic;                      // "Esic / Epf Employer Share" line inside Subtotal C
+    var bonus = rnd(base*N(card.bonusPct)/100);
+    var medical=N(role.medical), leave=N(role.leaveCharge), natHol=N(role.nationalHoliday);
+    var uniform=N(role.uniform), training=N(role.trainingCharge), reliever=N(role.relieverCharge);
+    var subtotalC = subtotalB+washing+medical+bonus+leave+natHol+uniform+training+reliever+share;
+    var again = card.employerShareAgain!==false;   // Karnataka Zone 4 sheet adds employer PF and ESIC again below Subtotal C
+    var grandTotal = subtotalC + (again ? pf+esic : 0);
+    var empPf = rnd(base*N(card.empPfPct)/100);
+    var empEsic = rnd(base*N(card.empEsicPct)/100);
+    var pt = N(role.pt);
+    var inHand = subtotalC-empPf-empEsic-pt;
+    var serviceCharge = rnd(grandTotal*N(card.servicePct)/100);
+    var gstAmt = rnd((grandTotal+serviceCharge)*N(card.gstPct)/100);   // GST is charged on the Grand Total plus the service charge, as on invoices
     var totalBill = grandTotal+serviceCharge+gstAmt;
-    return {subtotalA:subtotalA, subtotalB:subtotalB, pf:pf, esic:esic, bonus:bonus, medical:medical, leave:leave,
+    return {subtotalA:subtotalA, subtotalB:subtotalB, pf:pf, esic:esic, share:share, bonus:bonus, medical:medical, leave:leave,
       natHol:natHol, uniform:uniform, training:training, subtotalC:subtotalC, reliever:reliever, grandTotal:grandTotal,
-      empPf:empPf, empEsic:empEsic, pt:pt, inHand:inHand, serviceCharge:serviceCharge, gstAmt:gstAmt, totalBill:totalBill};
+      empPf:empPf, empEsic:empEsic, pt:pt, inHand:inHand, serviceCharge:serviceCharge, gstAmt:gstAmt, totalBill:totalBill, again:again};
   }
 
   function subscribeRateCards(){
@@ -2129,7 +2151,7 @@ tr:hover td{background:var(--line2)}
     document.getElementById('btnDeleteRc').addEventListener('click', deleteRateCard);
     document.getElementById('btnDownloadRc').addEventListener('click', downloadRateCard);
     document.getElementById('btnAddRole').addEventListener('click', function(){ addRoleBlock(null); });
-    ['rcPf','rcEsic','rcBonus','rcEmpPf','rcEmpEsic','rcService','rcGst'].forEach(function(id){
+    ['rcPf','rcEsic','rcBonus','rcEmpPf','rcEmpEsic','rcService','rcGst','rcShareAgain'].forEach(function(id){
       document.getElementById(id).addEventListener('input', renderRcPreview);
     });
   }
@@ -2165,7 +2187,8 @@ tr:hover td{background:var(--line2)}
       empPfPct: Number(document.getElementById('rcEmpPf').value)||0,
       empEsicPct: Number(document.getElementById('rcEmpEsic').value)||0,
       servicePct: Number(document.getElementById('rcService').value)||0,
-      gstPct: Number(document.getElementById('rcGst').value)||0
+      gstPct: Number(document.getElementById('rcGst').value)||0,
+      employerShareAgain: document.getElementById('rcShareAgain').checked
     };
   }
 
@@ -2183,39 +2206,48 @@ tr:hover td{background:var(--line2)}
     return roles;
   }
 
+  function rateCardRows(card, roles){
+    var anySpecial=roles.some(function(r){return Number(r.specialAllowance)>0;});
+    var anyMedical=roles.some(function(r){return Number(r.medical)>0;});
+    var defs=[
+      ['Basic', function(r,c){return r.basic;}],
+      ['VDA', function(r,c){return r.vda;}]];
+    if(anySpecial) defs.push(['Special Allowance', function(r,c){return r.specialAllowance;}]);
+    defs.push(['Subtotal A', function(r,c){return c.subtotalA;}, 'sub']);
+    defs.push(['Extra Hours', function(r,c){return r.extraHours;}]);
+    defs.push(['Subtotal B', function(r,c){return c.subtotalB;}, 'sub']);
+    defs.push(['Washing Allowance', function(r,c){return r.washingAllowance;}]);
+    if(anyMedical) defs.push(['Medical', function(r,c){return c.medical;}]);
+    defs.push(['Bonus on Basic + VDA - '+card.bonusPct+'%', function(r,c){return c.bonus;}]);
+    defs.push(['Leave Charge', function(r,c){return c.leave;}]);
+    defs.push(['National Holiday', function(r,c){return c.natHol;}]);
+    defs.push(['Uniform', function(r,c){return c.uniform;}]);
+    defs.push(['Training Charge', function(r,c){return c.training;}]);
+    defs.push(['Reliever Charge', function(r,c){return c.reliever;}]);
+    defs.push(['Esic / Epf Employer Share', function(r,c){return c.share;}]);
+    defs.push(['Subtotal C', function(r,c){return c.subtotalC;}, 'sub']);
+    if(card.employerShareAgain!==false){
+      defs.push(['Employer PF - '+card.pfPct+'% on Basic + VDA', function(r,c){return c.pf;}]);
+      defs.push(['Employer ESIC - '+card.esicPct+'%', function(r,c){return c.esic;}]);
+    }
+    defs.push(['GRAND TOTAL', function(r,c){return c.grandTotal;}, 'grand']);
+    defs.push(['Employee PF - '+card.empPfPct+'% on Basic + VDA', function(r,c){return c.empPf;}]);
+    defs.push(['Employee ESIC - '+card.empEsicPct+'%', function(r,c){return c.empEsic;}]);
+    defs.push(['Professional Tax', function(r,c){return c.pt;}]);
+    defs.push(['IN-HAND SALARY', function(r,c){return c.inHand;}, 'inhand']);
+    return defs;
+  }
+
   function renderRcPreview(){
     var card=currentCardFromForm();
     var roles=currentRolesFromForm();
     var table=document.getElementById('rcPreviewTable');
     if(!roles.length){ table.querySelector('tbody').innerHTML='<tr><td class="muted">Add at least one role to see the breakdown.</td></tr>'; return; }
     var computed = roles.map(function(r){ return computeRole(card,r); });
-    var rowDefs = [
-      ['Basic', function(r,c){return r.basic;}],
-      ['VDA', function(r,c){return r.vda;}],
-      ['Special Allowance', function(r,c){return r.specialAllowance;}],
-      ['Subtotal A', function(r,c){return c.subtotalA;}, true],
-      ['Extra Hours', function(r,c){return r.extraHours;}],
-      ['Washing Allowance', function(r,c){return r.washingAllowance;}],
-      ['Subtotal B', function(r,c){return c.subtotalB;}, true],
-      ['Employer PF @ '+card.pfPct+'% (on Basic+VDA)', function(r,c){return c.pf;}],
-      ['Employer ESIC @ '+card.esicPct+'%', function(r,c){return c.esic;}],
-      ['Medical', function(r,c){return c.medical;}],
-      ['Bonus @ '+card.bonusPct+'% (on Basic+VDA)', function(r,c){return c.bonus;}],
-      ['Leave charge', function(r,c){return c.leave;}],
-      ['National Holiday', function(r,c){return c.natHol;}],
-      ['Uniform', function(r,c){return c.uniform;}],
-      ['Training Charge', function(r,c){return c.training;}],
-      ['Subtotal C', function(r,c){return c.subtotalC;}, true],
-      ['Reliever Charge', function(r,c){return c.reliever;}],
-      ['GRAND TOTAL', function(r,c){return c.grandTotal;}, true],
-      ['Employee PF @ '+card.empPfPct+'%', function(r,c){return c.empPf;}],
-      ['Employee ESIC @ '+card.empEsicPct+'%', function(r,c){return c.empEsic;}],
-      ['Professional Tax', function(r,c){return c.pt;}],
-      ['IN-HAND SALARY', function(r,c){return c.inHand;}, true],
-      ['+ Service Charge @ '+card.servicePct+'% (billed extra)', function(r,c){return c.serviceCharge;}],
-      ['+ GST @ '+card.gstPct+'% (billed extra)', function(r,c){return c.gstAmt;}],
-      ['TOTAL BILL (Grand Total + Service Charge + GST)', function(r,c){return c.totalBill;}, true]
-    ];
+    var rowDefs = rateCardRows(card, roles).map(function(d){ return [d[0], d[1], !!d[2]]; });
+    rowDefs.push(['+ Service Charge @ '+card.servicePct+'% (billed extra)', function(r,c){return c.serviceCharge;}]);
+    rowDefs.push(['+ GST @ '+card.gstPct+'% (on Grand Total + service charge)', function(r,c){return c.gstAmt;}]);
+    rowDefs.push(['TOTAL BILL (Grand Total + Service Charge + GST)', function(r,c){return c.totalBill;}, true]);
     var html = '<thead><tr><th>Particulars</th>'+roles.map(function(r){return '<th class="right">'+escapeHtml(r.roleName||'Role')+'</th>';}).join('')+'</tr></thead><tbody>';
     rowDefs.forEach(function(def){
       var label=def[0], fn=def[1], bold=def[2];
@@ -2243,6 +2275,7 @@ tr:hover td{background:var(--line2)}
     document.getElementById('rcEmpEsic').value = rc?rc.empEsicPct:(cdef.empEsicPct||0.75);
     document.getElementById('rcService').value = rc?rc.servicePct:cdef.servicePct;
     document.getElementById('rcGst').value = rc?rc.gstPct:cdef.gstPct;
+    document.getElementById('rcShareAgain').checked = rc ? (rc.employerShareAgain!==false) : true;
     document.getElementById('btnDeleteRc').style.display = rc? '' : 'none';
 
     document.getElementById('rcRolesContainer').innerHTML='';
@@ -2471,6 +2504,7 @@ tr:hover td{background:var(--line2)}
     document.getElementById('invClientFilter').addEventListener('change', renderInvoicesTable);
     document.getElementById('invStatusFilter').addEventListener('change', renderInvoicesTable);
     document.getElementById('invGstPct').addEventListener('input', renderInvoicePreview);
+    document.getElementById('invSvcPct').addEventListener('input', renderInvoicePreview);
     document.getElementById('btnGenFromContract').addEventListener('click', generateFromContract);
     document.getElementById('invClient').addEventListener('change', function(){ renderInvContractOptions(''); });
   }
@@ -2507,8 +2541,12 @@ tr:hover td{background:var(--line2)}
 
   function renderInvoicePreview(){
     var items = currentLineItems();
-    var subtotal = items.reduce(function(s,i){return s+i.amount;},0);
-    var normalBase = items.filter(function(i){return i.cat!=='rcm';}).reduce(function(s,i){return s+i.amount;},0);
+    var svcPct = Number(document.getElementById('invSvcPct').value)||0; if(svcPct<0) svcPct=0;
+    var svcLines = serviceChargeLines(items, svcPct), allItems = items.concat(svcLines);
+    var linesTotal = items.reduce(function(s,i){return s+i.amount;},0);
+    var svcAmt = svcLines.reduce(function(s,i){return s+i.amount;},0);
+    var subtotal = linesTotal+svcAmt;
+    var normalBase = allItems.filter(function(i){return i.cat!=='rcm';}).reduce(function(s,i){return s+i.amount;},0);
     var rcmBase = subtotal-normalBase;
     var gstPct = Number(document.getElementById('invGstPct').value)||0;
     var gstAmt = normalBase*gstPct/100;
@@ -2521,10 +2559,12 @@ tr:hover td{background:var(--line2)}
     var tdsPct = costing.tdsPct==null? 1 : Number(costing.tdsPct);
     var tdsAmt = subtotal*tdsPct/100;
     var receivable = total-tdsAmt;
-    document.getElementById('invPreviewSubtotal').textContent = fmtMoney(subtotal);
+    document.getElementById('invPreviewSubtotal').textContent = fmtMoney(linesTotal);
+    document.getElementById('invPreviewSvc').textContent = fmtMoney(svcAmt);
     document.getElementById('invPreviewGst').textContent = fmtMoney(gstAmt);
     document.getElementById('invPreviewTotal').textContent = fmtMoney(total);
     var parts=[];
+    if(svcPct>0) parts.push('Service charge: '+svcPct+'% of '+fmtMoney(linesTotal)+' = '+fmtMoney(svcAmt)+'. GST is charged on the line items plus the service charge.');
     if(client && client.gstExempt){ parts.push('GST exempt client.'); }
     else {
       parts.push('Place of supply: '+sp.pos+' ('+sp.code+'). '+(sp.inter? 'IGST '+gstPct+'%: '+fmtMoney(igst) : 'CGST '+(gstPct/2)+'%: '+fmtMoney(cgst)+', SGST '+(gstPct/2)+'%: '+fmtMoney(sgst))+'.');
@@ -2532,7 +2572,7 @@ tr:hover td{background:var(--line2)}
     }
     parts.push('Expected receipt after TDS at '+tdsPct+'%: '+fmtMoney(receivable)+'.');
     document.getElementById('invTaxNote').innerHTML = parts.join('<br>');
-    return {items:items, subtotal:subtotal, gstPct:gstPct, gstAmt:gstAmt, total:total, normalBase:normalBase, rcmBase:rcmBase, rcmTax:rcmTax,
+    return {items:items, svcLines:svcLines, allItems:allItems, svcPct:svcPct, svcAmt:svcAmt, linesTotal:linesTotal, subtotal:subtotal, gstPct:gstPct, gstAmt:gstAmt, total:total, normalBase:normalBase, rcmBase:rcmBase, rcmTax:rcmTax,
       cgst:cgst, sgst:sgst, igst:igst, inter:sp.inter, pos:sp.pos, posCode:sp.code, tdsPct:tdsPct, tdsAmt:tdsAmt, receivable:receivable};
   }
 
@@ -2563,7 +2603,9 @@ tr:hover td{background:var(--line2)}
       var computed = computeRole(rc, role);
       addLineItemBlock({description:(role.roleName||'Role')+' — monthly charge', qty:1, rate:Math.round(computed.grandTotal)});
     });
-    toast('Line items loaded from "'+rc.name+'".');
+    document.getElementById('invSvcPct').value = (rc.servicePct!=null && rc.servicePct!=='') ? rc.servicePct : ((state.settings.costing && state.settings.costing.servicePct) || 0);
+    renderInvoicePreview();
+    toast('Line items loaded from "'+rc.name+'". Service charge set to '+document.getElementById('invSvcPct').value+'%.');
   }
 
   function openInvoiceModal(id){
@@ -2578,6 +2620,7 @@ tr:hover td{background:var(--line2)}
     document.getElementById('invDue').value = inv? inv.dueDate : '';
     document.getElementById('invStatus').value = inv? inv.status : 'draft';
     document.getElementById('invGstPct').value = inv? inv.gstPct : ((state.settings.costing && state.settings.costing.gstPct) || 18);
+    document.getElementById('invSvcPct').value = inv? (inv.serviceChargePct||0) : ((state.settings.costing && state.settings.costing.servicePct) || 0);
     document.getElementById('invNotes').value = inv? (inv.notes||'') : '';
     document.getElementById('invLineItems').innerHTML='';
     if(inv && inv.items && inv.items.length){ inv.items.forEach(function(line){ addLineItemBlock(line); }); }
@@ -2607,6 +2650,8 @@ tr:hover td{background:var(--line2)}
       status: document.getElementById('invStatus').value,
       notes: document.getElementById('invNotes').value.trim(),
       items: preview.items,
+      serviceChargePct: preview.svcPct,
+      serviceChargeAmt: Math.round(preview.svcAmt),
       subtotal: Math.round(preview.subtotal),
       gstPct: preview.gstPct,
       gstAmt: Math.round(preview.gstAmt),
@@ -3274,7 +3319,7 @@ tr:hover td{background:var(--line2)}
       });
     }
     var pct = k.servicePct!=null ? Number(k.servicePct) : (rc&&rc.servicePct!=null ? Number(rc.servicePct) : (costing.servicePct||0));
-    ['normal','rcm'].forEach(function(c){ if(base[c]>0 && pct>0) lines.push({description:'Service charge at '+pct+'%'+((base.normal>0&&base.rcm>0)?(c==='rcm'?' (security staff)':' (other staff)'):''), qty:1, rate:r2(base[c]*pct/100), cat:c}); });
+    document.getElementById('invSvcPct').value=pct;
     if(!lines.length){ toast(warns[0]||'Nothing to bill. Check attendance and the contract\'s posts.'); document.getElementById('invGenNote').textContent=warns.join(' '); return; }
     document.getElementById('invLineItems').innerHTML='';
     lines.forEach(function(l){ addLineItemBlock(l); });
@@ -3442,12 +3487,13 @@ tr:hover td{background:var(--line2)}
     var client=clients.find(function(c){return c.id===document.getElementById('invClient').value;})||{name:''};
     var p=renderInvoicePreview();
     return {no:document.getElementById('invNo').value, date:document.getElementById('invDate').value, due:document.getElementById('invDue').value, month:document.getElementById('invMonth').value,
-      notes:document.getElementById('invNotes').value.trim(), client:client, items:p.items.filter(function(i){return i.description||i.amount;}),
+      notes:document.getElementById('invNotes').value.trim(), client:client, items:p.allItems.filter(function(i){return i.description||i.amount;}),
       subtotal:p.subtotal, normalBase:p.normalBase, rcmBase:p.rcmBase, gstPct:p.gstPct, inter:p.inter, pos:p.pos, posCode:p.posCode, exempt:!!client.gstExempt};
   }
   function invoiceModelFromSaved(inv){
     var client=clients.find(function(c){return c.id===inv.clientId;})||{name:inv.clientName||''};
     var items=(inv.items||[]).map(function(i){ var q=Number(i.qty)||0, r=Number(i.rate)||0; return {description:i.description, qty:q, rate:r, amount:(i.amount!=null?Number(i.amount):q*r), cat:i.cat||'normal'}; });
+    items=items.concat(serviceChargeLines(items, Number(inv.serviceChargePct)||0));
     var subtotal=items.reduce(function(s,i){return s+i.amount;},0);
     var normalBase=items.filter(function(i){return i.cat!=='rcm';}).reduce(function(s,i){return s+i.amount;},0);
     var sp=supplyType(client);
@@ -3543,20 +3589,13 @@ tr:hover td{background:var(--line2)}
     var y=pdfHead(pb);
     pb.text(ML,y+6,(card.name||'Wage break-up details').toUpperCase(),14,{bold:true});
     pb.text(MR,y+6,'Date: '+pdfDate(xToday()),8.6,{align:'right',color:C.mute});
-    y+=22; pb.text(ML,y+4,'Rates structure as per the Minimum Wages of '+card.state+' State',9,{color:C.mute});
-    y+=13; pb.text(ML,y+4,'Working pattern: '+card.hours+' hours per day x '+card.days+' days per month. Amounts in Rs. per month.',9,{color:C.mute}); y+=20;
+    y+=22; pb.text(ML,y+4,roles.map(function(r){return r.roleName||'Role';}).join(' & ')+' - Wage and Service Cost Structure',9.6,{color:C.ink,bold:true});
+    y+=13; pb.text(ML,y+4,'State: '+card.state+'. Working pattern: '+card.hours+' hours per day x '+card.days+' days per month. Amounts in Rs. per month.',8.6,{color:C.mute}); y+=20;
     var pw=land?200:150, n=roles.length, cw=(CW-pw)/n, rh=land?15.5:16.5;
     function thead(){ pb.rect(ML,y,CW,22,{fill:C.ink}); pb.text(ML+8,y+14.5,'Particulars',8.4,{bold:true,color:C.white});
       roles.forEach(function(r,i){ pb.text(ML+pw+(i+1)*cw-8,y+14.5,pdfFit(pb,r.roleName||'Role',cw-12,8.4,true),8.4,{bold:true,color:C.white,align:'right'}); }); y+=22; }
     thead();
-    var defs=[['Basic',function(r){return r.basic;}],['VDA',function(r){return r.vda;}],['Special allowance',function(r){return r.specialAllowance;}],['Subtotal A',function(r,c){return c.subtotalA;},'sub'],
-      ['Extra hours',function(r){return r.extraHours;}],['Washing allowance',function(r){return r.washingAllowance;}],['Subtotal B',function(r,c){return c.subtotalB;},'sub'],
-      ['Employer PF @ '+card.pfPct+'%',function(r,c){return c.pf;}],['Employer ESIC @ '+card.esicPct+'%',function(r,c){return c.esic;}],['Medical',function(r,c){return c.medical;}],
-      ['Bonus @ '+card.bonusPct+'%',function(r,c){return c.bonus;}],['Leave charge',function(r,c){return c.leave;}],['National holiday',function(r,c){return c.natHol;}],
-      ['Uniform',function(r,c){return c.uniform;}],['Training charge',function(r,c){return c.training;}],['Subtotal C',function(r,c){return c.subtotalC;},'sub'],
-      ['Reliever charge',function(r,c){return c.reliever;}],['GRAND TOTAL',function(r,c){return c.grandTotal;},'grand'],
-      ['Employee PF @ '+card.empPfPct+'%',function(r,c){return c.empPf;}],['Employee ESIC @ '+card.empEsicPct+'%',function(r,c){return c.empEsic;}],
-      ['Professional tax',function(r,c){return c.pt;}],['IN-HAND SALARY',function(r,c){return c.inHand;},'inhand']];
+    var defs=rateCardRows(card, roles);
     defs.forEach(function(d){
       if(y+rh>LIMIT){ y=pdfHead(pb); thead(); }
       var st=d[2], bold=!!st, col=C.ink;
@@ -3568,8 +3607,7 @@ tr:hover td{background:var(--line2)}
       y+=rh; pb.line(ML,y,MR,y,0.35,C.line);
     });
     y+=14;
-    var notes=pb.wrap('GST at '+card.gstPct+'% and service charge at '+card.servicePct+'% are charged additionally on the Grand Total, as applicable.',CW,8.4,false)
-      .concat(pb.wrap('Figures are based on current state minimum wage notifications and are subject to revision.',CW,8.4,false));
+    var notes=pb.wrap('GST @ '+card.gstPct+'% extra and '+card.servicePct+'% service charge applicable on the total bill amount.',CW,8.8,true);
     if(y+notes.length*11+70>LIMIT){ y=pdfHead(pb); }
     notes.forEach(function(l){ pb.text(ML,y+8,l,8.4,{color:C.mute}); y+=11; });
     pdfSign(pb,y+14,ML,MR,null,'Authorised signatory, '+COMPANY.legalName+', Proprietor');
@@ -3947,6 +3985,20 @@ tr:hover td{background:var(--line2)}
       syncEmpStatus();
       if(s.value==='left' && !document.getElementById('fDol').value) document.getElementById('fDol').value=xToday();
     });
+  }
+
+  // ======== INVOICE SERVICE CHARGE (PFSS), in % of the line items ========
+  // Added as separate lines, split by GST treatment so reverse-charge security work stays separate.
+  function serviceChargeLines(items, pct){
+    pct=Number(pct)||0; if(!(pct>0)) return [];
+    var base={normal:0,rcm:0};
+    items.forEach(function(i){ base[i.cat==='rcm'?'rcm':'normal']+=(Number(i.amount)||0); });
+    var both=base.normal>0 && base.rcm>0, out=[];
+    ['normal','rcm'].forEach(function(c){
+      if(base[c]>0){ var amt=r2(base[c]*pct/100);
+        out.push({description:'Service charge at '+pct+'%'+(both?(c==='rcm'?' (security staff)':' (other staff)'):''), qty:1, rate:amt, amount:amt, cat:c, svc:true}); }
+    });
+    return out;
   }
 
   init();
