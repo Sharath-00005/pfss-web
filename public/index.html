@@ -3442,7 +3442,7 @@ tr:hover td{background:var(--line2)}
     var rx=ML+half+16;
     pb.text(rx,ry+8,'Supplier',8.6,{bold:true,color:C.goldDk}); ry+=22;
     pb.text(rx,ry,COMPANY.tradeName,10.4,{bold:true}); ry+=12;
-    pb.text(rx,ry,COMPANY.legalName+', Proprietor',8.4,{color:C.mute}); ry+=11;
+    pb.text(rx,ry,COMPANY.legalName,8.4,{color:C.mute}); ry+=11;
     pb.wrap(COMPANY.address,half,8.8,false).forEach(function(l){ pb.text(rx,ry,l,8.8,{color:C.mute}); ry+=11; });
     pb.text(rx,ry,'GSTIN: '+COMPANY.gstin+'    PAN: '+COMPANY.pan,8.8,{color:C.mute}); ry+=11;
     pb.wrap('Phone: '+COMPANY.phone+'    '+COMPANY.email,half,8.4,false).forEach(function(l){ pb.text(rx,ry,l,8.4,{color:C.mute}); ry+=10.5; });
