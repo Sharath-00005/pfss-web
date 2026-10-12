@@ -488,6 +488,26 @@ tr:hover td{background:var(--line2)}
     </div>
 
     <div class="card">
+      <h2>Payslip signature and approval stamp</h2>
+      <p class="muted">Once a payroll is approved, every payslip downloaded from it carries the signature image below and an "Electronically approved" stamp showing who approved it, when, and a reference. Nothing needs signing by hand.</p>
+      <div class="row">
+        <div class="field grow"><label>Authorised signatory</label><input id="sigName"></div>
+        <div class="field"><label>Designation</label><input id="sigDesig"></div>
+      </div>
+      <div class="row">
+        <div class="field grow"><label>Signature image</label><input type="file" id="sigFile" accept="image/*">
+          <div class="muted">Sign with dark ink on plain white paper and take a photo or scan. The paper is removed and the picture is cropped automatically.</div></div>
+        <div class="field"><img id="sigPreview" alt="Signature preview" style="max-height:72px;display:none;border:1px solid var(--line);background:#fff;padding:4px;border-radius:6px"></div>
+      </div>
+      <div class="row"><label><input type="checkbox" id="sigStamp" checked style="width:auto;margin-right:.4rem">Print the "Electronically approved" stamp on payslips</label></div>
+      <div class="row" style="margin-top:1rem">
+        <button class="btn" id="btnSaveSig">Save</button>
+        <button class="btn ghost" id="btnPreviewSlip">Download sample payslip</button>
+        <button class="btn ghost" id="btnRemoveSig">Remove signature image</button>
+      </div>
+    </div>
+
+    <div class="card">
       <h2>Invoice letterhead and bank details</h2>
       <p class="muted">Printed on every invoice PDF below the totals. The letterhead (crest, address, GSTIN, PAN, Udyam, EPF and ESIC numbers) is built in. Leave a field blank to leave it off the invoice.</p>
       <div class="row">
@@ -789,6 +809,29 @@ tr:hover td{background:var(--line2)}
   </div>
 </div>
 
+<!-- Billing pack modal -->
+<div class="modal-bg" id="packModalBg">
+  <div class="modal" style="max-width:560px">
+    <button class="close-x" id="packModalClose">&times;</button>
+    <h3>Billing pack for the client</h3>
+    <p class="muted" id="packInfo"></p>
+    <div class="row">
+      <div class="field grow"><label>Site</label><select id="packSite"></select></div>
+      <div class="field"><label>Month</label><input type="month" id="packMonth"></div>
+    </div>
+    <div class="row">
+      <div class="field grow"><label>Rate card (for the per-employee breakdown)</label><select id="packRate"></select></div>
+    </div>
+    <div class="banner" id="packWarn" style="display:none"></div>
+    <div class="row" style="margin-top:1rem">
+      <button class="btn" id="btnPackAll">Download billing pack</button>
+      <button class="btn ghost" id="btnPackReg">Wage register only</button>
+      <button class="btn ghost" id="btnPackAtt">Attendance sheet only</button>
+    </div>
+    <p class="muted" style="margin-top:.8rem">The pack is one PDF: the invoice, the wage register (per-employee breakdown by days worked) and the attendance sheet. Print it and add your seal and signature before sending.</p>
+  </div>
+</div>
+
 <!-- Invoice modal -->
 <div class="modal-bg" id="invModalBg">
   <div class="modal" style="max-width:800px">
@@ -970,6 +1013,8 @@ tr:hover td{background:var(--line2)}
     setupPayrollUI();
     setupSettingsUI();
     setupInvoiceSettingsUI();
+    setupSignatureUI();
+    setupPackModal();
 
     document.getElementById('attMonth').value=thisMonth();
     document.getElementById('payMonth').value=thisMonth();
@@ -1017,6 +1062,7 @@ tr:hover td{background:var(--line2)}
     renderCompliance();
     renderAttention();
     renderInvoiceSettings();
+    renderSignatureSettings();
   }
 
   function renderWorkflowRail(){
@@ -2488,7 +2534,7 @@ tr:hover td{background:var(--line2)}
         '<td>'+escapeHtml(i.clientName||'—')+'</td><td>'+escapeHtml(i.month||'—')+'</td><td>'+escapeHtml(i.dueDate||'—')+'</td>'+
         '<td class="right" style="font-weight:700">'+fmtMoney(i.total)+'</td>'+
         '<td><span class="tag '+tagClass+'">'+effectiveStatus+'</span></td>'+
-        '<td style="white-space:nowrap"><button class="btn small ghost" data-inv-pdf="'+i.id+'">PDF</button> <button class="btn small ghost" data-inv-edit="'+i.id+'">Edit</button></td>';
+        '<td style="white-space:nowrap"><button class="btn small ghost" data-inv-pdf="'+i.id+'">PDF</button> <button class="btn small ghost" data-inv-pack="'+i.id+'">Billing pack</button> <button class="btn small ghost" data-inv-edit="'+i.id+'">Edit</button></td>';
       tbody.appendChild(tr);
     });
     tbody.querySelectorAll('[data-inv-edit]').forEach(function(b){
@@ -2496,6 +2542,9 @@ tr:hover td{background:var(--line2)}
     });
     tbody.querySelectorAll('[data-inv-pdf]').forEach(function(b){
       b.addEventListener('click', function(){ var inv=invoices.find(function(x){return x.id===b.dataset.invPdf;}); if(inv) saveInvoicePdf(invoiceModelFromSaved(inv)); });
+    });
+    tbody.querySelectorAll('[data-inv-pack]').forEach(function(b){
+      b.addEventListener('click', function(){ var inv=invoices.find(function(x){return x.id===b.dataset.invPack;}); if(inv) openPackModal(inv); });
     });
   }
 
@@ -3305,12 +3354,14 @@ tr:hover td{background:var(--line2)}
       (k.positions||[]).forEach(function(p){
         var md=0; emps.forEach(function(e,i){ if((e.role||'')===p.role) md+=prs[i].present; });
         var monthly=Number(p.rate)||0;
-        if(!monthly && rc && rc.roles){ var rr=rc.roles.find(function(r){return (r.roleName||'').toLowerCase()===p.role.toLowerCase();}); if(rr) monthly=computeRole(rc,rr).grandTotal; }
+        var exact=null, rr=null;
+        if(!monthly && rc && rc.roles){ rr=rc.roles.find(function(r){return (r.roleName||'').toLowerCase()===p.role.toLowerCase();});
+          if(rr){ monthly=computeRole(rc,rr).grandTotal; exact=0; emps.forEach(function(e,i){ if((e.role||'')===p.role) exact+=employeeBilling(rc,rr,prs[i].present,dim).scamt; }); } }
         if(!monthly){ warns.push('No rate for '+p.role+'. Set a rate on the contract or add the role to its rate card.'); return; }
         if(!md){ warns.push('No attendance for '+p.role+'.'); return; }
         var c=catOf(p.role);
-        lines.push({description:p.role+': '+r2(md)+' man-days of '+dim+' ('+p.count+' post'+(p.count===1?'':'s')+' contracted)', qty:r2(md), rate:Math.round(monthly/dim*10000)/10000, cat:c});
-        base[c]+=md*monthly/dim;
+        lines.push({description:p.role+': '+r2(md)+' man-days of '+dim+' ('+p.count+' post'+(p.count===1?'':'s')+' contracted)', qty:r2(md), rate:Math.round((exact!=null?exact/md:monthly/dim)*10000)/10000, cat:c});
+        base[c]+=(exact!=null?exact:md*monthly/dim);
       });
     } else {
       ['normal','rcm'].forEach(function(c){
@@ -3357,12 +3408,12 @@ tr:hover td{background:var(--line2)}
   function pdfB64Bytes(b64){ var bin=atob(b64), a=new Uint8Array(bin.length); for(var i=0;i<bin.length;i++) a[i]=bin.charCodeAt(i); return a; }
 
   function PdfBuilder(logoBytes, logoW, logoH, land){
-    var W=land?841.89:595.28, H=land?595.28:841.89, pages=[], cur=null, api={W:W,H:H};
+    var W=land?841.89:595.28, H=land?595.28:841.89, pages=[], cur=null, api={W:W,H:H}, extra=[], dims=[];
     function rgb(h){ h=h.replace('#',''); return [0,2,4].map(function(i){return (parseInt(h.substr(i,2),16)/255).toFixed(3);}).join(' '); }
     function esc(s){ return s.replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)'); }
     api.tw=function(s,size,bold){ var t=bold?HELVB_W:HELV_W, w=0; for(var i=0;i<s.length;i++){ var c=s.charCodeAt(i); w+=(c>=32&&c<=126)?t[c-32]:556; } return w*size/1000; };
-    api.newPage=function(){ cur=[]; pages.push(cur); return pages.length-1; };
-    api.setPage=function(i){ cur=pages[i]; };
+    api.newPage=function(l){ if(l===true||l===false){ W=l?841.89:595.28; H=l?595.28:841.89; api.W=W; api.H=H; } cur=[]; pages.push(cur); dims.push([W,H]); return pages.length-1; };
+    api.setPage=function(i){ cur=pages[i]; W=dims[i][0]; H=dims[i][1]; api.W=W; api.H=H; };
     api.count=function(){ return pages.length; };
     api.text=function(x,y,s,size,o){ o=o||{}; s=pdfAscii(s); var w=api.tw(s,size,o.bold); if(o.align==='right') x-=w; else if(o.align==='center') x-=w/2;
       cur.push('BT /'+(o.italic?'F3':(o.bold?'F2':'F1'))+' '+size+' Tf '+rgb(o.color||'#232323')+' rg '+x.toFixed(2)+' '+(H-y).toFixed(2)+' Td ('+esc(s)+') Tj ET'); return w; };
@@ -3377,24 +3428,30 @@ tr:hover td{background:var(--line2)}
         var t=line?line+' '+w:w; if(api.tw(t,size,bold)<=maxW) line=t; else { if(line) out.push(line); line=w; }
       });
       if(line) out.push(line); return out.length?out:['']; };
+    api.addImage=function(bytes,w,h){ extra.push({b:bytes,w:w,h:h}); return extra.length-1; };
+    api.imageX=function(idx,x,y,w,h){ cur.push('q '+w.toFixed(2)+' 0 0 '+h.toFixed(2)+' '+x.toFixed(2)+' '+(H-y-h).toFixed(2)+' cm /Im'+(idx+2)+' Do Q'); };
     api.build=function(){
       var parts=[], offs=[], len=0, n=pages.length;
       function push(x){ var b=(typeof x==='string')?pdfStrBytes(x):x; parts.push(b); len+=b.length; }
       function obj(i,body){ offs[i]=len; push(i+' 0 obj\n'); push(body); push('\nendobj\n'); }
+      var imgs=[{b:logoBytes,w:logoW,h:logoH}].concat(extra), ni=imgs.length, base=6+ni;
       push('%PDF-1.4\n%\u00e2\u00e3\u00cf\u00d3\n');
-      var kids=[]; for(var i=0;i<n;i++) kids.push((8+2*i)+' 0 R');
+      var kids=[]; for(var i=0;i<n;i++) kids.push((base+1+2*i)+' 0 R');
       obj(1,'<</Type/Catalog/Pages 2 0 R>>');
       obj(2,'<</Type/Pages/Kids ['+kids.join(' ')+'] /Count '+n+'>>');
       obj(3,'<</Type/Font/Subtype/Type1/BaseFont/Helvetica/Encoding/WinAnsiEncoding>>');
       obj(4,'<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Bold/Encoding/WinAnsiEncoding>>');
       obj(5,'<</Type/Font/Subtype/Type1/BaseFont/Helvetica-Oblique/Encoding/WinAnsiEncoding>>');
-      offs[6]=len; push('6 0 obj\n<</Type/XObject/Subtype/Image/Width '+logoW+'/Height '+logoH+'/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length '+logoBytes.length+'>>\nstream\n'); push(logoBytes); push('\nendstream\nendobj\n');
+      var xo=''; for(var k0=0;k0<ni;k0++){ xo+='/Im'+(k0+1)+' '+(6+k0)+' 0 R'; }
+      for(var q=0;q<ni;q++){
+        offs[6+q]=len; push((6+q)+' 0 obj\n<</Type/XObject/Subtype/Image/Width '+imgs[q].w+'/Height '+imgs[q].h+'/ColorSpace/DeviceRGB/BitsPerComponent 8/Filter/DCTDecode/Length '+imgs[q].b.length+'>>\nstream\n'); push(imgs[q].b); push('\nendstream\nendobj\n');
+      }
       for(var p=0;p<n;p++){
         var stream=pages[p].join('\n');
-        obj(7+2*p,'<</Length '+stream.length+'>>\nstream\n'+stream+'\nendstream');
-        obj(8+2*p,'<</Type/Page/Parent 2 0 R/MediaBox [0 0 '+W+' '+H+']/Resources<</Font<</F1 3 0 R/F2 4 0 R/F3 5 0 R>>/XObject<</Im1 6 0 R>>>>/Contents '+(7+2*p)+' 0 R>>');
+        obj(base+2*p,'<</Length '+stream.length+'>>\nstream\n'+stream+'\nendstream');
+        obj(base+1+2*p,'<</Type/Page/Parent 2 0 R/MediaBox [0 0 '+dims[p][0]+' '+dims[p][1]+']/Resources<</Font<</F1 3 0 R/F2 4 0 R/F3 5 0 R>>/XObject<<'+xo+'>>>>/Contents '+(base+2*p)+' 0 R>>');
       }
-      var total=7+2*n, xref=len; push('xref\n0 '+total+'\n0000000000 65535 f \n');
+      var total=base+2*n, xref=len; push('xref\n0 '+total+'\n0000000000 65535 f \n');
       for(var k=1;k<total;k++) push(('0000000000'+offs[k]).slice(-10)+' 00000 n \n');
       push('trailer\n<</Size '+total+'/Root 1 0 R>>\nstartxref\n'+xref+'\n%%EOF');
       return new Blob(parts,{type:'application/pdf'});
@@ -3415,11 +3472,11 @@ tr:hover td{background:var(--line2)}
   function pdfMoney(n){ return (Math.round((n||0)*100)/100).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
   function pdfDate(s){ if(!s) return '-'; var p=String(s).split('-'); return p.length===3? p[2]+'-'+p[1]+'-'+p[0] : s; }
 
-  function buildInvoicePdf(m){
+  function drawInvoice(pb,m){
     var C={ink:'#232323',gold:'#C9973A',goldDk:'#8E6A1E',mute:'#55524c',paper:'#F1EDE4',line:'#D8D1C2',white:'#FFFFFF'};
-    var pb=PdfBuilder(pdfB64Bytes(LOGO_B64),198,214), ML=36, CW=pb.W-72, MR=ML+CW, LIMIT=pb.H-78;
+    var ML=36, CW=pb.W-72, MR=ML+CW, LIMIT=pb.H-78;
     var inv=(state.settings&&state.settings.invoice)||{};
-    function head(){ return pdfHead(pb); }
+    function head(){ return pdfHead(pb,false); }
     function tableHead(y){
       pb.rect(ML,y,CW,19,{fill:C.ink});
       var t=function(x,s,al){ pb.text(x,y+12.5,s,8.3,{bold:true,color:C.white,align:al}); };
@@ -3498,9 +3555,8 @@ tr:hover td{background:var(--line2)}
     pb.line(MR-170,y+62,MR,y+62,0.6,C.ink);
     pb.text(MR,y+74,'Authorised signatory',8.6,{align:'right',color:C.mute});
     pb.text(MR,y+85,COMPANY.legalName+', Proprietor',8.6,{align:'right',color:C.mute});
-    pdfFoot(pb,'Computer-generated invoice');
-    return pb.build();
   }
+  function buildInvoicePdf(m){ var pb=pdfNew(false); drawInvoice(pb,m); pdfFoot(pb,'Computer-generated invoice'); return pb.build(); }
   function invoiceModelFromModal(){
     var client=clients.find(function(c){return c.id===document.getElementById('invClient').value;})||{name:''};
     var p=renderInvoicePreview();
@@ -3566,8 +3622,8 @@ tr:hover td{background:var(--line2)}
   // ======== SHARED LETTERHEAD AND OTHER PDF DOCUMENTS ========
   var PDFC={ink:'#232323',gold:'#C9973A',goldDk:'#8E6A1E',mute:'#55524c',paper:'#F1EDE4',line:'#D8D1C2',white:'#FFFFFF',goldLt:'#E9DDBF'};
   function pdfNew(land){ return PdfBuilder(pdfB64Bytes(LOGO_B64),198,214,land); }
-  function pdfHead(pb){
-    var ML=36, MR=pb.W-36; pb.newPage();
+  function pdfHead(pb,land){
+    pb.newPage(land); var ML=36, MR=pb.W-36;
     pb.image(ML,28,58,62.7);
     pb.text(104,46,COMPANY.tradeName,17,{bold:true,color:PDFC.ink});
     pb.text(104,60,'Security services  |  Manpower outsourcing  |  Housekeeping and facility services',8.2,{color:PDFC.goldDk,bold:true});
@@ -3655,11 +3711,23 @@ tr:hover td{background:var(--line2)}
     y=ty+22+16;
     pb.rect(ML,y,CW,30,{fill:C.ink}); pb.text(ML+12,y+19.5,'Net pay',11,{bold:true,color:C.white}); pb.text(MR-12,y+19.5,'Rs. '+pdfMoney(r.net||0),12,{bold:true,color:'#E3BC6A',align:'right'});
     y+=30+16; pb.text(ML,y,'Amount in words',8.2,{color:C.mute}); y+=12;
-    pb.wrap('Rupees '+pdfWords(r.net||0)+' only',CW,9,true).forEach(function(l){ pb.text(ML,y,l,9,{bold:true}); y+=11.5; });
+    var netAmt=Math.round((r.net||0)*100)/100, rupees=Math.floor(netAmt), paise=Math.round((netAmt-rupees)*100);
+    pb.wrap('Rupees '+pdfWords(rupees)+(paise?' and '+pdfWords(paise)+' Paise':'')+' only',CW,9,true).forEach(function(l){ pb.text(ML,y,l,9,{bold:true}); y+=11.5; });
     y+=10;
-    var appr='Approved on '+(run&&run.approvedAt? new Date(run.approvedAt).toLocaleString('en-IN'):'-')+' by '+((run&&run.approvedByLabel)||'-')+'.';
-    pb.text(ML,y,appr,8.4,{color:C.mute}); y+=40;
-    pdfSign(pb,y,ML,MR,'Employee signature','Authorised signatory');
+    var sg=(state.settings&&state.settings.signature)||{};
+    var imgIdx=-1; if(sg.b64 && sg.w && sg.h){ imgIdx=pb.addImage(pdfB64Bytes(sg.b64), sg.w, sg.h); }
+    if(sg.stamp!==false && run && run.approvedAt){
+      var bw=270, bh=58;
+      pb.rect(ML,y,bw,bh,{stroke:C.goldDk,lw:0.9});
+      pb.text(ML+10,y+14,'ELECTRONICALLY APPROVED',8.4,{bold:true,color:C.goldDk});
+      pb.text(ML+10,y+27,'Approved by: '+(run.approvedByLabel||'-'),8.8);
+      pb.text(ML+10,y+39,'Date: '+pdfStampDate(run.approvedAt),8.8);
+      pb.text(ML+10,y+51,'Ref: PS-'+ym+'-'+(r.empCode||r.empId||'')+'-'+pdfRef(r,run,ym),8,{color:C.mute});
+      y+=bh+14;
+    } else {
+      pb.text(ML,y,'Approved on '+(run&&run.approvedAt? pdfStampDate(run.approvedAt):'-')+' by '+((run&&run.approvedByLabel)||'-')+'.',8.4,{color:C.mute}); y+=30;
+    }
+    payslipSignature(pb,y,ML,MR,imgIdx,sg);
     pdfFoot(pb,'Computer-generated payslip');
     return pb.build();
   }
@@ -4017,6 +4085,326 @@ tr:hover td{background:var(--line2)}
         out.push({description:'Service charge at '+pct+'%'+(both?(c==='rcm'?' (security staff)':' (other staff)'):''), qty:1, rate:amt, amount:amt, cat:c, svc:true}); }
     });
     return out;
+  }
+
+  // ======== PAYSLIP SIGNATURE AND ELECTRONIC APPROVAL STAMP ========
+  function pdfStampDate(ms){
+    try{
+      var d=new Date(ms);
+      return d.toLocaleDateString('en-GB',{timeZone:'Asia/Kolkata'}).replace(/\//g,'-')+' '+d.toLocaleTimeString('en-GB',{timeZone:'Asia/Kolkata',hour:'2-digit',minute:'2-digit',hour12:false})+' IST';
+    }catch(e){ return new Date(ms).toISOString(); }
+  }
+  // Short reference tied to this employee, month, figures and approval, so the printed payslip can be matched to the payroll record.
+  function pdfRef(r,run,ym){
+    var str=[r.empId||'',ym,Math.round((r.gross||0)*100),Math.round((r.net||0)*100),(run&&run.approvedAt)||'',(run&&run.approvedBy)||''].join('|'), h=2166136261;
+    for(var i=0;i<str.length;i++){ h^=str.charCodeAt(i); h=Math.imul(h,16777619); }
+    return ('00000000'+(h>>>0).toString(16)).slice(-6).toUpperCase();
+  }
+  function payslipSignature(pb,y,ML,MR,imgIdx,sg){
+    var C=PDFC, hasImg=imgIdx>=0, lineY=y+(hasImg?68:36);
+    pb.text(MR,y+10,'For '+COMPANY.tradeName,9,{bold:true,align:'right'});
+    if(hasImg){ var hh=46, ww=Math.min(160, sg.w*hh/sg.h); pb.imageX(imgIdx,MR-ww-14,y+17,ww,hh); }
+    pb.line(MR-170,lineY,MR,lineY,0.6,C.ink);
+    pb.text(MR,lineY+12,'Authorised signatory',8.6,{align:'right',color:C.mute});
+    pb.text(MR,lineY+23,(sg.name||COMPANY.legalName)+', '+(sg.designation||'Proprietor'),8.6,{align:'right',color:C.mute});
+    pb.line(ML,lineY,ML+170,lineY,0.6,C.ink);
+    pb.text(ML,lineY+12,'Employee signature',8.6,{color:C.mute});
+  }
+
+  // ---------- Settings: signatory name, signature image, stamp ----------
+  var sigDraft=null, sigSetDirty=false;
+  function sigPreviewShow(b64){
+    var img=document.getElementById('sigPreview'); if(!img) return;
+    if(b64){ img.src='data:image/jpeg;base64,'+b64; img.style.display=''; } else { img.removeAttribute('src'); img.style.display='none'; }
+  }
+  function renderSignatureSettings(){
+    if(sigSetDirty || !document.getElementById('sigName')) return;
+    var v=(state.settings&&state.settings.signature)||{};
+    document.getElementById('sigName').value=v.name||COMPANY.legalName;
+    document.getElementById('sigDesig').value=v.designation||'Proprietor';
+    document.getElementById('sigStamp').checked=v.stamp!==false;
+    sigDraft=null; sigPreviewShow(v.b64||'');
+  }
+  // Turn a photo or scan of a signature into a small, clean JPEG: paper and shadows removed, cropped to the ink.
+  async function signatureToJpeg(file){
+    var bmp=await createImageBitmap(file), sc=Math.min(1,900/bmp.width);
+    var c=document.createElement('canvas'); c.width=Math.max(1,Math.round(bmp.width*sc)); c.height=Math.max(1,Math.round(bmp.height*sc));
+    var ctx=c.getContext('2d'); ctx.fillStyle='#ffffff'; ctx.fillRect(0,0,c.width,c.height); ctx.drawImage(bmp,0,0,c.width,c.height);
+    var w=c.width, h=c.height, img=ctx.getImageData(0,0,w,h), d=img.data, x0=w, y0=h, x1=-1, y1=-1, x, y, i, lum;
+    for(y=0;y<h;y++){ for(x=0;x<w;x++){
+      i=(y*w+x)*4; lum=(d[i]*299+d[i+1]*587+d[i+2]*114)/1000;
+      if(lum>175){ d[i]=255; d[i+1]=255; d[i+2]=255; }
+      else { if(x<x0)x0=x; if(x>x1)x1=x; if(y<y0)y0=y; if(y>y1)y1=y; }
+    } }
+    if(x1<0) throw new Error('blank');
+    ctx.putImageData(img,0,0);
+    var pad=8; x0=Math.max(0,x0-pad); y0=Math.max(0,y0-pad); x1=Math.min(w-1,x1+pad); y1=Math.min(h-1,y1+pad);
+    var cw=x1-x0+1, ch=y1-y0+1, out=document.createElement('canvas'); out.width=cw; out.height=ch;
+    out.getContext('2d').drawImage(c,x0,y0,cw,ch,0,0,cw,ch);
+    return {b64:out.toDataURL('image/jpeg',0.9).split(',')[1], w:cw, h:ch};
+  }
+  function currentSignatureSettings(){
+    var cur=(state.settings&&state.settings.signature)||{}, base=sigDraft||cur;
+    return {name:document.getElementById('sigName').value.trim()||COMPANY.legalName, designation:document.getElementById('sigDesig').value.trim()||'Proprietor',
+      stamp:document.getElementById('sigStamp').checked, b64:base.b64||'', w:base.w||0, h:base.h||0};
+  }
+  function setupSignatureUI(){
+    var f=document.getElementById('sigFile'); if(!f) return;
+    ['sigName','sigDesig','sigStamp'].forEach(function(id){ document.getElementById(id).addEventListener('input', function(){ sigSetDirty=true; }); });
+    f.addEventListener('change', async function(){
+      if(!f.files||!f.files[0]) return;
+      try{ sigDraft=await signatureToJpeg(f.files[0]); sigSetDirty=true; sigPreviewShow(sigDraft.b64); toast('Signature ready. Click Save to keep it.'); }
+      catch(e){ toast(e&&e.message==='blank' ? 'No signature was found in that picture. Use dark ink on light paper.' : 'Could not read that picture.'); }
+    });
+    document.getElementById('btnSaveSig').addEventListener('click', async function(){
+      state.settings.signature=currentSignatureSettings();
+      if(!db){ toast('Storage unavailable.'); return; }
+      try{ await db.doc('settings/config').set(state.settings); sigDraft=null; sigSetDirty=false; toast('Signature settings saved.'); }catch(e){ toast('Could not save: '+(e.code||'')); }
+    });
+    document.getElementById('btnRemoveSig').addEventListener('click', async function(){
+      if(!confirm('Remove the signature image? Payslips will show the stamp and a blank signature line.')) return;
+      var cur=currentSignatureSettings(); cur.b64=''; cur.w=0; cur.h=0; state.settings.signature=cur; sigDraft=null;
+      try{ await db.doc('settings/config').set(state.settings); sigSetDirty=false; sigPreviewShow(''); toast('Signature image removed.'); }catch(e){ toast('Could not save.'); }
+    });
+    document.getElementById('btnPreviewSlip').addEventListener('click', async function(){
+      var saved=state.settings.signature, blob;
+      state.settings.signature=currentSignatureSettings();
+      try{
+        var row={empId:'sample',empCode:'PFSS-0000',name:'Sample Employee',site:'Sample Site',present:28,dim:30,gross:15400,pf:924,esi:115.5,pt:0,advance:1000,net:13360.5};
+        blob=buildPayslipPdf(row,{status:'approved',approvedAt:Date.now(),approvedBy:'sample',approvedByLabel:'Sample Approver'},thisMonth());
+      }catch(e){ toast('Could not build the sample payslip.'); }
+      finally{ state.settings.signature=saved; }
+      if(blob) await pdfSave(blob,'sample-payslip.pdf');
+    });
+  }
+
+  // ======== BILLING PACK: wage register (Form XVII), attendance sheet, one-click pack with the invoice ========
+  function roleShort(role){
+    var r=String(role||'').toLowerCase();
+    if(/supervisor/.test(r)) return 'S/S';
+    if(/lady/.test(r)) return 'L/G';
+    if(/gun/.test(r)) return 'G/M';
+    if(/guard/.test(r)) return 'S/G';
+    if(/housekeeping.*super|super.*housekeeping/.test(r)) return 'H/S';
+    if(/housekeep|cleaner/.test(r)) return 'H/K';
+    if(/driver/.test(r)) return 'DRV';
+    if(/field/.test(r)) return 'F/O';
+    return String(role||'-').split(/\s+/).map(function(w){return w.charAt(0).toUpperCase();}).join('/');
+  }
+  function findRcRole(rc, roleName){
+    if(!rc||!rc.roles) return null;
+    var want=String(roleName||'').toLowerCase();
+    return rc.roles.find(function(r){ return String(r.roleName||'').toLowerCase()===want; })||null;
+  }
+  // Day-by-day marks for one employee: P present, A absent, H half day, L leave, - not employed that day.
+  function attendanceMarks(e, ym, days){
+    var dim=daysInMonth(ym), marks=[], lop=0, out=0;
+    for(var d=1; d<=dim; d++){
+      var ds=ym+'-'+String(d).padStart(2,'0');
+      if((e.doj && ds<e.doj) || (e.dol && ds>e.dol)){ marks.push('-'); out++; continue; }
+      var st=days[String(d)]||'P'; marks.push(st);
+      if(st==='A') lop+=1; else if(st==='H') lop+=0.5;
+    }
+    return {dim:dim, marks:marks, pay:dim-lop-out, lop:lop, out:out};
+  }
+  // One employee's share of the rate card for the days worked (the columns of the wage register).
+  function employeeBilling(card, rr, pay, dim){
+    var N=function(x){return Number(x)||0;}, rnd=Math.round, f=pay/dim, c=computeRole(card, rr);
+    var basic=rnd(N(rr.basic)*f), vda=rnd(N(rr.vda)*f), extra=rnd(N(rr.extraHours)*f);
+    var other=rnd((c.share+N(rr.specialAllowance)+c.medical+c.leave+c.natHol+c.training)*f);
+    var washing=rnd(N(rr.washingAllowance)*f), bonus=rnd(c.bonus*f), uniform=rnd(c.uniform*f), reliever=rnd(c.reliever*f);
+    var gross=basic+vda+extra+other+washing+bonus+uniform+reliever;
+    var wage=basic+vda, again=card.employerShareAgain!==false;
+    var pf=rnd(wage*N(card.pfPct)/100), esic=rnd(wage*N(card.esicPct)/100), lwf=0;
+    var scBase=gross+(again?pf+esic:0)+lwf;
+    var sc=rnd(scBase*N(card.servicePct)/100), ctc=scBase+sc, gst=rnd(ctc*N(card.gstPct)/100);
+    var empPf=rnd(wage*N(card.empPfPct)/100), empEsic=rnd(wage*N(card.empEsicPct)/100), pt=pay>0?N(rr.pt):0;
+    return {basic:basic,vda:vda,extra:extra,other:other,washing:washing,bonus:bonus,uniform:uniform,reliever:reliever,gross:gross,
+      pf13:pf,esic325:esic,lwf:lwf,sc:sc,ctc:ctc,gst:gst,billing:ctc+gst,scamt:scBase,pf12:empPf,esic075:empEsic,pt:pt};
+  }
+  async function gatherBilling(site, ym, rc, client){
+    var dim=daysInMonth(ym), warns=[];
+    var order=(rc&&rc.roles?rc.roles:[]).map(function(r){return String(r.roleName||'').toLowerCase();});
+    var emps=state.employees.filter(function(e){ return employedInMonth(e,ym) && e.site===site; });
+    emps.sort(function(a,b){
+      var ia=order.indexOf(String(a.role||'').toLowerCase()), ib=order.indexOf(String(b.role||'').toLowerCase());
+      if(ia<0) ia=99; if(ib<0) ib=99;
+      return (ia-ib) || compareByEmpCode(a,b);
+    });
+    var run=null; try{ run=await getRun(ym); }catch(e){}
+    var advBy={}; if(run && run.rows) run.rows.forEach(function(r){ advBy[r.empId]=Number(r.advance)||0; });
+    var rows=[];
+    for(var i=0;i<emps.length;i++){
+      var e=emps[i], doc=await getAttendanceDoc(e.id, ym), att=attendanceMarks(e,ym,(doc&&doc.days)||{});
+      var rr=rc?findRcRole(rc,e.role):null, b=null;
+      if(rr){ b=employeeBilling(rc,rr,att.pay,dim); b.adv=advBy[e.id]||0; b.canteen=0; b.unifd=0;
+        b.totald=b.pf12+b.esic075+b.pt+b.canteen+b.adv+b.unifd; b.net=b.gross-b.totald; }
+      else if(rc){ warns.push((e.name||'Employee')+' ('+(e.role||'no role')+') has no matching role on the rate card, so is left out of the wage register.'); }
+      rows.push({e:e, att:att, b:b, short:roleShort(e.role), role:e.role||''});
+    }
+    return {site:site, ym:ym, dim:dim, client:client||{}, rc:rc, rows:rows, warns:warns};
+  }
+
+  function drawWageRegister(pb, data){
+    var C=PDFC, rc=data.rc, ML=24, y=pdfHead(pb,true), CWt=pb.W-48, LIMIT=pb.H-78;
+    var cols=[['sl','SI No',14,'c'],['id','ID NO',37,'l'],['name','Empl Name',57,'l'],['desig','Desig.',20,'c'],['tdays','Total Days',20,'r'],['pdays','Pay Days',22,'r'],
+      ['basic','Basic',26,'r'],['vda','VDA',24,'r'],['extra','Extra Hours',24,'r'],['other','Other Allow.',24,'r'],['washing','Wash. Allow.',22,'r'],
+      ['bonus','Bonus @ '+rc.bonusPct+'%',24,'r'],['uniform','Uniform Allow.',22,'r'],['reliever','Reliever Charge',22,'r'],['gross','Gross Salary',28,'r'],
+      ['pf13','PF @ '+rc.pfPct+'%',24,'r'],['esic325','ESIC @ '+rc.esicPct+'%',22,'r'],['lwf','LWF',16,'r'],['sc','Service Charge @ '+rc.servicePct+'%',24,'r'],
+      ['ctc','Total CTC',28,'r'],['gst','GST @ '+rc.gstPct+'%',24,'r'],['billing','Total Billing',28,'r'],['scamt','Service Charge Amount',28,'r'],
+      ['pf12','PF @ '+rc.empPfPct+'%',24,'r'],['esic075','ESIC @ '+rc.empEsicPct+'%',20,'r'],['pt','PT',16,'r'],['canteen','Canteen',23,'r'],['adv','Advance',22,'r'],
+      ['unifd','Uniform',20,'r'],['totald','Total',24,'r'],['net','Net Pay',28,'r'],['sign','Signature',35,'l']];
+    var tw=cols.reduce(function(s,c){return s+c[2];},0), scale=Math.min(1,CWt/tw);
+    cols=cols.map(function(c){ return [c[0],c[1],c[2]*scale,c[3]]; });
+    var xs=[], x=ML; cols.forEach(function(c){ xs.push(x); x+=c[2]; });
+    var tableW=x-ML, fs=6.2;
+    function put(i,txt,yy,bold,color){
+      var c=cols[i]; if(txt===''||txt==null) return;
+      if(c[3]==='r') pb.text(xs[i]+c[2]-2.5,yy,txt,fs,{align:'right',bold:bold,color:color});
+      else if(c[3]==='c') pb.text(xs[i]+c[2]/2,yy,txt,fs,{align:'center',bold:bold,color:color});
+      else pb.text(xs[i]+2.5,yy,pdfFit(pb,txt,c[2]-4,fs,bold),fs,{bold:bold,color:color});
+    }
+    function colHead(){
+      var fsList=cols.map(function(c){ var widest=0; c[1].split(' ').forEach(function(w){ widest=Math.max(widest,pb.tw(w,1,true)); }); return Math.max(3.9,Math.min(5.3,(c[2]-2.4)/widest)); });
+      var lines=cols.map(function(c,i){ return pb.wrap(c[1],c[2]-2.4,fsList[i],true); }), hh=Math.max.apply(null,lines.map(function(l){return l.length;}))*6.4+8;
+      var groups=[['EARNED','basic','reliever'],['CONTRIBUTION','pf13','sc'],['DEDUCTION','pf12','totald']];
+      var gy=y; pb.rect(ML,gy,tableW,10,{fill:C.paper});
+      groups.forEach(function(g){ var a=cols.findIndex(function(c){return c[0]===g[1];}), b=cols.findIndex(function(c){return c[0]===g[2];});
+        pb.text((xs[a]+xs[b]+cols[b][2])/2,gy+7.2,g[0],5.6,{align:'center',bold:true,color:C.goldDk}); });
+      y+=10; pb.rect(ML,y,tableW,hh,{fill:C.ink});
+      cols.forEach(function(c,i){ lines[i].forEach(function(l,k){ var cx=c[3]==='l'?xs[i]+2.5:xs[i]+c[2]/2; pb.text(cx,y+8+k*6.4,l,fsList[i],{bold:true,color:C.white,align:c[3]==='l'?'left':'center'}); }); });
+      y+=hh;
+    }
+    var info=[ 'Form XVII', 'Register of Wages', 'Prescribed Under Rule 78(1)(a) of The Contract Labour (R&A) Karnataka Rules, 1974' ];
+    pb.text(ML,y+6,info[0],9,{bold:true}); pb.text(ML,y+16,info[1],8,{color:C.mute}); pb.text(ML,y+25,info[2],7.2,{color:C.mute});
+    pb.text(pb.W-24,y+6,'Wage Period for the month of '+xMonthLabel(data.ym).replace(' ',' - '),9,{bold:true,align:'right',color:C.goldDk});
+    y+=34;
+    var cl=data.client||{};
+    pb.text(ML,y+4,'Name and address of contractor:',6.8,{color:C.mute}); pb.text(ML+118,y+4,COMPANY.tradeName+', '+COMPANY.address,6.8,{bold:true}); y+=10;
+    pb.text(ML,y+4,'Name and address of establishment:',6.8,{color:C.mute}); pb.text(ML+118,y+4,pdfFit(pb,(cl.name||'')+(cl.address?', '+cl.address:''),CWt-120,6.8,true),6.8,{bold:true}); y+=14;
+    colHead();
+    var rowH=14.5, tot={}, groups=[], cur=null;
+    data.rows.forEach(function(r){ if(!r.b) return; if(!cur||cur.role!==r.role){ cur={role:r.role,rows:[]}; groups.push(cur); } cur.rows.push(r); });
+    var keys=['pdays','basic','vda','extra','other','washing','bonus','uniform','reliever','gross','pf13','esic325','lwf','sc','ctc','gst','billing','scamt','pf12','esic075','pt','canteen','adv','unifd','totald','net'];
+    function sums(list){ var t={}; keys.forEach(function(k){ t[k]=0; }); list.forEach(function(r){ keys.forEach(function(k){ t[k]+= (k==='pdays'? r.att.pay : (r.b[k]||0)); }); }); return t; }
+    function totalRow(label,t,dark){
+      if(y+rowH+4>LIMIT){ y=pdfHead(pb,true); colHead(); }
+      pb.rect(ML,y,tableW,rowH+1.5,{fill:dark?C.ink:C.paper});
+      var col=dark?C.white:C.ink; put(2,label,y+10,true,col);
+      keys.forEach(function(k){ var i=cols.findIndex(function(c){return c[0]===k;}); put(i,k==='pdays'?(Math.round(t[k]*10)/10).toFixed(1):String(Math.round(t[k])),y+10,true,col); });
+      y+=rowH+1.5;
+    }
+    var n=0;
+    groups.forEach(function(g){
+      g.rows.forEach(function(r){
+        if(y+rowH>LIMIT){ y=pdfHead(pb,true); colHead(); }
+        n++; var b=r.b;
+        put(0,String(n),y+10); put(1,r.e.empCode||'',y+10); put(2,(r.e.name||'').toUpperCase(),y+10); put(3,r.short,y+10);
+        put(4,String(data.dim),y+10); put(5,r.att.pay.toFixed(1),y+10);
+        keys.slice(1).forEach(function(k){ var i=cols.findIndex(function(c){return c[0]===k;}); put(i,String(Math.round(b[k]||0)),y+10,(k==='net'||k==='billing')); });
+        y+=rowH; pb.line(ML,y,ML+tableW,y,0.3,C.line);
+      });
+      if(groups.length>1) totalRow('TOTAL '+roleShort(g.role),sums(g.rows),false);
+    });
+    var all=[]; groups.forEach(function(g){ all=all.concat(g.rows); });
+    totalRow('GRAND TOTAL',sums(all),true);
+    y+=8;
+    var note='Amounts in Rs. Figures are calculated from the rate card for the days worked (Pay Days), with service charge and GST as shown.';
+    if(y+70>LIMIT){ y=pdfHead(pb,true); }
+    pb.text(ML,y+6,note,6.6,{color:C.mute});
+    pb.text(ML,y+44,'Prepared by',7.6,{color:C.mute}); pb.line(ML,y+38,ML+150,y+38,0.5,C.ink);
+    pb.text(pb.W-24,y+44,'Authorised signatory (with seal)',7.6,{color:C.mute,align:'right'}); pb.line(pb.W-24-190,y+38,pb.W-24,y+38,0.5,C.ink);
+  }
+
+  function drawAttendanceSheet(pb, data){
+    var C=PDFC, ML=36, y=pdfHead(pb,true), CWt=pb.W-72, LIMIT=pb.H-78, dim=data.dim;
+    pb.text(ML,y+8,'ATTENDANCE SHEET',14,{bold:true}); pb.text(pb.W-36,y+8,xMonthLabel(data.ym),11,{bold:true,align:'right',color:C.goldDk});
+    y+=20; pb.text(ML,y+8,'Unit name: ',8.8,{color:C.mute}); pb.text(ML+50,y+8,data.site,9.4,{bold:true});
+    if(data.client&&data.client.name) pb.text(ML+300,y+8,'Client: '+data.client.name,8.8,{color:C.mute});
+    y+=18;
+    var fixed=18+44+26+108+36, dw=Math.floor((CWt-fixed)/dim*10)/10, x0=ML, hh=20, rh=17;
+    var X={sl:x0, id:x0+18, desig:x0+62, name:x0+88, d0:x0+196, tot:x0+196+dw*dim};
+    function thead(){
+      pb.rect(ML,y,CWt,hh,{fill:C.ink});
+      pb.text(X.sl+9,y+13,'Sr',7,{bold:true,color:C.white,align:'center'}); pb.text(X.id+3,y+13,'ID No',7,{bold:true,color:C.white});
+      pb.text(X.desig+13,y+13,'Desig',7,{bold:true,color:C.white,align:'center'}); pb.text(X.name+3,y+13,'Name',7,{bold:true,color:C.white});
+      for(var d=1; d<=dim; d++) pb.text(X.d0+dw*(d-1)+dw/2,y+13,String(d),6.8,{bold:true,color:C.white,align:'center'});
+      pb.text(X.tot+18,y+13,'Total',7,{bold:true,color:C.white,align:'center'});
+      y+=hh;
+    }
+    thead();
+    var total=0, n=0;
+    data.rows.forEach(function(r){
+      if(y+rh>LIMIT){ y=pdfHead(pb,true); thead(); }
+      n++;
+      pb.text(X.sl+9,y+11.5,String(n),7.6,{align:'center',color:C.mute}); pb.text(X.id+3,y+11.5,r.e.empCode||'',7.4);
+      pb.text(X.desig+13,y+11.5,r.short,7.4,{align:'center'}); pb.text(X.name+3,y+11.5,pdfFit(pb,r.e.name||'',102,8,true),8,{bold:true});
+      r.att.marks.forEach(function(m,i){
+        var col=m==='A'?'#B2372D':m==='H'?'#B07A10':m==='-'?'#9A9A92':m==='L'?'#2F6E3F':C.ink;
+        pb.text(X.d0+dw*i+dw/2,y+11.5,m,7.4,{align:'center',color:col,bold:m!=='P'&&m!=='-'});
+      });
+      var shown=(Math.round(r.att.pay*10)/10); total+=r.att.pay;
+      pb.text(X.tot+18,y+11.5,(shown%1?shown.toFixed(1):String(shown)),8,{bold:true,align:'center'});
+      y+=rh; pb.line(ML,y,ML+CWt,y,0.3,C.line);
+    });
+    if(y+rh>LIMIT){ y=pdfHead(pb,true); thead(); }
+    pb.rect(ML,y,CWt,rh+1,{fill:C.paper}); pb.text(X.name+3,y+11.8,'Total',8.2,{bold:true});
+    var tt=Math.round(total*10)/10; pb.text(X.tot+18,y+11.8,(tt%1?tt.toFixed(1):String(tt)),8.4,{bold:true,align:'center'});
+    y+=rh+10;
+    pb.text(ML,y+6,'P = present   A = absent   H = half day   L = leave   - = not employed on that day',7,{color:C.mute});
+    if(y+70>LIMIT){ y=pdfHead(pb,true); }
+    y+=14; var sy=y+34;
+    [['Prepared by',ML],['Checked by Area Officer',ML+CWt/3+8],['Client authorised signatory (with seal)',ML+2*CWt/3+16]].forEach(function(s){ pb.line(s[1],sy,s[1]+CWt/3-30,sy,0.5,C.ink); pb.text(s[1],sy+11,s[0],7.6,{color:C.mute}); });
+  }
+
+  // ---------- the "Billing pack" window on the Invoicing list ----------
+  var packInv=null;
+  function openPackModal(inv){
+    packInv=inv;
+    var client=clients.find(function(c){return c.id===inv.clientId;})||{}, k=contracts.find(function(x){return x.id===inv.contractId;});
+    var sites=allSites(); if(k&&k.site&&sites.indexOf(k.site)<0) sites.push(k.site);
+    var sel=document.getElementById('packSite');
+    sel.innerHTML='<option value="">Choose site</option>'+sites.map(function(s){return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>';}).join('');
+    var guess=k&&k.site? k.site : (sites.filter(function(s){ return client.name && s.toLowerCase().indexOf(String(client.name).toLowerCase().split(' ')[0])>-1; })[0]||'');
+    sel.value=guess;
+    document.getElementById('packMonth').value=inv.month||thisMonth();
+    var rs=document.getElementById('packRate');
+    rs.innerHTML='<option value="">Choose rate card</option>'+rateCards.map(function(r){return '<option value="'+r.id+'">'+escapeHtml(r.name)+'</option>';}).join('');
+    rs.value=(k&&k.rateCardId)||client.rateCardId||'';
+    document.getElementById('packInfo').textContent='Invoice '+(inv.invoiceNo||'')+' for '+(client.name||'')+'. Choose the site, month and rate card the per-employee breakdown should use.';
+    var w=document.getElementById('packWarn'); w.style.display='none'; w.innerHTML='';
+    document.getElementById('packModalBg').classList.add('show');
+  }
+  function closePackModal(){ document.getElementById('packModalBg').classList.remove('show'); }
+  async function runPack(kind){
+    var inv=packInv; if(!inv) return;
+    var site=document.getElementById('packSite').value, ym=document.getElementById('packMonth').value;
+    var rc=rateCards.find(function(r){return r.id===document.getElementById('packRate').value;});
+    if(!site){ toast('Choose the site.'); return; }
+    if(!ym){ toast('Choose the month.'); return; }
+    if(kind!=='att' && !rc){ toast('Choose a rate card for the wage register.'); return; }
+    var client=clients.find(function(c){return c.id===inv.clientId;})||{name:inv.clientName||''};
+    var btns=['btnPackAll','btnPackReg','btnPackAtt'].map(function(id){return document.getElementById(id);});
+    var labels=btns.map(function(b){return b.textContent;}); btns.forEach(function(b){ b.disabled=true; b.textContent='Preparing...'; });
+    try{
+      var data=await gatherBilling(site,ym,rc,client), w=document.getElementById('packWarn');
+      if(data.warns.length){ w.style.display=''; w.innerHTML=data.warns.map(escapeHtml).join('<br>'); } else { w.style.display='none'; }
+      if(!data.rows.length){ toast('No employees are assigned to that site for '+xMonthLabel(ym)+'.'); return; }
+      if(kind!=='att' && !data.rows.some(function(r){return r.b;})){ toast('None of these employees match a role on that rate card.'); return; }
+      var pb, name='';
+      if(kind==='pack'){ pb=pdfNew(false); drawInvoice(pb,invoiceModelFromSaved(inv)); drawWageRegister(pb,data); drawAttendanceSheet(pb,data); pdfFoot(pb,'Computer-generated billing documents'); name='billing-pack-'+pdfName(inv.invoiceNo)+'.pdf'; }
+      else if(kind==='reg'){ pb=pdfNew(true); drawWageRegister(pb,data); pdfFoot(pb,'Computer-generated wage register'); name='wage-register-'+pdfName(site)+'-'+ym+'.pdf'; }
+      else { pb=pdfNew(true); drawAttendanceSheet(pb,data); pdfFoot(pb,'Computer-generated attendance sheet'); name='attendance-'+pdfName(site)+'-'+ym+'.pdf'; }
+      await pdfSave(pb.build(),name);
+    }catch(e){ console.error(e); toast('Could not build the document.'); }
+    finally{ btns.forEach(function(b,i){ b.disabled=false; b.textContent=labels[i]; }); }
+  }
+  function setupPackModal(){
+    var c=document.getElementById('packModalClose'); if(!c) return;
+    c.addEventListener('click', closePackModal);
+    document.getElementById('btnPackAll').addEventListener('click', function(){ runPack('pack'); });
+    document.getElementById('btnPackReg').addEventListener('click', function(){ runPack('reg'); });
+    document.getElementById('btnPackAtt').addEventListener('click', function(){ runPack('att'); });
   }
 
   init();
