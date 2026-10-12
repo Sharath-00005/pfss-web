@@ -547,6 +547,7 @@ tr:hover td{background:var(--line2)}
         <button class="btn" id="btnAddSite">+ Add site</button>
       </div>
       <div class="pill-row" id="siteList"></div>
+      <div class="muted" id="siteMsg" style="margin-top:.6rem"></div>
       <div class="muted" style="margin-top:1rem">Guards required per shift (used by the Duty Roster's coverage check):</div>
       <div id="siteRequirements" style="margin-top:.4rem"></div>
     </div>
@@ -1152,9 +1153,11 @@ tr:hover td{background:var(--line2)}
 
   // ---------- EMPLOYEES ----------
   function allSites(){
-    var set={};
+    var set={}, removed=state.settings.removedSites||[];
     (state.settings.sites||[]).forEach(function(s){set[s]=1;});
     state.employees.forEach(function(e){ if(e.site) set[e.site]=1; });
+    // a removed site stays hidden unless an active employee is assigned to it again
+    removed.forEach(function(s){ if(!state.employees.some(function(e){return e.active!==false && e.site===s;})) delete set[s]; });
     return Object.keys(set).sort();
   }
 
@@ -1168,10 +1171,7 @@ tr:hover td{background:var(--line2)}
     });
     var dl=document.getElementById('siteDatalist');
     dl.innerHTML = sites.map(function(s){return '<option value="'+escapeHtml(s)+'">';}).join('');
-    var siteList=document.getElementById('siteList');
-    if(siteList){
-      siteList.innerHTML = sites.map(function(s){return '<span class="tag ok">'+escapeHtml(s)+'</span>';}).join(' ') || '<span class="muted">No sites yet.</span>';
-    }
+    renderSiteList(sites);
     renderRosterSiteOptions();
     renderSiteRequirements();
   }
@@ -2913,6 +2913,7 @@ tr:hover td{background:var(--line2)}
     if(!name) return;
     if(!state.settings.sites) state.settings.sites=[];
     if(state.settings.sites.indexOf(name)===-1) state.settings.sites.push(name);
+    state.settings.removedSites=(state.settings.removedSites||[]).filter(function(x){return x!==name;});
     document.getElementById('newSiteName').value='';
     if(db){
       try{ await db.doc('settings/config').set(state.settings); }catch(e){}
@@ -3499,7 +3500,7 @@ tr:hover td{background:var(--line2)}
     var rx=ML+half+16;
     pb.text(rx,ry+8,'Supplier',8.6,{bold:true,color:C.goldDk}); ry+=22;
     pb.text(rx,ry,COMPANY.tradeName,10.4,{bold:true}); ry+=12;
-    pb.text(rx,ry,COMPANY.legalName,8.4,{color:C.mute}); ry+=11;
+    pb.text(rx,ry,COMPANY.legalName+', Proprietor',8.4,{color:C.mute}); ry+=11;
     pb.wrap(COMPANY.address,half,8.8,false).forEach(function(l){ pb.text(rx,ry,l,8.8,{color:C.mute}); ry+=11; });
     pb.text(rx,ry,'GSTIN: '+COMPANY.gstin+'    PAN: '+COMPANY.pan,8.8,{color:C.mute}); ry+=11;
     pb.wrap('Phone: '+COMPANY.phone+'    '+COMPANY.email,half,8.4,false).forEach(function(l){ pb.text(rx,ry,l,8.4,{color:C.mute}); ry+=10.5; });
@@ -4405,6 +4406,65 @@ tr:hover td{background:var(--line2)}
     document.getElementById('btnPackAll').addEventListener('click', function(){ runPack('pack'); });
     document.getElementById('btnPackReg').addEventListener('click', function(){ runPack('reg'); });
     document.getElementById('btnPackAtt').addEventListener('click', function(){ runPack('att'); });
+  }
+
+  // ======== REMOVING SITES (Settings > Sites) ========
+  var pendingSiteRemove=null;
+  function siteUsage(name){
+    var all=state.employees.filter(function(e){return e.site===name;});
+    var act=all.filter(function(e){return e.active!==false;});
+    var cons=(typeof contracts!=='undefined'?contracts:[]).filter(function(k){return k.site===name;});
+    return {active:act, left:all.length-act.length, contracts:cons};
+  }
+  function setSiteMsg(text,bad){
+    var el=document.getElementById('siteMsg'); if(!el) return;
+    el.textContent=text||''; el.style.color=bad?'var(--bad)':'';
+  }
+  function renderSiteList(sites){
+    var el=document.getElementById('siteList'); if(!el) return;
+    if(!sites.length){ el.innerHTML='<span class="muted">No sites yet.</span>'; return; }
+    var btn='background:none;border:0;cursor:pointer;color:inherit;font-weight:700;padding:0';
+    el.innerHTML=sites.map(function(s){
+      var q=encodeURIComponent(s), n=state.employees.filter(function(e){return e.active!==false && e.site===s;}).length;
+      if(pendingSiteRemove===s){
+        return '<span class="tag bad" style="display:inline-flex;align-items:center;gap:.6rem">Remove '+escapeHtml(s)+'? <button type="button" data-site-yes="'+q+'" style="'+btn+';text-decoration:underline">Yes, remove</button> <button type="button" data-site-no="1" style="'+btn+';text-decoration:underline;font-weight:500">Cancel</button></span>';
+      }
+      return '<span class="tag ok" style="display:inline-flex;align-items:center;gap:.4rem">'+escapeHtml(s)+(n?' <span class="muted">('+n+')</span>':'')+
+        ' <button type="button" data-site-x="'+q+'" title="Remove this site" aria-label="Remove '+escapeHtml(s)+'" style="'+btn+'">&times;</button></span>';
+    }).join(' ');
+    el.querySelectorAll('[data-site-x]').forEach(function(b){ b.addEventListener('click', function(){ askRemoveSite(decodeURIComponent(b.dataset.siteX)); }); });
+    el.querySelectorAll('[data-site-yes]').forEach(function(b){ b.addEventListener('click', function(){ removeSiteConfirmed(decodeURIComponent(b.dataset.siteYes)); }); });
+    el.querySelectorAll('[data-site-no]').forEach(function(b){ b.addEventListener('click', function(){ pendingSiteRemove=null; setSiteMsg(''); renderSiteList(allSites()); }); });
+  }
+  function askRemoveSite(name){
+    var u=siteUsage(name);
+    if(u.active.length){
+      var names=u.active.slice(0,3).map(function(e){return e.name;}).join(', ')+(u.active.length>3?' and '+(u.active.length-3)+' more':'');
+      pendingSiteRemove=null;
+      setSiteMsg('Cannot remove "'+name+'": '+u.active.length+' active employee'+(u.active.length>1?'s are':' is')+' assigned to it ('+names+'). Move them to another site first (Employees, then Edit).', true);
+      renderSiteList(allSites()); return;
+    }
+    pendingSiteRemove=name;
+    var notes=[];
+    if(u.contracts.length) notes.push(u.contracts.length===1 ? '1 contract still uses this site name' : u.contracts.length+' contracts still use this site name');
+    if(u.left) notes.push(u.left===1 ? '1 past employee keeps their records' : u.left+' past employees keep their records');
+    setSiteMsg(notes.length?'Note: '+notes.join('; ')+'.':'', false);
+    renderSiteList(allSites());
+  }
+  async function removeSiteConfirmed(name){
+    var u=siteUsage(name);
+    if(u.active.length){ askRemoveSite(name); return; }
+    var backup=JSON.stringify(state.settings), s=state.settings;
+    s.sites=(s.sites||[]).filter(function(x){return x!==name;});
+    if(s.siteRequirements) delete s.siteRequirements[name];
+    if(u.active.length+u.left>0){ s.removedSites=s.removedSites||[]; if(s.removedSites.indexOf(name)<0) s.removedSites.push(name); }
+    pendingSiteRemove=null;
+    if(db){
+      try{ await db.doc('settings/config').set(s); }
+      catch(e){ state.settings=JSON.parse(backup); setSiteMsg('Could not remove the site: '+(e.code||'save failed')+'. Only an administrator can change settings.', true); renderSiteList(allSites()); return; }
+    }
+    renderAll();
+    setSiteMsg('Removed "'+name+'".', false);
   }
 
   init();
