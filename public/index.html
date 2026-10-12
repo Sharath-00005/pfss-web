@@ -718,6 +718,10 @@ tr:hover td{background:var(--line2)}
       <div class="field"><label><input type="checkbox" id="clGstExempt" style="width:auto;margin-right:.4rem">GST exempt</label></div>
       <div class="field grow"><label>Exemption reference / certificate no. (if exempt)</label><input id="clGstExemptRef" placeholder="e.g. Govt dept exemption order no."></div>
     </div>
+    <div class="row">
+      <div class="field grow"><label><input type="checkbox" id="clRcm" style="width:auto;margin-right:.4rem">This client pays the GST on security services itself (reverse charge)</label>
+        <div class="muted">Leave unticked and GST is added to the invoice total. Tick it only if your CA has confirmed that this client pays the GST directly.</div></div>
+    </div>
     <div class="row" style="margin-top:1rem;justify-content:flex-end">
       <button class="btn ghost" id="btnDeleteClient" style="display:none">Delete</button>
       <button class="btn" id="btnSaveClient">Save client</button>
@@ -814,6 +818,7 @@ tr:hover td{background:var(--line2)}
       <h3 style="font-size:1.1rem">Line items</h3>
       <div class="row" style="flex:none">
         <button class="btn small ghost" id="btnLoadRateCard" type="button">Load from client's rate card</button>
+        <button class="btn small ghost" id="btnAllNormal" type="button">Charge GST on all lines</button>
         <button class="btn small ghost" id="btnAddLineItem" type="button">+ Add line</button>
       </div>
     </div>
@@ -2420,6 +2425,7 @@ tr:hover td{background:var(--line2)}
     }).join('');
     rcSel.value = c?(c.defaultRateCardId||''):'';
     document.getElementById('clGstExempt').checked = c? !!c.gstExempt : false;
+    document.getElementById('clRcm').checked = c? c.rcmSecurity===true : false;
     document.getElementById('clGstExemptRef').value = c?(c.gstExemptRef||''):'';
     document.getElementById('btnDeleteClient').style.display = c? '' : 'none';
     document.getElementById('clientModalBg').classList.add('show');
@@ -2439,6 +2445,7 @@ tr:hover td{background:var(--line2)}
       address:document.getElementById('clAddress').value.trim(),
       defaultRateCardId:document.getElementById('clRateCard').value,
       gstExempt:document.getElementById('clGstExempt').checked,
+      rcmSecurity:document.getElementById('clRcm').checked,
       gstExemptRef:document.getElementById('clGstExemptRef').value.trim()
     };
     if(!db){ toast('Storage unavailable — cannot save.'); return; }
@@ -2505,6 +2512,10 @@ tr:hover td{background:var(--line2)}
     document.getElementById('invStatusFilter').addEventListener('change', renderInvoicesTable);
     document.getElementById('invGstPct').addEventListener('input', renderInvoicePreview);
     document.getElementById('invSvcPct').addEventListener('input', renderInvoicePreview);
+    document.getElementById('btnAllNormal').addEventListener('click', function(){
+      document.querySelectorAll('#invLineItems [data-f="cat"]').forEach(function(sel){ sel.value='normal'; });
+      renderInvoicePreview(); toast('GST will be charged on every line.');
+    });
     document.getElementById('btnGenFromContract').addEventListener('click', generateFromContract);
     document.getElementById('invClient').addEventListener('change', function(){ renderInvContractOptions(''); });
   }
@@ -3285,7 +3296,7 @@ tr:hover td{background:var(--line2)}
     applyClientGstDefault(false);
     var prs=[]; for(var i=0;i<emps.length;i++){ prs.push(await computePayroll(emps[i], ym)); }
     var costing=state.settings.costing||{}, rc=rateCards.find(function(r){return r.id===k.rateCardId;});
-    var rcm=clientRegistered(client);
+    var rcm=!!(client && client.rcmSecurity===true && clientRegistered(client));
     function catOf(role){ return (rcm && isSecurityRole(role)) ? 'rcm' : 'normal'; }
     var lines=[], base={normal:0,rcm:0}, warns=[];
     var posRoles=(k.positions||[]).map(function(p){return p.role;});
@@ -3327,6 +3338,7 @@ tr:hover td{background:var(--line2)}
     if(!document.getElementById('invDue').value) document.getElementById('invDue').value=xAddDays(d, Number(k.terms)||0);
     if(!document.getElementById('invNotes').value) document.getElementById('invNotes').value=k.title||'';
     var msg=[]; msg.push('Lines generated for '+xMonthLabel(ym)+' from '+emps.length+' employees. Days with no mark count as present.');
+    if(rcm) msg.push('Security lines are marked reverse charge because this client is set to pay that GST itself.');
     if(unbilled) msg.push(unbilled+' employee'+(unbilled>1?'s':'')+' at this site have a role not listed on the contract and were not billed.');
     document.getElementById('invGenNote').textContent=msg.concat(warns).join(' ');
     renderInvoicePreview();
@@ -3428,8 +3440,14 @@ tr:hover td{background:var(--line2)}
     if(m.client.gstin){ pb.text(ML,ly,'GSTIN: '+m.client.gstin,8.8,{color:C.mute}); ly+=11; }
     if(m.client.contact){ pb.text(ML,ly,'Attn: '+m.client.contact,8.8,{color:C.mute}); ly+=11; }
     var rx=ML+half+16;
-    pb.text(rx,ry+8,'Supply details',8.6,{bold:true,color:C.goldDk}); ry+=22;
-    [['Place of supply',m.pos+' ('+m.posCode+')'],['Service','Manpower, security and housekeeping services'],['Supplier GSTIN',COMPANY.gstin]].forEach(function(r){
+    pb.text(rx,ry+8,'Supplier',8.6,{bold:true,color:C.goldDk}); ry+=22;
+    pb.text(rx,ry,COMPANY.tradeName,10.4,{bold:true}); ry+=12;
+    pb.text(rx,ry,COMPANY.legalName+', Proprietor',8.4,{color:C.mute}); ry+=11;
+    pb.wrap(COMPANY.address,half,8.8,false).forEach(function(l){ pb.text(rx,ry,l,8.8,{color:C.mute}); ry+=11; });
+    pb.text(rx,ry,'GSTIN: '+COMPANY.gstin+'    PAN: '+COMPANY.pan,8.8,{color:C.mute}); ry+=11;
+    pb.wrap('Phone: '+COMPANY.phone+'    '+COMPANY.email,half,8.4,false).forEach(function(l){ pb.text(rx,ry,l,8.4,{color:C.mute}); ry+=10.5; });
+    ry+=8;
+    [['Place of supply',m.pos+' ('+m.posCode+')'],['Service','Manpower, security and housekeeping services']].forEach(function(r){
       pb.text(rx,ry,r[0]+':',8.8,{color:C.mute}); var lines=pb.wrap(r[1],half-82,8.8,true); lines.forEach(function(l,i){ pb.text(rx+82,ry,l,8.8,{bold:true}); if(i<lines.length-1) ry+=11; }); ry+=12;
     });
     y=Math.max(ly,ry)+8;
