@@ -316,6 +316,14 @@
     if (w) { w.opener = null; w.location.href = r.data.signedUrl; } else { location.href = r.data.signedUrl; }
   }, true);
 
+  /* ---------- sign-in details for pages that call server functions (the rate card app sends email this way) ---------- */
+  window.pfssAuth = {
+    url: cfg.SUPABASE_URL,
+    anonKey: cfg.SUPABASE_ANON_KEY,
+    token: async function () { await whenReady(); var r = await sb.auth.getSession(); return (r.data && r.data.session) ? r.data.session.access_token : null; },
+    signOut: signOut
+  };
+
   /* ---------- what the app calls ---------- */
   window.claude = {
     use: function (name) {
