@@ -122,6 +122,14 @@ tr:hover td{background:var(--line2)}
 .burger{display:none;background:none;border:1px solid var(--line);border-radius:8px;padding:6px 10px;cursor:pointer}
 
 .daycell.X{opacity:.3;cursor:not-allowed;background:var(--line);border-style:dashed}
+.cyc-steps{list-style:none;margin:0;padding:0}
+.cyc-steps li{display:flex;align-items:center;gap:12px;padding:10px 0;border-bottom:1px solid var(--line2)}
+.cyc-steps li:last-child{border-bottom:0}
+.cyc-steps .dot{width:26px;height:26px;border-radius:50%;border:2px solid var(--line);display:grid;place-items:center;font-size:12px;font-weight:700;flex:none}
+.cyc-steps li.done .dot{background:var(--brand);border-color:var(--brand);color:var(--brand-ink)}
+.cyc-steps li.next .dot{border-color:var(--brand)}
+.rail li button.rbtn{all:unset;cursor:pointer;display:flex;align-items:center;gap:10px;width:100%;color:inherit;font-size:13px}
+.rail li button.rbtn:hover{text-decoration:underline}
 .autofilled{outline:2px solid var(--warn);background:var(--warn-soft)!important}
 .slots{display:flex;gap:4px;flex-wrap:wrap;margin-top:6px}
 .slot{width:18px;height:18px;border-radius:3px;background:var(--brand)}
@@ -150,6 +158,7 @@ tr:hover td{background:var(--line2)}
     <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small></div></div>
     <div class="grp">Menu</div>
     <button class="navbtn on" id="tabs-dashboard" data-tab="dashboard">Dashboard</button>
+    <button class="navbtn" id="tabs-cycle" data-tab="cycle">Pay cycle</button>
     <button class="navbtn" id="tabs-employees" data-tab="employees">Employees</button>
     <button class="navbtn" id="tabs-attendance" data-tab="attendance">Attendance</button>
     <button class="navbtn" id="tabs-payroll" data-tab="payroll">Payroll</button>
@@ -160,7 +169,7 @@ tr:hover td{background:var(--line2)}
     <button class="navbtn" id="tabs-invoicing" data-tab="invoicing">Invoicing</button>
     <button class="navbtn" id="tabs-compliance" data-tab="compliance">Compliance</button>
     <button class="navbtn" id="tabs-settings" data-tab="settings">Settings</button>
-    <div class="grp">This month's progress</div>
+    <div class="grp" id="railTitle">Pay cycle</div>
     <ul class="rail" id="workflowRail"></ul>
   </nav>
 
@@ -187,10 +196,22 @@ tr:hover td{background:var(--line2)}
       <h2>By site</h2>
       <div id="siteBreakdown" class="scrollx"></div>
     </div>
-    <div class="card" id="attnCard"></div>
+    <div class="card" id="cycleCard"></div>
+  <div class="card" id="attnCard"></div>
   </section>
 
   <!-- EMPLOYEES -->
+  <section id="tab-cycle" style="display:none">
+    <div class="card">
+      <div class="row" style="justify-content:space-between;align-items:flex-end">
+        <div class="field" style="max-width:200px"><label>Pay month</label><input type="month" id="cycMonth"></div>
+        <div id="cycStatusPill" style="flex:none"></div>
+      </div>
+      <div id="cycStepper" style="margin-top:.8rem;display:flex;gap:.4rem;flex-wrap:wrap"></div>
+    </div>
+    <div id="cycleMain"></div>
+  </section>
+
   <section id="tab-employees" style="display:none">
     <div class="card">
       <div class="row" style="justify-content:space-between">
@@ -485,6 +506,18 @@ tr:hover td{background:var(--line2)}
         <div class="field"><label>TDS % clients deduct (1 for proprietors, 2 for companies and firms)</label><input type="number" id="setCostTds" step="0.1"></div>
       </div>
       <button class="btn" id="btnSaveCosting" style="margin-top:1rem">Save rate card defaults</button>
+    </div>
+
+    <div class="card">
+      <h2>Overtime, night shifts and employer ESIC</h2>
+      <p class="muted">Used by the pay cycle. Overtime hours and night shifts are entered for each employee every month. Recalculate payroll after changing these.</p>
+      <div class="row">
+        <div class="field"><label>Overtime multiplier</label><input type="number" step="0.1" id="setOtMult"></div>
+        <div class="field"><label>Night shift allowance (\u20b9 per shift)</label><input type="number" id="setNightAllow"></div>
+        <div class="field"><label>Employer ESIC %</label><input type="number" step="0.01" id="setEsiEr"></div>
+        <div class="field"><label>Warn when overtime is over (hours)</label><input type="number" id="setOtWarn"></div>
+      </div>
+      <div class="row" style="margin-top:1rem"><button class="btn" id="btnSaveCycSettings">Save</button></div>
     </div>
 
     <div class="card">
@@ -1016,6 +1049,9 @@ tr:hover td{background:var(--line2)}
     setupInvoiceSettingsUI();
     setupSignatureUI();
     setupPackModal();
+    subscribeCycleData();
+    setupCycleUI();
+    setupCycleSettings();
 
     document.getElementById('attMonth').value=thisMonth();
     document.getElementById('payMonth').value=thisMonth();
@@ -1064,34 +1100,22 @@ tr:hover td{background:var(--line2)}
     renderAttention();
     renderInvoiceSettings();
     renderSignatureSettings();
+    renderCycleSettings();
+    renderCycleCard();
   }
 
   function renderWorkflowRail(){
-    var el=document.getElementById('workflowRail');
-    if(!el) return;
-    var ym=thisMonth();
-    var hasEmployees = state.employees.filter(function(e){return e.active!==false;}).length>0;
-    var hasSites = allSites().length>0;
-    var hasAttendance = Object.keys(state.attendance||{}).some(function(k){return k.indexOf('_'+ym.replace('-',''))>-1;});
-    var curRun = (typeof runCache!=='undefined') ? runCache[ym.replace('-','')] : null;
-    var hasCalculated = !!curRun;
-    var hasApproved = !!(curRun && curRun.status==='approved');
-    var steps = [
-      {label:'Sites added', done:hasSites},
-      {label:'Employees added', done:hasEmployees},
-      {label:'Attendance marked ('+ym+')', done:hasAttendance},
-      {label:'Payroll calculated ('+ym+')', done:hasCalculated},
-      {label:'Payroll approved ('+ym+')', done:hasApproved}
-    ];
-    var seenNext=false;
-    el.innerHTML = steps.map(function(s,i){
-      var cls = s.done ? 'done' : (!seenNext ? (seenNext=true,'next') : '');
-      return '<li class="'+cls+'"><span class="rdot">'+(s.done?'\u2713':(i+1))+'</span>'+s.label+'</li>';
+    var el=document.getElementById('workflowRail'); if(!el) return;
+    var ym=cycMonth(), next=cycNext(ym), t=document.getElementById('railTitle');
+    if(t) t.textContent=xMonthLabel(ym)+' pay cycle';
+    el.innerHTML=CYC_STEPS.map(function(s){
+      var d=cycDone(s.id,ym), cls=d?'done':(next===s.id?'next':'');
+      return '<li class="'+cls+'"><button type="button" class="rbtn" data-cyc-go="'+s.id+'"><span class="rdot">'+(d?'\u2713':s.n)+'</span>'+escapeHtml(s.label)+'</button></li>';
     }).join('');
   }
 
   // ---------- TABS ----------
-  var TAB_TITLES = {dashboard:'Dashboard', employees:'Employees', attendance:'Attendance', roster:'Duty Roster', payroll:'Payroll', advances:'Advances', ratecard:'Rate Card', invoicing:'Invoicing', contracts:'Contracts', compliance:'Compliance', settings:'Settings'};
+  var TAB_TITLES = {dashboard:'Dashboard', employees:'Employees', attendance:'Attendance', roster:'Duty Roster', payroll:'Payroll', advances:'Advances', ratecard:'Rate Card', invoicing:'Invoicing', contracts:'Contracts', compliance:'Compliance', settings:'Settings', cycle:'Pay cycle'};
   function setupTabs(){
     var btns=document.querySelectorAll('.side .navbtn');
     btns.forEach(function(b){
@@ -1099,10 +1123,11 @@ tr:hover td{background:var(--line2)}
         btns.forEach(function(x){x.classList.remove('on');});
         b.classList.add('on');
         document.getElementById('pageTitle').textContent = TAB_TITLES[b.dataset.tab]||'';
-        ['dashboard','employees','attendance','roster','payroll','advances','ratecard','invoicing','contracts','compliance','settings'].forEach(function(t){
+        ['dashboard','cycle','employees','attendance','roster','payroll','advances','ratecard','invoicing','contracts','compliance','settings'].forEach(function(t){
           document.getElementById('tab-'+t).style.display = (t===b.dataset.tab)?'':'none';
         });
         document.body.classList.remove('menu');
+        if(b.dataset.tab==='cycle'){ renderCycle(); }
       });
     });
   }
@@ -1351,6 +1376,7 @@ tr:hover td{background:var(--line2)}
       closeEmpModal();
       var payMonthEl=document.getElementById('payMonth');
       if(payMonthEl && payMonthEl.value) invalidateRun(payMonthEl.value);
+      if(cyc.month && (!payMonthEl || payMonthEl.value!==cyc.month)) invalidateRun(cyc.month);
     }catch(e){ toast('Save failed: '+(e.code||e.message||'error')); }
     btn.disabled=false; btn.textContent='Save employee';
   }
@@ -1550,6 +1576,7 @@ tr:hover td{background:var(--line2)}
     container.querySelectorAll('.daycell').forEach(function(cell){
       cell.addEventListener('click', async function(){
         if(cell.classList.contains('X')) return;
+        if(cycClosed(ym)){ toast('This month is closed. Reopen it in the pay cycle to change attendance.'); return; }
         var cur = cell.classList.contains('P')?'P':cell.classList.contains('A')?'A':cell.classList.contains('H')?'H':cell.classList.contains('L')?'L':'P';
         var order = {P:'A', A:'H', H:'L', L:'P'};
         var next = order[cur] || 'P';
@@ -1586,20 +1613,29 @@ tr:hover td{background:var(--line2)}
     if(e.wageType==='daily'){ gross = (Number(e.wageAmount)||0) * present; }
     else { var perDay=(Number(e.wageAmount)||0)/dim; gross = (Number(e.wageAmount)||0) - (lop+notEmployed)*perDay; }
     gross = Math.max(0, gross);
-    var basicPct = state.settings.basicPct||50;
+    var st = state.settings, basicPct = st.basicPct||50;
     var basic = gross * basicPct/100;
-    var pf=0, esi=0, pt=0;
+    var ex = extrasMap[e.id+'|'+ym] || {};
+    var otHrs = Number(ex.ot)||0, nights = Number(ex.night)||0, otherDed = Number(ex.otherDed)||0;
+    var monthlyBasic = (e.wageType==='daily') ? (Number(e.wageAmount)||0)*basicPct/100*dim : (Number(e.wageAmount)||0)*basicPct/100;
+    var otPay = Math.round(otHrs * (monthlyBasic/(dim*8)) * (st.otMult||2));
+    var nightPay = Math.round(nights * (st.nightAllowance==null?150:st.nightAllowance));
+    var baseGross = gross;
+    gross = baseGross + otPay + nightPay;
+    var pf=0, esi=0, pt=0, pfEr=0, esiEr=0;
     if(e.pfApplicable){
-      var base = state.settings.pfCeilingEnabled ? Math.min(basic, state.settings.pfCeiling||15000) : basic;
-      pf = base * (state.settings.pfRate||12)/100;
+      var base = st.pfCeilingEnabled ? Math.min(basic, st.pfCeiling||15000) : basic;
+      pf = base * (st.pfRate||12)/100; pfEr = pf;
     }
-    if(e.esiApplicable && gross <= (state.settings.esiThreshold||21000)){
-      esi = gross * (state.settings.esiRate||0.75)/100;
+    if(e.esiApplicable && baseGross <= (st.esiThreshold||21000)){
+      esi = gross * (st.esiRate||0.75)/100;
+      esiEr = gross * (st.esiErRate==null?3.25:st.esiErRate)/100;
     }
     pt = ptForState(e.state, gross);
     var advance = (typeof suggestedAdvanceDeduction==='function') ? suggestedAdvanceDeduction(e.id) : 0;
-    var net = gross - pf - esi - pt - advance;
-    return {present:present, dim:dim, gross:gross, basic:basic, pf:pf, esi:esi, pt:pt, advance:advance, net:net};
+    var net = gross - pf - esi - pt - advance - otherDed;
+    return {present:present, dim:dim, gross:gross, baseGross:baseGross, basic:basic, pf:pf, esi:esi, pt:pt, advance:advance, net:net,
+      otHrs:otHrs, nights:nights, otPay:otPay, nightPay:nightPay, otherDed:otherDed, pfEr:pfEr, esiEr:esiEr};
   }
 
   // ---------- DUTY ROSTER ----------
@@ -1918,6 +1954,8 @@ tr:hover td{background:var(--line2)}
   }
 
   async function invalidateRun(ym){
+    if(cycClosed(ym)) return;
+    cycleReset(ym);
     var run = await getRun(ym);
     if(run && (run.status==='submitted' || run.status==='approved')){
       run.status='draft';
@@ -2024,6 +2062,7 @@ tr:hover td{background:var(--line2)}
   }
 
   async function calculateRun(ym){
+    if(cycClosed(ym)){ toast('This month is closed. Reopen it in the pay cycle to recalculate.'); return; }
     var existing = await getRun(ym);
     if(existing && existing.status==='approved'){
       if(!confirm('This month is already approved. Recalculating will reset it to draft and require re-approval. Continue?')) return;
@@ -2033,7 +2072,10 @@ tr:hover td{background:var(--line2)}
       return {empId:x.emp.id, empCode:x.emp.empCode||'', name:x.emp.name, site:x.emp.site||'',
         bankAcc:x.emp.bankAcc||'', ifsc:x.emp.ifsc||'', present:x.r.present, dim:x.r.dim,
         gross:Math.round(x.r.gross), pf:Math.round(x.r.pf), esi:Math.round(x.r.esi), pt:Math.round(x.r.pt),
-        advance:Math.round(x.r.advance||0), net:Math.round(x.r.net)};
+        advance:Math.round(x.r.advance||0), net:Math.round(x.r.net),
+        role:x.emp.role||'', uan:x.emp.uan||'', esicNo:x.emp.esic||'', doj:x.emp.doj||'',
+        otHrs:x.r.otHrs||0, nights:x.r.nights||0, otPay:Math.round(x.r.otPay||0), nightPay:Math.round(x.r.nightPay||0),
+        otherDed:Math.round(x.r.otherDed||0), pfEr:Math.round(x.r.pfEr||0), esiEr:Math.round(x.r.esiEr||0)};
     });
     var totalNet = rows.reduce(function(s,r){return s+r.net;},0);
     var run = {ym:ym, status:'draft', rows:rows, totalNet:totalNet, calculatedAt:Date.now(), calculatedBy:identity.id,
@@ -2041,11 +2083,13 @@ tr:hover td{background:var(--line2)}
     await saveRun(ym, run);
     toast('Payroll calculated for '+ym+'.');
     renderRunStatus(ym);
+    patchCycle(ym,{},'Payroll calculated: '+rows.length+' employees, net pay '+fmtMoney(totalNet));
   }
 
   async function submitRun(ym){
     var run = await getRun(ym);
     if(!run){ toast('Calculate payroll first.'); return; }
+    if(!cycValidatedOk(ym)){ toast('Run the validation checks before submitting for approval.'); cycGo('validate',ym); return; }
     var identity = await myIdentity();
     run.status='submitted';
     run.submittedAt=Date.now();
@@ -2054,6 +2098,7 @@ tr:hover td{background:var(--line2)}
     run.remark=null;
     await saveRun(ym, run);
     toast('Submitted for approval.');
+    patchCycle(ym,{},'Submitted for approval');
     renderRunStatus(ym);
   }
 
@@ -2077,21 +2122,23 @@ tr:hover td{background:var(--line2)}
     }
     toast('Payroll approved.');
     renderRunStatus(ym);
+    patchCycle(ym,{},'Payroll approved by '+identity.label);
   }
 
-  async function rejectRun(ym){
+  async function rejectRun(ym, remarkIn){
     var run = await getRun(ym);
     if(!run || run.status!=='submitted') return;
     var identity = await myIdentity();
     if(run.submittedBy===identity.id){ toast('You cannot reject your own submission.'); return; }
     if(!isApproverId(identity.id)){ toast('You are not on the approvers list.'); return; }
-    var remark = prompt('Reason for rejecting this payroll run (required):');
+    var remark = (remarkIn!==undefined) ? remarkIn : prompt('Reason for rejecting this payroll run (required):');
     if(!remark){ toast('A reason is required to reject.'); return; }
     run.status='rejected';
     run.remark=remark;
     run.approvedAt=null; run.approvedBy=null; run.approvedByLabel=null;
     await saveRun(ym, run);
     toast('Payroll rejected and sent back.');
+    patchCycle(ym,{reviewed:false,validated:false},'Payroll sent back: '+remark);
     renderRunStatus(ym);
   }
 
@@ -3500,7 +3547,7 @@ tr:hover td{background:var(--line2)}
     var rx=ML+half+16;
     pb.text(rx,ry+8,'Supplier',8.6,{bold:true,color:C.goldDk}); ry+=22;
     pb.text(rx,ry,COMPANY.tradeName,10.4,{bold:true}); ry+=12;
-    pb.text(rx,ry,COMPANY.legalName+', Proprietor',8.4,{color:C.mute}); ry+=11;
+    pb.text(rx,ry,COMPANY.legalName,8.4,{color:C.mute}); ry+=11;
     pb.wrap(COMPANY.address,half,8.8,false).forEach(function(l){ pb.text(rx,ry,l,8.8,{color:C.mute}); ry+=11; });
     pb.text(rx,ry,'GSTIN: '+COMPANY.gstin+'    PAN: '+COMPANY.pan,8.8,{color:C.mute}); ry+=11;
     pb.wrap('Phone: '+COMPANY.phone+'    '+COMPANY.email,half,8.4,false).forEach(function(l){ pb.text(rx,ry,l,8.4,{color:C.mute}); ry+=10.5; });
@@ -3634,14 +3681,14 @@ tr:hover td{background:var(--line2)}
     pb.line(ML,98,MR,98,2.6,PDFC.gold); pb.line(ML,102,MR,102,0.5,PDFC.ink);
     return 120;
   }
-  function pdfFoot(pb,label){
+  function pdfFoot(pb,label,hidePage){
     var ML=36, MR=pb.W-36, n=pb.count();
     for(var i=0;i<n;i++){ pb.setPage(i);
       pb.line(ML,pb.H-60,MR,pb.H-60,0.8,PDFC.gold);
       pb.text(pb.W/2,pb.H-47,'GSTIN '+COMPANY.gstin+'  |  PAN '+COMPANY.pan+'  |  Udyam '+COMPANY.udyam+'  |  EPF BGBNG3901490000  |  ESIC 49000731570001099',6.8,{align:'center',color:PDFC.mute});
       pb.text(ML,pb.H-33,'Your safety, our mission',8,{italic:true,color:PDFC.goldDk});
       pb.text(pb.W/2,pb.H-33,label||'Computer-generated document',7.2,{align:'center',color:PDFC.mute});
-      pb.text(MR,pb.H-33,'Page '+(i+1)+' of '+n,8,{align:'right',color:PDFC.mute});
+      if(!hidePage) pb.text(MR,pb.H-33,'Page '+(i+1)+' of '+n,8,{align:'right',color:PDFC.mute});
     }
   }
   function pdfFit(pb,s,w,size,bold){ s=pdfAscii(s); if(pb.tw(s,size,bold)<=w) return s; while(s.length>1&&pb.tw(s+'...',size,bold)>w) s=s.slice(0,-1); return s+'...'; }
@@ -3691,22 +3738,30 @@ tr:hover td{background:var(--line2)}
   }
 
   /* ---------- payslip ---------- */
-  function buildPayslipPdf(r,run,ym){
-    var pb=pdfNew(false), ML=36, CW=pb.W-72, MR=ML+CW, C=PDFC, y=pdfHead(pb);
+  function drawPayslip(pb,r,run,ym){
+    var ML=36, y=pdfHead(pb,false), CW=pb.W-72, MR=ML+CW, C=PDFC;
     pb.text(ML,y+8,'PAYSLIP',15,{bold:true}); pb.text(MR,y+8,xMonthLabel(ym),11,{bold:true,align:'right',color:C.goldDk});
-    y+=20; pb.rect(ML,y,CW,36,{fill:C.paper});
-    [['Employee ID',r.empCode||'-'],['Name',r.name||'-'],['Site',r.site||'-'],['Days present',r.present+' of '+r.dim]].forEach(function(c,i){
-      var x=ML+12+i*(CW/4); pb.text(x,y+13,c[0],7.6,{color:C.mute}); pb.text(x,y+27,pdfFit(pb,c[1],CW/4-16,10,true),10,{bold:true});
-    });
-    y+=36+22;
+    function band(cells){
+      pb.rect(ML,y,CW,36,{fill:C.paper});
+      cells.forEach(function(c,i){ var x=ML+12+i*(CW/4); pb.text(x,y+13,c[0],7.6,{color:C.mute}); pb.text(x,y+27,pdfFit(pb,String(c[1]),CW/4-16,10,true),10,{bold:true}); });
+      y+=36;
+    }
+    y+=20;
+    band([['Employee ID',r.empCode||'-'],['Name',r.name||'-'],['Site',r.site||'-'],['Days present',r.present+' of '+r.dim]]);
+    if(r.role||r.uan||r.esicNo||r.doj){ y+=6; band([['Designation',r.role||'-'],['UAN',r.uan||'-'],['ESIC No.',r.esicNo||'-'],['Date of joining',r.doj?pdfDate(r.doj):'-']]); }
+    y+=22;
     var half=(CW-20)/2, lx=ML, rx=ML+half+20;
     function head2(x,t){ pb.rect(x,y,half,20,{fill:C.ink}); pb.text(x+8,y+13.5,t,8.6,{bold:true,color:C.white}); pb.text(x+half-8,y+13.5,'Amount (Rs.)',8.6,{bold:true,color:C.white,align:'right'}); }
     head2(lx,'Earnings'); head2(rx,'Deductions');
-    var ded=[['Provident fund (PF)',r.pf||0],['ESI',r.esi||0],['Professional tax',r.pt||0],['Salary advance',r.advance||0]], earn=[['Gross pay',r.gross||0]];
+    var ot=r.otPay||0, nt=r.nightPay||0, earn;
+    if(ot||nt){ earn=[['Pay for days worked',(r.gross||0)-ot-nt]]; if(ot) earn.push(['Overtime ('+(r.otHrs||0)+' hrs)',ot]); if(nt) earn.push(['Night shift allowance ('+(r.nights||0)+')',nt]); }
+    else earn=[['Gross pay',r.gross||0]];
+    var ded=[['Provident fund (PF)',r.pf||0],['ESI',r.esi||0],['Professional tax',r.pt||0],['Salary advance',r.advance||0]];
+    if(r.otherDed) ded.push(['Other deduction',r.otherDed]);
     var top=y+20, rows=Math.max(earn.length,ded.length);
     function line(x,yy,a,v){ pb.text(x+8,yy+13.5,a,9); pb.text(x+half-8,yy+13.5,pdfMoney(v),9,{align:'right'}); pb.line(x,yy+20,x+half,yy+20,0.35,C.line); }
     earn.forEach(function(e,i){ line(lx,top+i*20,e[0],e[1]); }); ded.forEach(function(d,i){ line(rx,top+i*20,d[0],d[1]); });
-    var ty=top+rows*20, totalDed=ded.reduce(function(s,d){return s+d[1];},0);
+    var ty=top+rows*20, totalDed=ded.reduce(function(s2,d){return s2+d[1];},0);
     pb.rect(lx,ty,half,22,{fill:C.paper}); pb.text(lx+8,ty+14.5,'Total earnings',9,{bold:true}); pb.text(lx+half-8,ty+14.5,pdfMoney(r.gross||0),9,{bold:true,align:'right'});
     pb.rect(rx,ty,half,22,{fill:C.paper}); pb.text(rx+8,ty+14.5,'Total deductions',9,{bold:true}); pb.text(rx+half-8,ty+14.5,pdfMoney(totalDed),9,{bold:true,align:'right'});
     y=ty+22+16;
@@ -3714,9 +3769,11 @@ tr:hover td{background:var(--line2)}
     y+=30+16; pb.text(ML,y,'Amount in words',8.2,{color:C.mute}); y+=12;
     var netAmt=Math.round((r.net||0)*100)/100, rupees=Math.floor(netAmt), paise=Math.round((netAmt-rupees)*100);
     pb.wrap('Rupees '+pdfWords(rupees)+(paise?' and '+pdfWords(paise)+' Paise':'')+' only',CW,9,true).forEach(function(l){ pb.text(ML,y,l,9,{bold:true}); y+=11.5; });
-    y+=10;
+    y+=4;
+    if(r.pfEr!=null){ pb.text(ML,y+6,'Employer contributions this month: PF Rs. '+pdfMoney(r.pfEr)+', ESIC Rs. '+pdfMoney(r.esiEr||0)+'.',8,{color:C.mute}); y+=18; }
+    y+=6;
     var sg=(state.settings&&state.settings.signature)||{};
-    var imgIdx=-1; if(sg.b64 && sg.w && sg.h){ imgIdx=pb.addImage(pdfB64Bytes(sg.b64), sg.w, sg.h); }
+    if(pb._sigIdx===undefined){ pb._sigIdx=(sg.b64 && sg.w && sg.h)? pb.addImage(pdfB64Bytes(sg.b64), sg.w, sg.h) : -1; }
     if(sg.stamp!==false && run && run.approvedAt){
       var bw=270, bh=58;
       pb.rect(ML,y,bw,bh,{stroke:C.goldDk,lw:0.9});
@@ -3728,10 +3785,10 @@ tr:hover td{background:var(--line2)}
     } else {
       pb.text(ML,y,'Approved on '+(run&&run.approvedAt? pdfStampDate(run.approvedAt):'-')+' by '+((run&&run.approvedByLabel)||'-')+'.',8.4,{color:C.mute}); y+=30;
     }
-    payslipSignature(pb,y,ML,MR,imgIdx,sg);
-    pdfFoot(pb,'Computer-generated payslip');
-    return pb.build();
+    payslipSignature(pb,y,ML,MR,pb._sigIdx,sg);
   }
+  function buildPayslipPdf(r,run,ym){ var pb=pdfNew(false); drawPayslip(pb,r,run,ym); pdfFoot(pb,'Computer-generated payslip'); return pb.build(); }
+  function buildAllPayslipsPdf(run,ym){ var pb=pdfNew(false); (run.rows||[]).forEach(function(r){ drawPayslip(pb,r,run,ym); }); pdfFoot(pb,'Computer-generated payslip',true); return pb.build(); }
 
   /* ---------- payroll register (all employees for the month) ---------- */
   function buildPayrollRegisterPdf(run,ym){
@@ -4465,6 +4522,444 @@ tr:hover td{background:var(--line2)}
     }
     renderAll();
     setSiteMsg('Removed "'+name+'".', false);
+  }
+
+  // ======== PAY CYCLE: the guided monthly workflow (attendance to reports) ========
+  var CYC_STEPS=[
+    {n:1,id:'attendance',label:'Attendance and shifts'},
+    {n:2,id:'review',label:'Overtime, leave and absences'},
+    {n:3,id:'calculate',label:'Calculate payroll'},
+    {n:4,id:'validate',label:'Validate PF, ESI and deductions'},
+    {n:5,id:'approval',label:'Manager approval'},
+    {n:6,id:'payslips',label:'Payslips and bank file'},
+    {n:7,id:'reports',label:'Reports and history'}];
+  var cyc={month:'',step:'overview'}, cycles={}, cycPend={}, cycQ={}, extrasMap={}, allRuns={}, cycAttCache={}, cycSeq=0, cycDirty=false;
+
+  function cycMonth(){ if(!cyc.month) cyc.month=xAddMonth(thisMonth(),-1); return cyc.month; }
+  function cycKey(ym){ return ym.replace('-',''); }
+  function cycDoc(ym){ return cycles[cycKey(ym)]||{log:[]}; }
+  function cycRun(ym){
+    var k=cycKey(ym), x=allRuns[k], y=runCache[k];
+    if(x && y) return ((y.calculatedAt||0)>=(x.calculatedAt||0)) ? y : x;   // the newest copy, including changes saved a moment ago
+    return x||y||null;
+  }
+  function cycClosed(ym){ return !!cycDoc(ym).closed; }
+  function cycEmps(ym){ return state.employees.filter(function(e){ return employedInMonth(e,ym); }).sort(compareByEmpCode); }
+  function cycValidatedOk(ym){ var c=cycDoc(ym), r=cycRun(ym); return !!(c.validated && r && r.calculatedAt && c.validatedStamp===r.calculatedAt); }
+  function cycDone(id,ym){
+    var c=cycDoc(ym), r=cycRun(ym);
+    switch(id){
+      case 'attendance': return !!c.attConfirmed;
+      case 'review': return !!c.reviewed;
+      case 'calculate': return !!(r && r.rows && r.rows.length);
+      case 'validate': return cycValidatedOk(ym);
+      case 'approval': return !!(r && r.status==='approved');
+      case 'payslips': return !!c.closed;
+      case 'reports': return !!c.closed;
+    }
+    return false;
+  }
+  function cycNext(ym){ for(var i=0;i<CYC_STEPS.length;i++){ if(!cycDone(CYC_STEPS[i].id,ym)) return CYC_STEPS[i].id; } return null; }
+  function cycStatus(ym){
+    var c=cycDoc(ym), r=cycRun(ym);
+    if(c.closed) return ['Closed','ok'];
+    if(r && r.status==='approved') return ['Approved','ok'];
+    if(r && r.status==='submitted') return ['Awaiting approval','warn'];
+    if(r && r.status==='rejected') return ['Sent back','bad'];
+    if(cycValidatedOk(ym)) return ['Validated','info'];
+    if(r && r.rows && r.rows.length) return ['Calculated','info'];
+    return ['Draft','mute'];
+  }
+
+  // ---------- saving the cycle record (step confirmations and the activity log) ----------
+  function patchCycle(ym, patch, msg){
+    var key=cycKey(ym), base=cycles[key]||{log:[]}, next=Object.assign({}, base, patch||{});
+    if(msg){ next.log=(base.log||[]).concat([{t:new Date().toISOString(), by:(me&&me.id)||null, who:(me&&(me.name||me.email))||'Someone', msg:msg}]).slice(-200); }
+    cycles[key]=next;
+    if(!db){ cycRefresh(true); return Promise.resolve(); }
+    cycPend[key]=(cycPend[key]||0)+1;
+    cycQ[key]=(cycQ[key]||Promise.resolve()).catch(function(){}).then(function(){ return db.doc('payCycles/'+key).set(next); })
+      .catch(function(e){ toast('Could not save: '+(e&&e.code||'error')); })
+      .then(function(){ cycPend[key]--; });
+    cycRefresh(true);
+    return cycQ[key];
+  }
+  function cycleReset(ym){
+    cycAttCache={};
+    var c=cycles[cycKey(ym)];
+    if(!c || c.closed) return;
+    if(c.reviewed || c.validated) patchCycle(ym,{reviewed:false,validated:false,issues:null},'Attendance or employee data changed, so the review and validation must be done again');
+  }
+  function subscribeCycleData(){
+    if(!db) return;
+    try{
+      db.collection('payCycles').onSnapshot(function(snap){
+        var o={}; snap.docs.forEach(function(d){ o[d.id]=d.data(); });
+        Object.keys(cycles).forEach(function(k){ if(cycPend[k]>0) o[k]=cycles[k]; });
+        cycles=o; cycRefresh();
+      }, function(){});
+      db.collection('monthExtras').onSnapshot(function(snap){
+        var o={}; snap.docs.forEach(function(d){ var x=d.data(); if(x&&x.empId) o[x.empId+'|'+x.ym]=x; });
+        extrasMap=o; cycRefresh();
+      }, function(){});
+      db.collection('payrollRuns').onSnapshot(function(snap){
+        var o={}; snap.docs.forEach(function(d){ o[d.id]=d.data(); runCache[d.id]=d.data(); });
+        allRuns=o; cycRefresh();
+      }, function(){});
+    }catch(e){}
+  }
+
+  // ---------- small helpers ----------
+  function cycTotals(rows){
+    var t={n:rows.length,gross:0,pf:0,esi:0,pt:0,other:0,net:0,ot:0,pfEr:0,esiEr:0};
+    rows.forEach(function(r){
+      t.gross+=r.gross||0; t.pf+=r.pf||0; t.esi+=r.esi||0; t.pt+=r.pt||0; t.other+=(r.advance||0)+(r.otherDed||0); t.net+=r.net||0; t.ot+=(r.otPay||0)+(r.nightPay||0);
+      t.pfEr+= (r.pfEr!=null? r.pfEr : (r.pf||0));
+      t.esiEr+=(r.esiEr!=null? r.esiEr : ((r.esi||0)>0? Math.ceil((r.gross||0)*(state.settings.esiErRate==null?3.25:state.settings.esiErRate)/100):0));
+    });
+    t.cost=t.gross+t.pfEr+t.esiEr; return t;
+  }
+  function cycGate(items){
+    return '<div class="banner"><b>This step is not ready yet.</b><ul style="margin:.4rem 0 0 1.1rem">'+items.map(function(i){ return '<li>'+escapeHtml(i[1])+' <button class="btn small" data-cyc="go" data-step="'+i[0]+'">Go to step</button></li>'; }).join('')+'</ul></div>';
+  }
+  function cycLogHtml(ym){
+    var l=(cycDoc(ym).log||[]).slice().reverse();
+    if(!l.length) return '<p class="muted" style="margin:0">Nothing recorded yet for this month.</p>';
+    return '<ul style="list-style:none;margin:0;padding:0">'+l.slice(0,30).map(function(x){
+      var d=new Date(x.t);
+      return '<li style="padding:6px 0;border-bottom:1px solid var(--line2)"><span class="muted">'+escapeHtml(d.toLocaleDateString('en-IN',{day:'numeric',month:'short'})+', '+d.toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'}))+'</span> <b>'+escapeHtml(x.who||'Someone')+':</b> '+escapeHtml(x.msg)+'</li>';
+    }).join('')+'</ul>';
+  }
+  function cycGaps(){
+    var out=[];
+    state.employees.filter(function(e){return e.active!==false;}).forEach(function(e){
+      empGaps(e).forEach(function(g){ if(/UAN|ESIC|Bank/i.test(g)) out.push([e,g]); });
+    });
+    return out;
+  }
+  function cycRowsTable(rows,t){
+    var h='<div class="scrollx"><table><thead><tr><th>ID</th><th>Employee</th><th>Site</th><th class="right">Paid days</th><th class="right">Gross</th><th class="right">OT and shifts</th><th class="right">PF</th><th class="right">ESI</th><th class="right">PT</th><th class="right">Advance and other</th><th class="right">Net pay</th></tr></thead><tbody>';
+    rows.forEach(function(r){
+      h+='<tr><td>'+escapeHtml(r.empCode||'')+'</td><td>'+escapeHtml(r.name)+'</td><td>'+escapeHtml(r.site||'')+'</td><td class="right">'+r.present+'/'+r.dim+'</td><td class="right">'+fmtMoney(r.gross)+'</td><td class="right">'+fmtMoney((r.otPay||0)+(r.nightPay||0))+'</td><td class="right">'+fmtMoney(r.pf)+'</td><td class="right">'+fmtMoney(r.esi)+'</td><td class="right">'+fmtMoney(r.pt)+'</td><td class="right">'+fmtMoney((r.advance||0)+(r.otherDed||0))+'</td><td class="right"><b>'+fmtMoney(r.net)+'</b></td></tr>';
+    });
+    return h+'</tbody><tfoot><tr><td colspan="4">Total for '+t.n+' employees</td><td class="right">'+fmtMoney(t.gross)+'</td><td class="right">'+fmtMoney(t.ot)+'</td><td class="right">'+fmtMoney(t.pf)+'</td><td class="right">'+fmtMoney(t.esi)+'</td><td class="right">'+fmtMoney(t.pt)+'</td><td class="right">'+fmtMoney(t.other)+'</td><td class="right">'+fmtMoney(t.net)+'</td></tr></tfoot></table></div>';
+  }
+  async function cycLoadAtt(ym){
+    if(cycAttCache[ym]) return cycAttCache[ym];
+    var emps=cycEmps(ym), out={};
+    for(var i=0;i<emps.length;i+=10){
+      await Promise.all(emps.slice(i,i+10).map(async function(e){ var doc=await getAttendanceDoc(e.id,ym); out[e.id]=attendanceMarks(e,ym,(doc&&doc.days)||{}); }));
+    }
+    cycAttCache[ym]=out; return out;
+  }
+  function exOf(id,ym){ return extrasMap[id+'|'+ym]||{}; }
+
+  // ---------- validation checks (step 4) ----------
+  function cycChecks(ym){
+    var run=cycRun(ym), out=[], seen={}, st=state.settings;
+    ((run&&run.rows)||[]).forEach(function(r){
+      var e=state.employees.find(function(x){return x.id===r.empId;})||{};
+      function add(lv,msg){ out.push({lv:lv,id:r.empId,name:r.name,msg:msg}); }
+      if(e.pfApplicable && !/^\d{12}$/.test(String(e.uan||'').replace(/\s/g,''))) add('error','UAN is missing or is not 12 digits. It is needed for PF.');
+      if(e.esiApplicable && (r.esi||0)>0 && !String(e.esic||'').trim()) add('error','ESIC number is missing.');
+      if(!/^\d{9,18}$/.test(String(e.bankAcc||'').replace(/\s/g,''))) add('error','Bank account number is missing or invalid.');
+      if(!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(String(e.ifsc||'').toUpperCase().replace(/\s/g,''))) add('error','IFSC code is missing or invalid.');
+      if((r.net||0)<0) add('error','Deductions are higher than earnings, so net pay is negative.');
+      if(!(r.present>0)) add('warn','No payable days this month. Net pay is zero.');
+      if(e.esiApplicable && !((r.esi||0)>0) && (r.present>0)) add('warn','Marked ESI applicable, but pay is above the ESI limit, so no ESI is deducted.');
+      var basicEarned=((r.gross||0)-(r.otPay||0)-(r.nightPay||0))*(st.basicPct||50)/100;
+      if(e.pfApplicable && st.pfCeilingEnabled && basicEarned>(st.pfCeiling||15000)) add('warn','Basic pay is above the PF wage ceiling. PF is limited to '+fmtMoney((st.pfCeiling||15000)*(st.pfRate||12)/100)+'.');
+      if((r.otHrs||0)>(st.otWarnHours||50)) add('warn','Overtime of '+r.otHrs+' hours is unusually high.');
+      var acct=String(e.bankAcc||'').replace(/\s/g,''); if(acct) (seen[acct]=seen[acct]||[]).push(r.name);
+    });
+    Object.keys(seen).forEach(function(k){ if(seen[k].length>1) out.push({lv:'warn',id:null,name:seen[k].join(', '),msg:'These employees share one bank account number.'}); });
+    return out;
+  }
+
+  // ---------- the pages ----------
+  var CYC_PAGES={};
+  CYC_PAGES.overview=async function(){
+    var ym=cycMonth(), r=cycRun(ym), st=cycStatus(ym), next=cycNext(ym), emps=cycEmps(ym), gaps=cycGaps();
+    if(!state.employees.length) return '<div class="card"><h2>Welcome to the pay cycle</h2><p class="muted">Add your employees first. The same seven steps then repeat every month.</p><button class="btn" data-cyc="tab" data-tab="employees">Go to Employees</button></div>';
+    var nl=next?CYC_STEPS.filter(function(s){return s.id===next;})[0].label:null, t=r&&r.rows?cycTotals(r.rows):null;
+    var h='<div class="card" style="border-left:4px solid var(--brand)"><div class="row" style="justify-content:space-between;align-items:center"><div><h2 style="margin:0">'+escapeHtml(xMonthLabel(ym))+' payroll</h2><p class="muted" style="margin:.3rem 0 0">'+(next?'Next up: '+escapeHtml(nl)+'.':'This month is closed. Payslips, the bank file and reports are available.')+'</p></div>'+
+      (next?'<button class="btn" data-cyc="go" data-step="'+next+'">Continue: '+escapeHtml(nl)+'</button>':'<button class="btn" data-cyc="go" data-step="reports">Open reports</button>')+'</div></div>';
+    h+='<div class="card"><div class="stat-grid"><div class="stat"><b>'+emps.length+'</b><span>Employees this month</span></div><div class="stat"><b>'+(t?fmtMoney(t.net):'Not yet')+'</b><span>Net pay</span></div><div class="stat"><b>'+(t?fmtMoney(t.cost):'Not yet')+'</b><span>Cost to company</span></div><div class="stat"><b>'+xTag(st[0],st[1])+'</b><span>Status</span></div></div></div>';
+    h+='<div class="card"><h2>Pay cycle</h2><p class="muted">Seven steps repeat every month. Each one opens when the one before it is done.</p><ol class="cyc-steps">';
+    CYC_STEPS.forEach(function(s){ var d=cycDone(s.id,ym); h+='<li class="'+(d?'done':'')+' '+(next===s.id?'next':'')+'"><span class="dot">'+(d?'\u2713':s.n)+'</span><span style="flex:1">'+escapeHtml(s.label)+'</span><button class="btn small ghost" data-cyc="go" data-step="'+s.id+'">Open</button></li>'; });
+    h+='</ol></div><div class="card"><h2>Employee records to fix</h2><p class="muted">Missing details will stop the validation step later.</p>';
+    if(!gaps.length) h+='<p class="muted" style="margin:0">All active employees have their UAN, ESIC and bank details.</p>';
+    else{ h+='<ul style="list-style:none;margin:0;padding:0">'+gaps.slice(0,8).map(function(g){ return '<li style="padding:6px 0;border-bottom:1px solid var(--line2)"><b>'+escapeHtml(g[0].name)+'</b> <span class="muted">'+escapeHtml(g[1])+'</span> <button class="btn small ghost" data-cyc="fixEmp" data-id="'+g[0].id+'">Fix</button></li>'; }).join('')+'</ul>'; if(gaps.length>8) h+='<p class="muted">and '+(gaps.length-8)+' more</p>'; }
+    return h+'</div><div class="card"><h2>Activity</h2><p class="muted">Who did what for this month.</p>'+cycLogHtml(ym)+'</div>';
+  };
+
+  CYC_PAGES.attendance=async function(){
+    var ym=cycMonth(), D=daysInMonth(ym), emps=cycEmps(ym), closed=cycClosed(ym), c=cycDoc(ym);
+    var h='';
+    if(closed) h+='<div class="banner">This month is closed, so attendance and shifts are locked.</div>';
+    h+='<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><p class="muted" style="margin:0;max-width:64ch">'+escapeHtml(xMonthLabel(ym))+' has '+D+' days. Mark each day present, absent, half day or leave in the daily attendance. Then enter overtime hours, night shifts and any other deduction here.</p><button class="btn ghost" data-cyc="openAtt">Open daily attendance</button></div></div>';
+    if(!emps.length) return h+'<div class="card"><p class="muted" style="margin:0">No employees were working in '+escapeHtml(xMonthLabel(ym))+'.</p></div>';
+    h+='<div class="card"><div class="scrollx"><table><thead><tr><th>Employee</th><th class="right">OT hours</th><th class="right">Night shifts</th><th class="right">Other deduction (\u20b9)</th><th>Note</th></tr></thead><tbody>';
+    emps.forEach(function(e){
+      var x=exOf(e.id,ym), dis=closed?' disabled':'';
+      function inp(f,step){ return '<td class="right"><input type="number" min="0" step="'+step+'" style="width:96px" data-extra="'+f+'" data-id="'+e.id+'" value="'+(x[f]!=null&&x[f]!==0?x[f]:'')+'" aria-label="'+f+' for '+escapeHtml(e.name)+'"'+dis+'></td>'; }
+      h+='<tr><td><b>'+escapeHtml(e.name)+'</b><div class="muted">'+escapeHtml(e.empCode||'')+' \u00b7 '+escapeHtml(e.site||'No site')+'</div></td>'+inp('ot','0.5')+inp('night','1')+inp('otherDed','1')+'<td><input type="text" data-extra="note" data-id="'+e.id+'" value="'+escapeHtml(x.note||'')+'" placeholder="Optional note" style="min-width:160px"'+dis+'></td></tr>';
+    });
+    h+='</tbody></table></div><p class="muted">Changes save automatically. Overtime is paid at '+(state.settings.otMult||2)+' times the hourly basic rate. Each night shift adds '+fmtMoney(state.settings.nightAllowance==null?150:state.settings.nightAllowance)+'. Both rates are in Settings.</p></div>';
+    if(!closed) h+='<div class="card"><div class="row" style="align-items:center"><button class="btn" data-cyc="confirmAtt"'+(c.attConfirmed?' disabled':'')+'>'+(c.attConfirmed?'Attendance confirmed':'Confirm attendance and shifts')+'</button><span class="muted">'+(c.attConfirmed?'You can continue to the review.':'Confirm once every day is marked and extras are entered.')+'</span></div></div>';
+    return h;
+  };
+
+  CYC_PAGES.review=async function(){
+    var ym=cycMonth(), c=cycDoc(ym), closed=cycClosed(ym);
+    if(!c.attConfirmed) return cycGate([['attendance','Confirm attendance and shifts']]);
+    var att=await cycLoadAtt(ym), emps=cycEmps(ym);
+    var rows=emps.filter(function(e){ var a=att[e.id]||{marks:[]}, x=exOf(e.id,ym), cnt=cycMarkCounts(a); return cnt.A||cnt.H||cnt.L||x.ot||x.night||x.otherDed||x.note||(typeof suggestedAdvanceDeduction==='function'&&suggestedAdvanceDeduction(e.id)>0); });
+    var h='';
+    if(closed) h+='<div class="banner">This month is closed, so the review is locked.</div>';
+    else if(c.reviewed) h+='<div class="banner">Review confirmed. You can continue to calculate payroll.</div>';
+    h+='<div class="card"><p class="muted" style="margin:0 0 .8rem;max-width:70ch">These employees have absences, half days, leave, overtime, night shifts, advances or deductions this month. Check them, add a note where something needs explaining, then confirm.</p>';
+    if(!rows.length) h+='<p class="muted" style="margin:0"><b>No exceptions this month.</b> Everyone worked a regular month.</p>';
+    else{
+      h+='<div class="scrollx"><table><thead><tr><th>Employee</th><th class="right">Absent</th><th class="right">Half days</th><th class="right">Leave</th><th class="right">OT hours</th><th class="right">Night shifts</th><th class="right">Advance</th><th class="right">Other deduction</th><th>Note</th></tr></thead><tbody>';
+      rows.forEach(function(e){
+        var cnt=cycMarkCounts(att[e.id]||{marks:[]}), x=exOf(e.id,ym), adv=(typeof suggestedAdvanceDeduction==='function')?suggestedAdvanceDeduction(e.id):0;
+        h+='<tr><td><b>'+escapeHtml(e.name)+'</b><div class="muted">'+escapeHtml(e.site||'')+'</div></td><td class="right">'+cnt.A+'</td><td class="right">'+cnt.H+'</td><td class="right">'+cnt.L+'</td><td class="right">'+((x.ot||0)>(state.settings.otWarnHours||50)?xTag(String(x.ot),'warn'):(x.ot||0))+'</td><td class="right">'+(x.night||0)+'</td><td class="right">'+fmtMoney(adv||0)+'</td><td class="right">'+fmtMoney(x.otherDed||0)+'</td><td><input type="text" data-extra="note" data-id="'+e.id+'" value="'+escapeHtml(x.note||'')+'" placeholder="Add a note" style="min-width:160px"'+(closed?' disabled':'')+'></td></tr>';
+      });
+      h+='</tbody></table></div>';
+    }
+    h+='</div>';
+    if(!closed) h+='<div class="card"><button class="btn" data-cyc="confirmReview"'+(c.reviewed?' disabled':'')+'>'+(c.reviewed?'Review confirmed':'Confirm review')+'</button></div>';
+    return h;
+  };
+  function cycMarkCounts(a){ var n={A:0,H:0,L:0}; (a.marks||[]).forEach(function(m){ if(n[m]!==undefined) n[m]++; }); return n; }
+
+  CYC_PAGES.calculate=async function(){
+    var ym=cycMonth(), c=cycDoc(ym), r=cycRun(ym), miss=[], closed=cycClosed(ym);
+    if(!c.attConfirmed) miss.push(['attendance','Confirm attendance and shifts']);
+    if(!c.reviewed && !(r&&r.rows)) miss.push(['review','Confirm the overtime, leave and absence review']);
+    if(miss.length && !(r&&r.rows)) return cycGate(miss);
+    var h='';
+    if(r && r.status==='rejected' && r.remark) h+='<div class="banner"><b>Sent back by approver:</b> '+escapeHtml(r.remark)+'</div>';
+    if(closed) h+='<div class="banner">This month is closed, so the calculation is locked.</div>';
+    h+='<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><p class="muted" style="margin:0;max-width:64ch">Pay is worked out from each wage amount and the attendance, plus overtime and night shifts. PF, ESI and professional tax rates come from Settings.</p>'+
+      (closed?'':'<button class="btn" data-cyc="calc">'+(r&&r.rows?'Recalculate payroll':'Calculate payroll for '+escapeHtml(xMonthLabel(ym)))+'</button>')+'</div></div>';
+    if(!(r&&r.rows&&r.rows.length)) return h+'<div class="card"><p class="muted" style="margin:0"><b>Payroll not calculated yet.</b> Calculate to see gross pay, deductions and net pay for each employee.</p></div>';
+    return h+'<div class="card">'+cycRowsTable(r.rows,cycTotals(r.rows))+'</div>';
+  };
+
+  CYC_PAGES.validate=async function(){
+    var ym=cycMonth(), c=cycDoc(ym), r=cycRun(ym), closed=cycClosed(ym);
+    if(!(r&&r.rows&&r.rows.length)) return cycGate([['calculate','Calculate monthly payroll']]);
+    var t=cycTotals(r.rows), h='';
+    h+='<div class="card"><div class="stat-grid"><div class="stat"><b>'+fmtMoney(t.pf)+'</b><span>PF from employees</span></div><div class="stat"><b>'+fmtMoney(t.pfEr)+'</b><span>PF by employer</span></div><div class="stat"><b>'+fmtMoney(t.esi)+'</b><span>ESI from employees</span></div><div class="stat"><b>'+fmtMoney(t.esiEr)+'</b><span>ESI by employer</span></div></div></div>';
+    h+='<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><p class="muted" style="margin:0;max-width:64ch">The checks cover UAN, ESIC number, bank details, negative pay and unusual values. Errors must be fixed. Warnings can be accepted.</p>'+(closed?'':'<button class="btn" data-cyc="runChecks">'+(c.issues?'Run checks again':'Run checks')+'</button>')+'</div></div>';
+    if(!c.issues) return h+'<div class="card"><p class="muted" style="margin:0"><b>Checks not run yet.</b> Run the checks before sending this payroll for approval.</p></div>';
+    var errs=c.issues.filter(function(i){return i.lv==='error';}), warns=c.issues.filter(function(i){return i.lv==='warn';});
+    if(cycValidatedOk(ym)) h+='<div class="banner"><b>Validated.</b> '+(warns.length?warns.length+' warning'+(warns.length>1?'s':'')+' accepted. ':'No issues found. ')+'This payroll can go for approval.</div>';
+    else if(errs.length) h+='<div class="banner" style="border-color:var(--bad)"><b>'+errs.length+' error'+(errs.length>1?'s':'')+' to fix.</b> Update the employee record, recalculate, then run the checks again.</div>';
+    else h+='<div class="banner"><b>The payroll was recalculated after these checks.</b> Run the checks again.</div>';
+    if(c.issues.length){
+      h+='<div class="card"><div class="scrollx"><table><thead><tr><th>Level</th><th>Employee</th><th>Issue</th><th></th></tr></thead><tbody>';
+      errs.concat(warns).forEach(function(i){ h+='<tr><td>'+xTag(i.lv==='error'?'Error':'Warning',i.lv==='error'?'bad':'warn')+'</td><td><b>'+escapeHtml(i.name)+'</b></td><td>'+escapeHtml(i.msg)+'</td><td>'+((i.id&&!closed)?'<button class="btn small ghost" data-cyc="fixEmp" data-id="'+i.id+'">Fix</button>':'')+'</td></tr>'; });
+      h+='</tbody></table></div></div>';
+    }
+    return h;
+  };
+
+  CYC_PAGES.approval=async function(){
+    var ym=cycMonth(), r=cycRun(ym), c=cycDoc(ym);
+    if(!(r&&r.rows&&r.rows.length)) return cycGate([['calculate','Calculate monthly payroll']]);
+    var appr=r.status==='approved', sub=r.status==='submitted';
+    if(!cycValidatedOk(ym) && !sub && !appr) return cycGate([['validate','Validate PF, ESI and deductions']]);
+    var t=cycTotals(r.rows), st=cycStatus(ym), ident=await myIdentity(), amApprover=isApproverId(ident.id);
+    var h='<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">'+escapeHtml(xMonthLabel(ym))+' payroll summary</h2>'+xTag(st[0],st[1])+'</div><div class="stat-grid" style="margin-top:.8rem"><div class="stat"><b>'+t.n+'</b><span>Employees</span></div><div class="stat"><b>'+fmtMoney(t.gross)+'</b><span>Gross pay</span></div><div class="stat"><b>'+fmtMoney(t.gross-t.net)+'</b><span>Deductions</span></div><div class="stat"><b>'+fmtMoney(t.net)+'</b><span>Net pay</span></div><div class="stat"><b>'+fmtMoney(t.cost)+'</b><span>Cost to company</span></div></div></div>';
+    if(r.status==='rejected' && r.remark) h+='<div class="banner"><b>Last rejection:</b> '+escapeHtml(r.remark)+'</div>';
+    if(appr) h+='<div class="banner">Approved'+(r.approvedByLabel?' by '+escapeHtml(r.approvedByLabel):'')+'. Continue to payslips and the bank file.</div>';
+    else if(!sub){
+      h+='<div class="card"><h2>Send for approval</h2><p class="muted">An approver checks the totals and approves the payroll or sends it back. The person who submits it cannot approve it.</p><button class="btn" data-cyc="submit">Submit for approval</button></div>';
+    } else if(r.submittedBy===ident.id){
+      h+='<div class="banner">Waiting for someone else to approve. You submitted this payroll, so you cannot approve it yourself.</div>';
+    } else if(!amApprover){
+      h+='<div class="banner">Waiting for a payroll approver. Approvers are chosen in Settings.</div>';
+    } else {
+      h+='<div class="card"><h2>Your decision</h2><p class="muted">Rejecting sends the payroll back so it can be corrected and calculated again.</p><label class="muted" for="cycRemark">Reason (required when rejecting)</label><textarea id="cycRemark" rows="2" style="width:100%"></textarea><div class="row" style="margin-top:.8rem"><button class="btn" data-cyc="approve">Approve payroll</button><button class="btn ghost" data-cyc="reject">Reject and send back</button></div></div>';
+    }
+    return h+'<div class="card"><h2>Activity</h2>'+cycLogHtml(ym)+'</div>';
+  };
+
+  CYC_PAGES.payslips=async function(){
+    var ym=cycMonth(), r=cycRun(ym), c=cycDoc(ym);
+    if(!(r && r.status==='approved')) return cycGate([['approval','Get the payroll approved']]);
+    var closed=!!c.closed, canReopen=!!(me && (me.isOwner || isApproverId(me.id)));
+    var h=closed?'<div class="banner">'+escapeHtml(xMonthLabel(ym))+' is closed. Attendance and payroll are locked.'+(canReopen?' <button class="btn small ghost" data-cyc="reopen">Reopen month</button>':'')+'</div>'
+      :'<div class="card"><h2>Payslips and bank file</h2><p class="muted">Download what you need below. When everything has been paid and checked, close the month. Closing locks attendance and payroll for '+escapeHtml(xMonthLabel(ym))+'.</p><button class="btn" data-cyc="close">Close '+escapeHtml(xMonthLabel(ym))+'</button></div>';
+    h+='<div class="card"><h2>Downloads</h2><div class="row"><button class="btn" data-cyc="allSlips">All payslips (one PDF)</button><button class="btn ghost" data-cyc="bank">Bank transfer file (CSV)</button><button class="btn ghost" data-cyc="register">Payroll register (PDF)</button></div></div>';
+    h+='<div class="card"><div class="scrollx"><table><thead><tr><th>ID</th><th>Employee</th><th>Site</th><th class="right">Gross</th><th class="right">Deductions</th><th class="right">Net pay</th><th></th></tr></thead><tbody>';
+    r.rows.forEach(function(x){ h+='<tr><td>'+escapeHtml(x.empCode||'')+'</td><td>'+escapeHtml(x.name)+'</td><td>'+escapeHtml(x.site||'')+'</td><td class="right">'+fmtMoney(x.gross)+'</td><td class="right">'+fmtMoney(x.gross-x.net)+'</td><td class="right"><b>'+fmtMoney(x.net)+'</b></td><td><button class="btn small ghost" data-cyc="slip" data-id="'+x.empId+'">Payslip</button></td></tr>'; });
+    return h+'</tbody></table></div></div>';
+  };
+
+  CYC_PAGES.reports=async function(){
+    var ym=cycMonth(), r=cycRun(ym), h='';
+    if(r && r.rows && r.rows.length){
+      var t=cycTotals(r.rows), by={};
+      r.rows.forEach(function(x){ var k=x.site||'No site'; var b=by[k]||(by[k]={n:0,gross:0,net:0,cost:0}); var one=cycTotals([x]); b.n++; b.gross+=one.gross; b.net+=one.net; b.cost+=one.cost; });
+      if(!cycDoc(ym).closed) h+='<div class="banner">'+escapeHtml(xMonthLabel(ym))+' is not closed yet. These figures come from the latest calculation.</div>';
+      h+='<div class="card"><h2>Cost by site, '+escapeHtml(xMonthLabel(ym))+'</h2><p class="muted">Cost to company includes the employer share of PF and ESI.</p><div class="scrollx"><table><thead><tr><th>Site</th><th class="right">Employees</th><th class="right">Gross pay</th><th class="right">Net pay</th><th class="right">Cost to company</th></tr></thead><tbody>';
+      Object.keys(by).sort().forEach(function(k){ var b=by[k]; h+='<tr><td><b>'+escapeHtml(k)+'</b></td><td class="right">'+b.n+'</td><td class="right">'+fmtMoney(b.gross)+'</td><td class="right">'+fmtMoney(b.net)+'</td><td class="right">'+fmtMoney(b.cost)+'</td></tr>'; });
+      h+='</tbody><tfoot><tr><td>Total</td><td class="right">'+t.n+'</td><td class="right">'+fmtMoney(t.gross)+'</td><td class="right">'+fmtMoney(t.net)+'</td><td class="right">'+fmtMoney(t.cost)+'</td></tr></tfoot></table></div></div>';
+      h+='<div class="card"><h2>Statutory summary, '+escapeHtml(xMonthLabel(ym))+'</h2><p class="muted">Amounts to pay to the authorities for this month.</p><div class="scrollx"><table><thead><tr><th>Contribution</th><th class="right">Employees</th><th class="right">Employer</th><th class="right">Total</th></tr></thead><tbody>'+
+        '<tr><td>Provident fund</td><td class="right">'+fmtMoney(t.pf)+'</td><td class="right">'+fmtMoney(t.pfEr)+'</td><td class="right">'+fmtMoney(t.pf+t.pfEr)+'</td></tr>'+
+        '<tr><td>ESIC</td><td class="right">'+fmtMoney(t.esi)+'</td><td class="right">'+fmtMoney(t.esiEr)+'</td><td class="right">'+fmtMoney(t.esi+t.esiEr)+'</td></tr>'+
+        '<tr><td>Professional tax</td><td class="right">'+fmtMoney(t.pt)+'</td><td class="right">-</td><td class="right">'+fmtMoney(t.pt)+'</td></tr></tbody></table></div></div>';
+      if(r.status==='approved') h+='<div class="card"><div class="row"><button class="btn" data-cyc="register">Payroll register (PDF)</button><button class="btn ghost" data-cyc="bank">Bank transfer file (CSV)</button></div></div>';
+    } else h+='<div class="card"><p class="muted" style="margin:0"><b>No payroll calculated for '+escapeHtml(xMonthLabel(ym))+'.</b> Reports appear here once payroll is calculated.</p></div>';
+    var hist=Object.keys(allRuns).filter(function(k){return allRuns[k].rows&&allRuns[k].rows.length;}).sort().reverse();
+    h+='<div class="card"><h2>Payroll history</h2><p class="muted">All months with a calculated payroll.</p>';
+    if(!hist.length) h+='<p class="muted" style="margin:0">No history yet.</p>';
+    else{
+      h+='<div class="scrollx"><table><thead><tr><th>Month</th><th>Status</th><th class="right">Employees</th><th class="right">Net pay</th><th class="right">Cost to company</th><th></th></tr></thead><tbody>';
+      hist.forEach(function(k){ var x=allRuns[k], ymk=k.slice(0,4)+'-'+k.slice(4), s=cycStatus(ymk), tt=cycTotals(x.rows); h+='<tr><td><b>'+escapeHtml(xMonthLabel(ymk))+'</b></td><td>'+xTag(s[0],s[1])+'</td><td class="right">'+tt.n+'</td><td class="right">'+fmtMoney(tt.net)+'</td><td class="right">'+fmtMoney(tt.cost)+'</td><td><button class="btn small ghost" data-cyc="openRun" data-m="'+ymk+'">Open</button></td></tr>'; });
+      h+='</tbody></table></div>';
+    }
+    return h+'</div>';
+  };
+
+  // ---------- drawing the tab, the sidebar rail and the dashboard card ----------
+  function cycTabOpen(){ var s=document.getElementById('tab-cycle'); return !!(s && s.style.display!=='none'); }
+  function cycRefresh(force){
+    renderWorkflowRail(); renderCycleCard();
+    if(!cycTabOpen()) return;
+    var a=document.activeElement;
+    if(!force && a && document.getElementById('cycleMain') && document.getElementById('cycleMain').contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)){ cycDirty=true; return; }
+    renderCycle();
+  }
+  function renderCycStepper(){
+    var el=document.getElementById('cycStepper'); if(!el) return;
+    var ym=cycMonth(), next=cycNext(ym);
+    var h='<button class="btn small '+(cyc.step==='overview'?'':'ghost')+'" data-cyc="go" data-step="overview">Overview</button>';
+    CYC_STEPS.forEach(function(s){ var d=cycDone(s.id,ym); h+=' <button class="btn small '+(cyc.step===s.id?'':'ghost')+'" data-cyc="go" data-step="'+s.id+'">'+(d?'\u2713 ':s.n+'. ')+escapeHtml(s.label)+'</button>'; });
+    el.innerHTML=h;
+  }
+  async function renderCycle(){
+    var el=document.getElementById('cycleMain'); if(!el) return;
+    var seq=++cycSeq, ym=cycMonth(), mi=document.getElementById('cycMonth');
+    if(mi && mi.value!==ym) mi.value=ym;
+    renderCycStepper();
+    var st=cycStatus(ym), pill=document.getElementById('cycStatusPill'); if(pill) pill.innerHTML='<span class="muted">Status: </span>'+xTag(st[0],st[1]);
+    var html;
+    try{ html=await CYC_PAGES[cyc.step](); }catch(e){ console.error(e); html='<div class="banner">This step could not be shown. Reload the page and try again.</div>'; }
+    if(seq!==cycSeq) return;
+    el.innerHTML=html; cycDirty=false;
+  }
+  function renderCycleCard(){
+    var el=document.getElementById('cycleCard'); if(!el) return;
+    var ym=cycMonth(), next=cycNext(ym), n=CYC_STEPS.filter(function(s){return cycDone(s.id,ym);}).length, st=cycStatus(ym);
+    if(!state.employees.length){ el.innerHTML='<h2>Pay cycle</h2><p class="muted">Add your employees, then start the monthly pay cycle.</p>'; return; }
+    var nl=next?CYC_STEPS.filter(function(s){return s.id===next;})[0].label:null;
+    el.innerHTML='<div class="row" style="justify-content:space-between;align-items:center"><div><h2 style="margin:0">'+escapeHtml(xMonthLabel(ym))+' pay cycle</h2><p class="muted" style="margin:.3rem 0 0">'+n+' of '+CYC_STEPS.length+' steps done. '+(next?'Next up: '+escapeHtml(nl)+'.':'This month is closed.')+'</p></div><div class="row" style="flex:none;align-items:center">'+xTag(st[0],st[1])+'<button class="btn" data-cyc="go" data-step="'+(next||'overview')+'">'+(next?'Continue':'Open')+'</button></div></div>';
+  }
+  function cycGo(step, ym){
+    if(ym) cyc.month=ym;
+    cyc.step=step||'overview';
+    var b=document.getElementById('tabs-cycle'); if(b) b.click();
+    renderCycle();
+  }
+
+  // ---------- actions ----------
+  function cycMonthLink(tabId, monthInputId, fn){
+    var ym=cycMonth(), inp=document.getElementById(monthInputId);
+    if(inp) inp.value=ym;
+    if(fn) fn();
+    var b=document.getElementById(tabId); if(b) b.click();
+  }
+  async function cycSaveExtra(id, field, val){
+    var ym=cycMonth();
+    if(cycClosed(ym)){ toast('This month is closed. Reopen it to change attendance.'); cycRefresh(true); return; }
+    var key=id+'|'+ym, cur=Object.assign({empId:id, ym:ym}, extrasMap[key]||{});
+    if(field==='note') cur.note=String(val||'').trim();
+    else { var n=val===''?0:Number(val); cur[field]=(isFinite(n)&&n>0)?n:0; }
+    extrasMap[key]=cur;
+    if(db){ try{ await db.doc('monthExtras/'+id+'_'+ym.replace('-','')).set(cur); }catch(e){ toast('Could not save: '+(e&&e.code||'error')); return; } }
+    if(field!=='note') await invalidateRun(ym);
+  }
+  async function cycCalculate(){
+    var ym=cycMonth();
+    if(cycClosed(ym)){ toast('This month is closed.'); return; }
+    var pm=document.getElementById('payMonth'); if(pm) pm.value=ym;
+    await renderPayroll(); await calculateRun(ym);
+    cycRefresh(true);
+  }
+  async function cycRunChecks(){
+    var ym=cycMonth(), r=cycRun(ym); if(!r||!r.rows) return;
+    var issues=cycChecks(ym), errs=issues.filter(function(i){return i.lv==='error';}).length, warns=issues.length-errs;
+    await patchCycle(ym,{issues:issues, validated:errs===0, validatedStamp:r.calculatedAt}, errs? 'Checks run: '+errs+' error'+(errs>1?'s':'')+' to fix' : 'Checks run: validated'+(warns?' with '+warns+' warning'+(warns>1?'s':'')+' accepted':''));
+  }
+  async function cycAllPayslips(){
+    var ym=cycMonth(), r=cycRun(ym);
+    if(!(r&&r.status==='approved')){ toast('The payroll must be approved first.'); return; }
+    var blob; try{ blob=buildAllPayslipsPdf(r,ym); }catch(e){ console.error(e); toast('Could not build the payslips.'); return; }
+    await pdfSave(blob,'payslips-'+ym+'.pdf');
+  }
+  async function cycHandle(act, el){
+    var ym=cycMonth(), id=el&&el.dataset?el.dataset.id:null;
+    switch(act){
+      case 'go': cyc.step=el.dataset.step; renderCycle(); window.scrollTo(0,0); break;
+      case 'tab': { var b=document.getElementById('tabs-'+el.dataset.tab); if(b) b.click(); break; }
+      case 'openAtt': cycMonthLink('tabs-attendance','attMonth',function(){ renderAttendance(); }); break;
+      case 'confirmAtt': await patchCycle(ym,{attConfirmed:true,attConfirmedAt:Date.now()},'Attendance and shifts confirmed'); break;
+      case 'confirmReview': await patchCycle(ym,{reviewed:true},'Overtime, leave and absence review confirmed'); break;
+      case 'calc': await cycCalculate(); break;
+      case 'runChecks': await cycRunChecks(); break;
+      case 'submit': await submitRun(ym); cycRefresh(true); break;
+      case 'approve': await approveRun(ym); cycRefresh(true); break;
+      case 'reject': { var rm=document.getElementById('cycRemark'), txt=rm?rm.value.trim():''; if(!txt){ toast('Enter a reason for rejecting.'); break; } await rejectRun(ym,txt); cycRefresh(true); break; }
+      case 'allSlips': await cycAllPayslips(); break;
+      case 'bank': await exportCsv(ym); break;
+      case 'register': await downloadPayrollRegister(ym); break;
+      case 'slip': await downloadPayslip(id,ym); break;
+      case 'close': { var r=cycRun(ym); if(!(r&&r.status==='approved')){ toast('Approve the payroll before closing the month.'); break; } if(!confirm('Close '+xMonthLabel(ym)+'? Attendance and payroll will be locked.')) break; await patchCycle(ym,{closed:true,closedAt:Date.now()},'Month closed. Attendance and payroll are locked'); break; }
+      case 'reopen': { if(!confirm('Reopen '+xMonthLabel(ym)+'? Attendance and payroll can be changed again.')) break; await patchCycle(ym,{closed:false},'Month reopened'); break; }
+      case 'fixEmp': { var tb=document.getElementById('tabs-employees'); if(tb) tb.click(); openEmpModal(id); break; }
+      case 'openRun': cyc.month=el.dataset.m; cyc.step='overview'; renderCycle(); renderWorkflowRail(); renderCycleCard(); window.scrollTo(0,0); break;
+    }
+  }
+  function setupCycleUI(){
+    var root=document.getElementById('tab-cycle'); if(!root) return;
+    root.addEventListener('click', function(ev){ var el=ev.target.closest('[data-cyc]'); if(el && !el.disabled) cycHandle(el.dataset.cyc, el); });
+    root.addEventListener('change', function(ev){
+      var el=ev.target;
+      if(el.id==='cycMonth'){ if(el.value){ cyc.month=el.value; cycAttCache={}; renderCycle(); renderWorkflowRail(); renderCycleCard(); } return; }
+      if(el.dataset && el.dataset.extra) cycSaveExtra(el.dataset.id, el.dataset.extra, el.value);
+    });
+    root.addEventListener('focusout', function(){ if(cycDirty) setTimeout(function(){ if(cycDirty) renderCycle(); },200); });
+    var card=document.getElementById('cycleCard');
+    if(card) card.addEventListener('click', function(ev){ var el=ev.target.closest('[data-cyc]'); if(el) cycGo(el.dataset.step); });
+    var rail=document.getElementById('workflowRail');
+    if(rail) rail.addEventListener('click', function(ev){ var el=ev.target.closest('[data-cyc-go]'); if(el) cycGo(el.dataset.cycGo); });
+    var pool=document.getElementById('attnCard'); /* attention list keeps its own handler */
+  }
+  // settings for the pay cycle
+  function renderCycleSettings(){
+    if(!document.getElementById('setOtMult')) return;
+    var s=state.settings;
+    document.getElementById('setOtMult').value=s.otMult==null?2:s.otMult;
+    document.getElementById('setNightAllow').value=s.nightAllowance==null?150:s.nightAllowance;
+    document.getElementById('setEsiEr').value=s.esiErRate==null?3.25:s.esiErRate;
+    document.getElementById('setOtWarn').value=s.otWarnHours==null?50:s.otWarnHours;
+  }
+  function setupCycleSettings(){
+    var b=document.getElementById('btnSaveCycSettings'); if(!b) return;
+    b.addEventListener('click', async function(){
+      var s=state.settings;
+      s.otMult=Number(document.getElementById('setOtMult').value)||2;
+      s.nightAllowance=Math.max(0,Number(document.getElementById('setNightAllow').value)||0);
+      s.esiErRate=Number(document.getElementById('setEsiEr').value)||0;
+      s.otWarnHours=Number(document.getElementById('setOtWarn').value)||50;
+      if(!db){ toast('Storage unavailable.'); return; }
+      try{ await db.doc('settings/config').set(s); toast('Saved. Recalculate payroll to apply.'); }catch(e){ toast('Could not save: '+(e&&e.code||'')); }
+    });
   }
 
   init();
