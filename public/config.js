@@ -3,5 +3,6 @@
 window.PFSS_CONFIG = {
   SUPABASE_URL: "https://eyiulppjxmualumcjigm.supabase.co",
   SUPABASE_ANON_KEY: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImV5aXVscHBqeG11YWx1bWNqaWdtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE1MTc3OTQsImV4cCI6MjEwNzA5Mzc5NH0.vRhPWelUl4w0OtRhXFE8Iq-I2zUGFtkieORd_LEVpJY",
+  EMAIL_API_URL: "https://pfss-email.sharath9480.workers.dev",
   IDLE_MINUTES: 30   // automatic sign-out after this many idle minutes
 };
