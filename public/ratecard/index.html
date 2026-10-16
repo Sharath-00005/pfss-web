@@ -134,7 +134,10 @@ tr.sec td{background:var(--bg);color:var(--brand);font-weight:700}
         <div><label for="rt_eesic">Employee ESIC %</label><input id="rt_eesic" type="number" inputmode="decimal" step="0.01"></div>
       </div>
       <label class="chk" style="margin-top:14px"><input type="checkbox" id="rt_show"> Show employee deductions and in-hand salary</label>
-      <div class="muted" style="margin-top:6px">Turn this off for a client copy that shows only the 14 billing lines.</div>
+      <div class="muted" style="margin-top:6px">Turn this off for a client copy that shows only the billing lines.</div>
+      <label class="chk" style="margin-top:16px"><input type="checkbox" id="rt_extra"> Add an "Extra Hours" line</label>
+      <div class="muted" style="margin-top:6px">Enter the Extra Hours amount for each role. It is added to Total Wages (A).</div>
+      <div id="extraBox" hidden><label for="rt_extrahrs">Extra hours per day</label><input id="rt_extrahrs" type="number" inputmode="decimal" step="0.5"></div>
     </details>
 
     <div class="card totals" id="totals"></div>
@@ -357,6 +360,7 @@ var COMPANY={tradeName:'PUBLIC FORCE SECURITY SERVICES', legalName:'Satish Kumar
       'GST @ '+(Number(card.gstPct)||0)+'% will be charged additional as applicable.',
       'Any change in Minimum Wages, statutory contributions and/or taxes will be charged as per law.',
       'Wage calculation is considered for '+card.hours+' working hours per day and '+card.days+' working days per month.'];
+    if(card.showExtra) notes.push('The Extra '+(Number(card.extraHrs)||4)+' Hours line covers '+(Number(card.extraHrs)||4)+' additional working hours per day.');
     if(card.showEmp!==false) notes.push('Employee deductions and in-hand salary are shown for reference. They are paid from the Total Wages and are not added to the bill.');
     if(y+notes.length*12+80>LIMIT){ y=pdfHead(pb); }
     pb.text(ML,y+8,'Note:',8.8,{bold:true,color:C.goldDk}); y+=14;
@@ -381,7 +385,8 @@ var COMPANY={tradeName:'PUBLIC FORCE SECURITY SERVICES', legalName:'Satish Kumar
   function computeRole(card, role){
     var N=function(x){ return Number(x)||0; }, rnd=function(x){ return Math.round(x); }, r2=function(x){ return Math.round(x*100)/100; };
     var basic=N(role.basic), da=N(role.vda), special=N(role.specialAllowance), washing=N(role.washingAllowance), uniform=N(role.uniform);
-    var minWages=r2(basic+da+special), totalWages=r2(minWages+washing);
+    var extra=card.showExtra?N(role.extraHours):0;
+    var minWages=r2(basic+da+special), totalWages=r2(minWages+extra+washing);
     var wage=basic+da;
     var pf=rnd(wage*N(card.pfPct)/100), esic=rnd(wage*N(card.esicPct)/100), bonus=rnd(wage*N(card.bonusPct)/100);
     var subtotalB=pf+esic+bonus+uniform;
@@ -393,7 +398,7 @@ var COMPANY={tradeName:'PUBLIC FORCE SECURITY SERVICES', legalName:'Satish Kumar
     var empPfPct=card.empPfPct!=null?N(card.empPfPct):N(st.pfRate||12), empEsicPct=card.empEsicPct!=null?N(card.empEsicPct):N(st.esiRate||0.75);
     var empPf=rnd(wage*empPfPct/100), empEsic=rnd(wage*empEsicPct/100), pt=ptForState(card.state,totalWages);
     var inHand=r2(totalWages-empPf-empEsic-pt);
-    return {minWages:minWages, totalWages:totalWages, pf:pf, esic:esic, bonus:bonus, uniform:uniform, subtotalB:subtotalB, totalCost:totalCost,
+    return {minWages:minWages, extra:extra, totalWages:totalWages, pf:pf, esic:esic, bonus:bonus, uniform:uniform, subtotalB:subtotalB, totalCost:totalCost,
       serviceCharge:serviceCharge, grandTotal:grandTotal, gstAmt:gstAmt, totalBill:r2(grandTotal+gstAmt),
       empPf:empPf, empEsic:empEsic, pt:pt, inHand:inHand, empPfPct:empPfPct, empEsicPct:empEsicPct};
   }
@@ -401,31 +406,39 @@ var COMPANY={tradeName:'PUBLIC FORCE SECURITY SERVICES', legalName:'Satish Kumar
 
   function rateCardRows(card, roles){
     var pct=function(x){ return (Number(x)||0).toFixed(2)+'%'; };
-    var rows=[
-      [1,'Basic','-',function(r,c){return r.basic;}],
-      [2,'Dearness Allowance (D.A.)','-',function(r,c){return r.vda;}],
-      [3,'Special Allowance','-',function(r,c){return r.specialAllowance;}],
-      [4,'Minimum Wages','-',function(r,c){return c.minWages;},'sub'],
-      [5,'Washing Allowance','-',function(r,c){return r.washingAllowance;}],
-      [6,'Total Wages (A)','-',function(r,c){return c.totalWages;},'sub2'],
-      [7,'Provident Fund (PF)',pct(card.pfPct),function(r,c){return c.pf;}],
-      [8,'Employee State Insurance (ESIC)',pct(card.esicPct),function(r,c){return c.esic;}],
-      [9,'Bonus',pct(card.bonusPct),function(r,c){return c.bonus;}],
-      [10,'Uniform','Fixed',function(r,c){return c.uniform;}],
-      [11,'Sub Total - Statutory & Others (B)','-',function(r,c){return c.subtotalB;},'sub2'],
-      [12,'Total Cost (A + B)','-',function(r,c){return c.totalCost;},'sub'],
-      [13,'Service Charge @ '+(Number(card.servicePct)||0)+'%',(Number(card.servicePct)||0)+'%',function(r,c){return c.serviceCharge;}],
-      [14,'GRAND TOTAL (Per Person Per Month)','-',function(r,c){return c.grandTotal;},'grand']
-    ];
+    var rows=[];
+    function add(label,type,fn,style){ rows.push([0,label,type,fn,style]); }
+    add('Basic','-',function(r,c){return r.basic;});
+    add('Dearness Allowance (D.A.)','-',function(r,c){return r.vda;});
+    add('Special Allowance','-',function(r,c){return r.specialAllowance;});
+    add('Minimum Wages','-',function(r,c){return c.minWages;},'sub');
+    if(card.showExtra) add('Extra '+(Number(card.extraHrs)||4)+' Hours','-',function(r,c){return c.extra;});
+    add('Washing Allowance','-',function(r,c){return r.washingAllowance;});
+    add('Total Wages (A)','-',function(r,c){return c.totalWages;},'sub2');
+    add('Provident Fund (PF)',pct(card.pfPct),function(r,c){return c.pf;});
+    add('Employee State Insurance (ESIC)',pct(card.esicPct),function(r,c){return c.esic;});
+    add('Bonus',pct(card.bonusPct),function(r,c){return c.bonus;});
+    add('Uniform','Fixed',function(r,c){return c.uniform;});
+    add('Sub Total - Statutory & Others (B)','-',function(r,c){return c.subtotalB;},'sub2');
+    add('Total Cost (A + B)','-',function(r,c){return c.totalCost;},'sub');
+    add('Service Charge @ '+(Number(card.servicePct)||0)+'%',(Number(card.servicePct)||0)+'%',function(r,c){return c.serviceCharge;});
+    add('GRAND TOTAL (Per Person Per Month)','-',function(r,c){return c.grandTotal;},'grand');
     if(card.showEmp!==false){
       var st=state.settings||{}, ep=card.empPfPct!=null?card.empPfPct:(st.pfRate||12), ee=card.empEsicPct!=null?card.empEsicPct:(st.esiRate||0.75);
       rows.push(['','Employee deductions (from Total Wages, for reference)','',null,'section']);
-      rows.push([15,'Employee PF (on Basic + D.A.)',pct(ep),function(r,c){return c.empPf;}]);
-      rows.push([16,'Employee State Insurance (ESIC)',pct(ee),function(r,c){return c.empEsic;}]);
-      rows.push([17,'Professional Tax','-',function(r,c){return c.pt;}]);
-      rows.push([18,'IN-HAND SALARY (A - deductions)','-',function(r,c){return c.inHand;},'sub2']);
+      add('Employee PF (on Basic + D.A.)',pct(ep),function(r,c){return c.empPf;});
+      add('Employee State Insurance (ESIC)',pct(ee),function(r,c){return c.empEsic;});
+      add('Professional Tax','-',function(r,c){return c.pt;});
+      add('IN-HAND SALARY (A - deductions)','-',function(r,c){return c.inHand;},'sub2');
     }
+    var n=0; rows.forEach(function(r){ if(r[4]!=='section') r[0]=++n; });
     return rows;
+  }
+
+  // shows the "Extra hours" box on each role only while the option is ticked
+  function syncExtraFields(){
+    var on=document.getElementById('rcShowExtra').checked;
+    document.querySelectorAll('#rcRolesContainer .rc-extra').forEach(function(el){ el.style.display=on?'':'none'; });
   }
 
 
@@ -443,29 +456,30 @@ var state={settings:{pfRate:12,esiRate:0.75,ptSlabs:{Karnataka:[{min:0,max:24999
 var APP={id:null,card:null,roles:[],clients:[],saved:[],senders:null,view:'vForm',canWrite:true,msgEdited:false,db:null};
 function blankCard(){
   return {clientName:'',clientEmail:'',name:'Karnataka Minimum Wages - Zone 4',state:'Karnataka',hours:8,days:26,
-    pfPct:13,esicPct:3.25,bonusPct:8.33,servicePct:7,gstPct:18,empPfPct:state.settings.pfRate||12,empEsicPct:state.settings.esiRate||0.75,showEmp:true};
+    pfPct:13,esicPct:3.25,bonusPct:8.33,servicePct:7,gstPct:18,empPfPct:state.settings.pfRate||12,empEsicPct:state.settings.esiRate||0.75,showEmp:true,showExtra:false,extraHrs:4};
 }
 function blankRole(name){
   var c=state.settings.costing||{};
-  return {roleName:name||'',basic:'',vda:'',specialAllowance:'',washingAllowance:(c.washing!=null?c.washing:300),uniform:(c.uniform!=null?c.uniform:200)};
+  return {roleName:name||'',basic:'',vda:'',specialAllowance:'',extraHours:'',washingAllowance:(c.washing!=null?c.washing:300),uniform:(c.uniform!=null?c.uniform:200)};
 }
 function num(x){ return Number(x)||0; }
 function cardForPdf(){
   var c=APP.card;
   return {name:c.name||'Wage break-up',state:c.state,hours:num(c.hours)||8,days:num(c.days)||26,pfPct:num(c.pfPct),esicPct:num(c.esicPct),bonusPct:num(c.bonusPct),
-    servicePct:num(c.servicePct),gstPct:num(c.gstPct),empPfPct:num(c.empPfPct),empEsicPct:num(c.empEsicPct),showEmp:!!c.showEmp};
+    servicePct:num(c.servicePct),gstPct:num(c.gstPct),empPfPct:num(c.empPfPct),empEsicPct:num(c.empEsicPct),showEmp:!!c.showEmp,showExtra:!!c.showExtra,extraHrs:num(c.extraHrs)||4};
 }
 function rolesForPdf(){
-  return APP.roles.map(function(r,i){ return {roleName:(r.roleName||'').trim()||('Role '+(i+1)),basic:num(r.basic),vda:num(r.vda),specialAllowance:num(r.specialAllowance),washingAllowance:num(r.washingAllowance),uniform:num(r.uniform)}; });
+  return APP.roles.map(function(r,i){ return {roleName:(r.roleName||'').trim()||('Role '+(i+1)),basic:num(r.basic),vda:num(r.vda),specialAllowance:num(r.specialAllowance),extraHours:num(r.extraHours),washingAllowance:num(r.washingAllowance),uniform:num(r.uniform)}; });
 }
 function ready(){ return APP.roles.some(function(r){ return num(r.basic)>0; }); }
 
 /* ---------- the form ---------- */
 var CARD_FIELDS=[['cl_name','clientName','s'],['cl_email','clientEmail','s'],['rc_name','name','s'],['rc_state','state','s'],['rc_hours','hours','n'],['rc_days','days','n'],
-  ['rt_pf','pfPct','n'],['rt_esic','esicPct','n'],['rt_bonus','bonusPct','n'],['rt_service','servicePct','n'],['rt_gst','gstPct','n'],['rt_epf','empPfPct','n'],['rt_eesic','empEsicPct','n']];
+  ['rt_pf','pfPct','n'],['rt_esic','esicPct','n'],['rt_bonus','bonusPct','n'],['rt_service','servicePct','n'],['rt_gst','gstPct','n'],['rt_epf','empPfPct','n'],['rt_eesic','empEsicPct','n'],['rt_extrahrs','extraHrs','n']];
 function fillForm(){
   CARD_FIELDS.forEach(function(f){ $(f[0]).value=APP.card[f[1]]==null?'':APP.card[f[1]]; });
   $('rt_show').checked=APP.card.showEmp!==false;
+  $('rt_extra').checked=!!APP.card.showExtra; $('extraBox').hidden=!APP.card.showExtra;
   renderRoles(); renderTotals();
 }
 function renderRoles(){
@@ -476,7 +490,8 @@ function renderRoles(){
     return '<div class="role"><div class="rh"><input data-i="'+i+'" data-f="roleName" value="'+esc(r.roleName)+'" placeholder="Role name" aria-label="Role name">'+
       '<button type="button" class="btn sm ghost" data-dup="'+i+'" aria-label="Copy this role">Copy</button><button type="button" class="btn sm ghost" data-del="'+i+'" aria-label="Remove this role">Remove</button></div>'+
       '<div class="grid2" style="margin-top:8px">'+inp('basic','Basic')+inp('vda','Dearness Allowance (D.A.)')+'</div>'+
-      '<div class="grid3" style="margin-top:2px">'+inp('specialAllowance','Special')+inp('washingAllowance','Washing')+inp('uniform','Uniform')+'</div></div>';
+      '<div class="grid3" style="margin-top:2px">'+inp('specialAllowance','Special')+inp('washingAllowance','Washing')+inp('uniform','Uniform')+'</div>'+
+      (APP.card.showExtra?'<div style="margin-top:2px">'+inp('extraHours','Extra '+(num(APP.card.extraHrs)||4)+' Hours (\u20b9)')+'</div>':'')+'</div>';
   }).join('');
 }
 function renderTotals(){
@@ -490,6 +505,7 @@ function renderTotals(){
 function syncCardFromForm(){
   CARD_FIELDS.forEach(function(f){ APP.card[f[1]]=(f[2]==='n')?$(f[0]).value:$(f[0]).value; });
   APP.card.showEmp=$('rt_show').checked;
+  APP.card.showExtra=$('rt_extra').checked;
 }
 function matchClient(){
   var name=$('cl_name').value.trim().toLowerCase();
@@ -497,8 +513,9 @@ function matchClient(){
   if(c && c.email && !$('cl_email').value.trim()){ $('cl_email').value=c.email; APP.card.clientEmail=c.email; }
 }
 function bindForm(){
-  CARD_FIELDS.forEach(function(f){ $(f[0]).addEventListener('input',function(){ syncCardFromForm(); if(f[0]==='cl_name') matchClient(); renderTotals(); }); $(f[0]).addEventListener('change',function(){ syncCardFromForm(); renderTotals(); }); });
+  CARD_FIELDS.forEach(function(f){ $(f[0]).addEventListener('input',function(){ syncCardFromForm(); if(f[0]==='cl_name') matchClient(); if(f[0]==='rt_extrahrs') renderRoles(); renderTotals(); }); $(f[0]).addEventListener('change',function(){ syncCardFromForm(); renderTotals(); }); });
   $('rt_show').addEventListener('change',function(){ syncCardFromForm(); });
+  $('rt_extra').addEventListener('change',function(){ syncCardFromForm(); $('extraBox').hidden=!APP.card.showExtra; renderRoles(); renderTotals(); });
   $('roles').addEventListener('input',function(ev){
     var t=ev.target; if(t.dataset.i==null) return;
     APP.roles[Number(t.dataset.i)][t.dataset.f]=t.value; renderTotals();
@@ -559,8 +576,8 @@ function openSaved(id){
   var rc=APP.saved.filter(function(x){ return x.id===id; })[0]; if(!rc) return;
   APP.id=id; APP.card=Object.assign(blankCard(),{clientName:rc.clientName||'',clientEmail:rc.clientEmail||'',name:rc.name||'',state:rc.state||'Karnataka',hours:rc.hours||8,days:rc.days||26,
     pfPct:rc.pfPct,esicPct:rc.esicPct,bonusPct:rc.bonusPct,servicePct:rc.servicePct,gstPct:rc.gstPct,
-    empPfPct:rc.empPfPct!=null?rc.empPfPct:(state.settings.pfRate||12),empEsicPct:rc.empEsicPct!=null?rc.empEsicPct:(state.settings.esiRate||0.75),showEmp:rc.showEmp!==false});
-  APP.roles=(rc.roles||[]).map(function(r){ return {roleName:r.roleName||'',basic:r.basic||'',vda:r.vda||'',specialAllowance:r.specialAllowance||'',washingAllowance:r.washingAllowance||'',uniform:r.uniform||''}; });
+    empPfPct:rc.empPfPct!=null?rc.empPfPct:(state.settings.pfRate||12),empEsicPct:rc.empEsicPct!=null?rc.empEsicPct:(state.settings.esiRate||0.75),showEmp:rc.showEmp!==false,showExtra:!!rc.showExtra,extraHrs:rc.extraHrs||4});
+  APP.roles=(rc.roles||[]).map(function(r){ return {roleName:r.roleName||'',basic:r.basic||'',vda:r.vda||'',specialAllowance:r.specialAllowance||'',extraHours:r.extraHours||'',washingAllowance:r.washingAllowance||'',uniform:r.uniform||''}; });
   APP.msgEdited=false; fillForm(); showView('vForm'); toast('Opened. Change anything, then preview.');
 }
 async function removeSaved(id){
