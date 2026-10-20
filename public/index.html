@@ -4374,7 +4374,7 @@ tr:hover td{background:var(--line2)}
 
   /* ---------- company profile (brochure), 5 pages ---------- */
   function profileData(){ return (state.settings&&state.settings.profile)||{}; }
-  var PROFILE_ABOUT='Public Force Security Services is a Bengaluru-based provider of security services, manpower outsourcing and housekeeping and facility services. Working from Yelahanka New Town, we supply guards, supervisors and support staff to industrial units, offices, business parks and residential communities. We keep our clients\' sites protected and their paperwork in order: our staff are covered by PF and ESIC where applicable, paid at or above the minimum wage notified for the zone, and every monthly invoice comes with the attendance sheet and wage register behind it.';
+  var PROFILE_ABOUT='Public Force Security Services is a Bengaluru-based provider of security services, manpower outsourcing and housekeeping and facility services. Working from Yelahanka New Town, we supply guards, supervisors and support staff to industrial units, offices, business parks and residential communities. We keep our clients\' sites protected and their paperwork in order: our staff are covered by PF and ESIC where applicable, paid at or above the minimum wage notified for the zone, and every monthly invoice comes with the attendance sheet and wage register behind it. Our services are available PAN-India, so a client with sites in more than one city can deal with one agency.';
   // the technology and reporting services; the wording can be changed in Settings (one line each, as  Title: description)
   var PROFILE_TECH_DEFAULT=[
     ['Guard tracking app','Track your guards on duty through a mobile app.'],
@@ -4404,6 +4404,7 @@ tr:hover td{background:var(--line2)}
     pb.text(W/2,462,'Your safety, our mission',16,{italic:true,color:C.gold,align:'center'});
     pb.text(W/2,520,'COMPANY PROFILE',13,{bold:true,color:'#C9C6B8',align:'center'});
     pb.text(W/2,560,'Security services  |  Manpower outsourcing  |  Housekeeping and facility services',9.6,{color:C.white,align:'center'});
+    pb.text(W/2,590,'Serving clients PAN-India',12,{bold:true,color:C.gold,align:'center'});
     pb.line(ML+60,735,MR-60,735,0.8,C.gold);
     pb.text(W/2,762,'www.publicforcesecurity.com',13,{bold:true,color:C.white,align:'center'});
     pb.text(W/2,782,'Phone '+COMPANY.phone+'   |   '+COMPANY.email,10,{color:'#C9C6B8',align:'center'});
@@ -4434,14 +4435,16 @@ tr:hover td{background:var(--line2)}
       ['Supervised posts','Supervisors and area officers check every post, with relief cover for weekly offs and leave.'],
       ['Clear monthly billing','Invoice, attendance sheet and wage register come together every month.'],
       ['Statutory compliance','PF, ESIC, professional tax, bonus and leave are managed for all staff.'],
-      ['Rates you can follow','Rate cards are built line by line on the Karnataka minimum wages notification.'],
+      ['Rates you can follow','Rate cards are built line by line on the minimum wages notified for the state of your site.'],
       ['One point of contact','Our Operations Head is a single call away for any requirement.']];
     var colW=(CW-16)/2;
     why.forEach(function(it,i){ var x=ML+(i%2)*(colW+16), yy=y+Math.floor(i/2)*52;
       pb.rect(x,yy+2,8,8,{fill:C.gold}); pb.text(x+16,yy+10,it[0],10.4,{bold:true,color:C.ink});
       var ly=yy+23; pb.wrap(it[1],colW-18,9,false).forEach(function(l){ pb.text(x+16,ly,l,9,{color:C.mute}); ly+=11.5; }); });
     y+=3*52+6;
-    if(tx(prof.keyClients)){ sect('Our clients'); para(tx(prof.keyClients).split(/\s*,\s*/).filter(Boolean).join('   |   '),10,C.ink,14); }
+    var clientsLater=false;
+    function clientsBlock(){ sect('Our clients'); para(tx(prof.keyClients).split(/\s*,\s*/).filter(Boolean).join('   |   '),10,C.ink,14); }
+    if(tx(prof.keyClients)){ if(y+80<=HT-74) clientsBlock(); else clientsLater=true; }
 
     // ---- page 3: services and technology
     y=pdfHead(pb);
@@ -4460,7 +4463,12 @@ tr:hover td{background:var(--line2)}
       rl.forEach(function(l){ pb.text(ML+18,yy,l,9,{color:C.mute}); yy+=11.5; });
       y+=h+10;
     });
-    y+=8;
+    var panL=pb.wrap('We provide security services, manpower outsourcing and housekeeping and facility services across India. Tell us where your sites are and we will plan the deployment.',CW-44,9.8,false);
+    var panH=24+panL.length*13+14;
+    pb.rect(ML,y,CW,panH,{fill:'#212322'}); pb.rect(ML,y,5,panH,{fill:C.gold});
+    pb.text(ML+18,y+22,'PAN-India services',13,{bold:true,color:C.white});
+    var panY=y+38; panL.forEach(function(l){ pb.text(ML+18,panY,l,9.8,{color:'#E6E3D8'}); panY+=13; });
+    y+=panH+16;
     sect('Technology and reporting');
     var tech=profileTech(prof), tw=(CW-16)/2;
     for(var ti=0;ti<tech.length;ti+=2){
@@ -4475,7 +4483,7 @@ tr:hover td{background:var(--line2)}
     // ---- page 4: how we work, credentials, compliance
     y=pdfHead(pb);
     sect('How we work');
-    var steps=[['Understand your site','We visit, learn your posts and shifts, and agree what you need.'],['Rate card and proposal','You receive a clear cost sheet built on the Karnataka minimum wages.'],
+    var steps=[['Understand your site','We visit, learn your posts and shifts, and agree what you need.'],['Rate card and proposal','You receive a clear cost sheet built on the minimum wages notified for your state.'],
       ['Deployment','Verified guards and a supervisor are deployed, with relief cover.'],['Monthly service','Attendance, wage register and invoice reach you together each month.']];
     var sw=(CW-30)/4;
     steps.forEach(function(st,i){ var x=ML+i*(sw+10); pb.rect(x,y,sw,122,{fill:C.paper}); pb.rect(x,y,26,26,{fill:C.gold}); pb.text(x+13,y+18,String(i+1),13,{bold:true,color:C.white,align:'center'});
@@ -4489,8 +4497,9 @@ tr:hover td{background:var(--line2)}
     reg.forEach(function(r,i){ if(i%2===0) pb.rect(ML,y,CW,21,{fill:C.paper}); pb.text(ML+12,y+14,r[0],9.6,{color:C.mute}); pb.text(ML+190,y+14,r[1],10,{bold:true,color:C.ink}); y+=21; });
     y+=18;
     sect('Our commitment to compliance');
-    ['PF and ESIC contributions paid every month for eligible staff.','Wages at or above the minimum wage notified by the Government of Karnataka.','Professional tax, bonus and leave provided for.','A payslip for every employee, and the attendance sheet and wage register (Form XVII) with every invoice.'].forEach(function(t){
+    ['PF and ESIC contributions paid every month for eligible staff.','Wages at or above the minimum wage notified for the state where the staff work.','Professional tax, bonus and leave provided for.','A payslip for every employee, and the attendance sheet and wage register (Form XVII) with every invoice.'].forEach(function(t){
       pb.rect(ML+2,y+3,7,7,{fill:C.gold}); var ls=pb.wrap(t,CW-24,10,false); ls.forEach(function(l,i){ pb.text(ML+18,y+11+i*13.5,l,10,{color:C.ink}); }); y+=ls.length*13.5+6; });
+    if(clientsLater){ y+=14; clientsBlock(); }
 
     // ---- page 5: back cover with the contact details
     darkPage();
@@ -4500,7 +4509,7 @@ tr:hover td{background:var(--line2)}
     pb.wrap('Call or write to us for a site visit and a rate card for your requirement.',CW-120,11.5,false).forEach(function(l,i){ pb.text(W/2,314+i*16,l,11.5,{color:C.gold,align:'center'}); });
     var cy=392;
     function row(label,val){ pb.text(W/2-14,cy,label,10.5,{bold:true,color:C.gold,align:'right'}); pb.text(W/2+14,cy,val,13,{color:C.white}); cy+=36; }
-    row('Phone',COMPANY.phone); row('Email',COMPANY.email); row('Website','www.publicforcesecurity.com'); row('Operations Head','Sathish Reddy');
+    row('Phone',COMPANY.phone); row('Email',COMPANY.email); row('Website','www.publicforcesecurity.com'); row('Operations Head','Sathish Reddy'); row('Coverage','PAN-India services');
     pb.text(W/2-14,cy,'Address',10.5,{bold:true,color:C.gold,align:'right'});
     pb.wrap(COMPANY.address,236,11,false).forEach(function(l,i){ pb.text(W/2+14,cy+i*15,l,11,{color:'#E6E3D8'}); });
     pb.line(ML+60,735,MR-60,735,0.8,C.gold);
