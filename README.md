@@ -171,3 +171,44 @@ How it is worked out: employee PF 12% and employer PF 13% on wages up to the PF 
 The standard portals: EPFO https://unifiedportal-emp.epfindia.gov.in/epfo/ | ESIC https://www.esic.gov.in/ | Karnataka professional tax https://pt.kar.nic.in/ | GST https://www.gst.gov.in/ | Income tax (TDS) https://www.incometax.gov.in/ | TRACES https://www.tdscpc.gov.in/ | Karnataka Labour Welfare Board https://klwb.karnataka.gov.in/
 
 The links only open the official sites. Payments are made there with your own login. The app never asks for or stores portal passwords. PF admin and insurance charges are shown as about 1% of the PF wages; the EPFO challan has the exact amount.
+
+
+## GST for the month (Compliance, GST for the month)
+
+Pick the month. The screen reads the invoices dated in that month (drafts are left out) and sorts them into the GSTR-1 tables:
+- **Table 4A:** B2B invoices where you charge GST.
+- **Table 4B:** B2B invoices where the client pays the GST (reverse charge).
+- **Table 5 and Table 7:** invoices to unregistered clients (Table 5 only for inter-state invoices over Rs 2.5 lakh; otherwise Table 7, by state and rate).
+- **Table 8:** invoices to GST-exempt clients.
+- **Table 12:** the SAC summary, B2B and B2C.
+- **Table 13:** the first and last invoice number and how many were issued.
+An invoice with both reverse charge and normal lines is split between 4A and 4B.
+
+**GSTR-3B.** The screen shows the tax on your sales (IGST, CGST, SGST). Enter the input tax credit for the month (from your GST portal purchase statement, plus any balance carried forward) and it shows the credit used, the **cash to pay** and the credit left over. IGST credit pays IGST, then CGST, then SGST. CGST credit pays CGST, then IGST. SGST credit pays SGST, then IGST. The credit you enter is saved for the month.
+
+The two **filed** ticks are shared with the filing calendar. **Download the invoice list (CSV)** gives one row per invoice per table for your CA.
+
+**SAC code.** Settings, Invoice letterhead and bank details, has a SAC code box (998525, guard services, to start). It prints on every invoice and is used in Table 12.
+
+The figures come from your saved invoices. They help you prepare the return; your CA should check them before you file.
+
+
+## Company profile (brochure)
+
+**Settings, Company profile (brochure)** builds a 5-page PDF: a cover, About us, Our services with Technology and reporting, How we work with your credentials, and a back cover with the contact details. It uses your registrations, address and contacts. The Settings card lets an administrator add things that only you can vouch for. Each prints only if you fill it in:
+- the About us paragraph (a standard one is used if you leave it empty)
+- the technology and reporting services, one per line as `Title: description` (the standard list is the guard tracking app, attendance tracking, duty roster and relief cover, payroll and compliance, and the monthly billing pack). Change the wording to match exactly what you offer, and add more lines for anything else
+- years in business, clients served, staff deployed and sites covered
+- your PSARA licence number
+- the names of key clients
+
+**Download company profile PDF** builds it from what is in the boxes. Please read every line before you send it to a client, especially the "Why clients choose us" and "Our commitment to compliance" points.
+
+**In the phone app**, the email sheet has **Also send our company profile (PDF)**. The rate card and the profile go in one email as two PDFs. The app remembers your choice. Share offers both files too, and the preview has a **Download the company profile** button.
+
+**The email service must be updated once** for the profile to go by email. Until then the app says so, sends nothing, and still lets you use Share:
+- **Cloudflare Worker:** open the Worker in Cloudflare, click Edit code, replace everything with the new `worker/send-ratecard.js`, and click Deploy.
+- **Supabase function** (if you use that instead): replace the code of `send-ratecard` with the new `supabase/functions/send-ratecard/index.ts`, and deploy.
+The service now accepts up to two extra PDFs per email (6 MB in all) and logs how many were attached.
+
+The brochure shows one contact number, 99860 20293, and names Sathish Reddy as Operations Head. It does not mention the constitution of the business or the proprietor.
