@@ -304,6 +304,12 @@
       var r = await sb.storage.from(BUCKET).upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
       if (r.error) throw dbError(r.error);
       return { id: path, url: DOC_PREFIX + path, contentType: file.type, sizeBytes: file.size };
+    },
+    // the file itself (for example an employee photo for an ID card), fetched with the signed-in person's access
+    fetchBlob: async function (path) {
+      var r = await sb.storage.from(BUCKET).download(path);
+      if (r.error || !r.data) throw dbError(r.error || new Error('File not found'));
+      return r.data;
     }
   };
   document.addEventListener('click', async function (ev) {

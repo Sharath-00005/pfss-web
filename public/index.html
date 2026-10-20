@@ -216,7 +216,7 @@ tr:hover td{background:var(--line2)}
     <div class="card">
       <div class="row" style="justify-content:space-between">
         <h2>Employees</h2>
-        <button class="btn" id="btnAddEmp">+ Add employee</button>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn ghost" id="btnIdCards">ID cards</button><button class="btn" id="btnAddEmp">+ Add employee</button></div>
       </div>
       <div class="row" style="margin-top:1rem">
         <div class="field grow"><label>Search</label><input id="empSearch" placeholder="Search name or site..."></div>
@@ -911,6 +911,29 @@ tr:hover td{background:var(--line2)}
 </div>
 
 <!-- Billing pack modal -->
+<div class="modal-bg" id="idModalBg">
+  <div class="modal" style="max-width:740px">
+    <button class="close-x" id="idModalClose">&times;</button>
+    <h3>Employee ID cards</h3>
+    <p class="muted">Choose a design, pick who gets a card, and download the PDF. Every card has a QR code with the employee ID.</p>
+    <div class="field"><label>Design</label><div id="idTypes" class="row" style="gap:.6rem;align-items:stretch"></div></div>
+    <div class="row">
+      <div class="field grow"><label>Print as</label><select id="idLayout"><option value="sheet">A4 sheets with cut marks (a front page and a back page)</option><option value="single">Card printer, one card per page (54 x 86 mm)</option></select></div>
+      <div class="field"><label>Issued on</label><input type="date" id="idIssued"></div>
+      <div class="field"><label>Valid until</label><input type="date" id="idValid"></div>
+    </div>
+    <div class="row">
+      <div class="field grow"><label>Site</label><select id="idSite"></select></div>
+      <div class="field grow"><label>Role</label><select id="idRole"></select></div>
+    </div>
+    <div class="row" style="justify-content:space-between;align-items:center;margin-top:.4rem"><div class="muted" id="idCount"></div><div><button class="btn small ghost" id="idAll" type="button">Select all</button> <button class="btn small ghost" id="idNone" type="button">Select none</button></div></div>
+    <div id="idList" style="max-height:220px;overflow:auto;border:1px solid var(--line);border-radius:10px;padding:.4rem .6rem;margin-top:.4rem"></div>
+    <div class="banner" id="idWarn" style="display:none;margin-top:.6rem"></div>
+    <div class="row" style="margin-top:1rem"><button class="btn" id="btnIdDownload">Download ID cards (PDF)</button></div>
+    <p class="muted" style="margin-top:.8rem">Staff without a photo get a blank silhouette, so add the photo in the employee form first if you want it on the card. The signature on the back is the one saved in Settings under Payslip signature. On A4 sheets, print the front page, put the paper back, and print the back page on the other side (flip on the long edge).</p>
+  </div>
+</div>
+
 <div class="modal-bg" id="packModalBg">
   <div class="modal" style="max-width:560px">
     <button class="close-x" id="packModalClose">&times;</button>
@@ -1109,6 +1132,7 @@ tr:hover td{background:var(--line2)}
     setupRateCardUI();
     setupTabs();
     setupEmployeeUI();
+    setupIdCardsUI();
     setupAttendanceUI();
     setupAttImportUI();
     setupRosterUI();
@@ -1315,11 +1339,14 @@ tr:hover td{background:var(--line2)}
         '<td>'+(e.esiApplicable?'<span class="tag ok">Yes</span>':'<span class="tag bad">No</span>')+'</td>'+
         '<td>'+((typeof outstandingBalanceForEmp==='function' && outstandingBalanceForEmp(e.id)>0)?('<span class="tag warn">'+fmtMoney(outstandingBalanceForEmp(e.id))+'</span>'):'—')+'</td>'+
         '<td>'+(e.active===false?'<span class="tag bad">Left'+(e.dol?' '+new Date(e.dol+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'')+'</span>'+(e.leaveReason?'<div class="muted">'+escapeHtml(e.leaveReason)+'</div>':''):'<span class="tag ok">Active</span>')+'</td>'+
-        '<td><button class="btn small ghost" data-edit="'+e.id+'">Edit</button></td>';
+        '<td style="white-space:nowrap"><button class="btn small ghost" data-edit="'+e.id+'">Edit</button> <button class="btn small ghost" data-idcard="'+e.id+'">ID card</button></td>';
       tbody.appendChild(tr);
     });
     tbody.querySelectorAll('[data-edit]').forEach(function(b){
       b.addEventListener('click', function(){ openEmpModal(b.dataset.edit); });
+    });
+    tbody.querySelectorAll('[data-idcard]').forEach(function(b){
+      b.addEventListener('click', function(){ openIdModal(b.dataset.idcard); });
     });
   }
 
@@ -1524,6 +1551,329 @@ tr:hover td{background:var(--line2)}
       toast('Employee deleted.');
       closeEmpModal();
     }catch(e){ toast('Delete failed.'); }
+  }
+
+  /* ---------- QR code (byte mode, error correction M, versions 1 to 6) ---------- */
+  var QR_SPEC={1:{d:16,e:10,b:1,al:[]},2:{d:28,e:16,b:1,al:[6,18]},3:{d:44,e:26,b:1,al:[6,22]},4:{d:64,e:18,b:2,al:[6,26]},5:{d:86,e:24,b:2,al:[6,30]},6:{d:108,e:16,b:4,al:[6,34]}};
+  var QR_EXP=[], QR_LOG=[];
+  (function(){ var x=1; for(var i=0;i<255;i++){ QR_EXP[i]=x; QR_LOG[x]=i; x<<=1; if(x&256) x^=0x11d; } QR_EXP[255]=QR_EXP[0]; })();
+  function qrMul(a,b){ return (a&&b)?QR_EXP[(QR_LOG[a]+QR_LOG[b])%255]:0; }
+  function qrEc(data,deg){
+    var g=[1], i, j;
+    for(i=0;i<deg;i++){ var ng=[]; for(j=0;j<=g.length;j++) ng[j]=0; for(j=0;j<g.length;j++){ ng[j]^=g[j]; ng[j+1]^=qrMul(g[j],QR_EXP[i]); } g=ng; }
+    var r=[]; for(i=0;i<deg;i++) r[i]=0;
+    data.forEach(function(b){ var f=b^r.shift(); r.push(0); if(f) for(var t=0;t<deg;t++) r[t]^=qrMul(g[t+1],f); });
+    return r;
+  }
+  // returns a square grid of true (dark) and false (light), or null if the text is too long (about 100 characters)
+  function qrMatrix(text){
+    var bytes=[], i, x, y;
+    for(i=0;i<text.length;i++) bytes.push(text.charCodeAt(i)&255);
+    var v=0; for(var vv=1;vv<=6;vv++){ if(12+8*bytes.length<=8*QR_SPEC[vv].d){ v=vv; break; } }
+    if(!v) return null;
+    var sp=QR_SPEC[v], size=17+4*v;
+    var bits=[]; function put(val,len){ for(var k=len-1;k>=0;k--) bits.push((val>>>k)&1); }
+    put(4,4); put(bytes.length,8); bytes.forEach(function(b){ put(b,8); });
+    var cap=8*sp.d; for(var z=0;z<4&&bits.length<cap;z++) bits.push(0); while(bits.length%8) bits.push(0);
+    var cw=[]; for(var p=0;p<bits.length;p+=8){ var n=0; for(var q=0;q<8;q++) n=(n<<1)|bits[p+q]; cw.push(n); }
+    for(var pad=0xEC; cw.length<sp.d; pad^=0xEC^0x11) cw.push(pad);
+    var per=sp.d/sp.b, blocks=[], ecs=[];
+    for(var b0=0;b0<sp.b;b0++){ var blk=cw.slice(b0*per,(b0+1)*per); blocks.push(blk); ecs.push(qrEc(blk,sp.e)); }
+    var all=[]; for(var c0=0;c0<per;c0++) blocks.forEach(function(blk){ all.push(blk[c0]); });
+    for(var c1=0;c1<sp.e;c1++) ecs.forEach(function(ec){ all.push(ec[c1]); });
+    var mod=[], fn=[]; for(y=0;y<size;y++){ var ra=[], rb=[]; for(x=0;x<size;x++){ ra.push(false); rb.push(false); } mod.push(ra); fn.push(rb); }
+    function setF(px,py,dark){ mod[py][px]=!!dark; fn[py][px]=true; }
+    for(i=0;i<size;i++){ setF(6,i,i%2===0); setF(i,6,i%2===0); }
+    function finder(cx,cy){ for(var dy=-4;dy<=4;dy++) for(var dx=-4;dx<=4;dx++){ var xx=cx+dx, yy=cy+dy; if(xx<0||yy<0||xx>=size||yy>=size) continue; var d=Math.max(Math.abs(dx),Math.abs(dy)); setF(xx,yy,d!==2&&d!==4); } }
+    finder(3,3); finder(size-4,3); finder(3,size-4);
+    var al=sp.al;
+    for(var ai=0;ai<al.length;ai++) for(var aj=0;aj<al.length;aj++){
+      if((ai===0&&aj===0)||(ai===0&&aj===al.length-1)||(ai===al.length-1&&aj===0)) continue;
+      for(var ay=-2;ay<=2;ay++) for(var ax=-2;ax<=2;ax++) setF(al[ai]+ax,al[aj]+ay,Math.max(Math.abs(ax),Math.abs(ay))!==1);
+    }
+    function drawFormat(mask){
+      var data=mask, rem=data; for(var k=0;k<10;k++) rem=(rem<<1)^((rem>>>9)*0x537);
+      var fb=((data<<10)|rem)^0x5412, bit=function(k){ return ((fb>>>k)&1)!==0; };
+      for(var a=0;a<=5;a++) setF(8,a,bit(a)); setF(8,7,bit(6)); setF(8,8,bit(7)); setF(7,8,bit(8)); for(var a2=9;a2<15;a2++) setF(14-a2,8,bit(a2));
+      for(var b=0;b<8;b++) setF(size-1-b,8,bit(b)); for(var b2=8;b2<15;b2++) setF(8,size-15+b2,bit(b2)); setF(8,size-8,true);
+    }
+    drawFormat(0);
+    var bi=0;
+    for(var right=size-1; right>=1; right-=2){
+      if(right===6) right=5;
+      for(var vert=0; vert<size; vert++) for(var j=0;j<2;j++){
+        var xx=right-j, up=((right+1)&2)===0, yy=up?size-1-vert:vert;
+        if(!fn[yy][xx] && bi<all.length*8){ mod[yy][xx]=((all[bi>>>3]>>>(7-(bi&7)))&1)!==0; bi++; }
+      }
+    }
+    function applyMask(m){
+      for(var yy=0;yy<size;yy++) for(var xx=0;xx<size;xx++){
+        var inv; switch(m){ case 0: inv=(xx+yy)%2===0; break; case 1: inv=yy%2===0; break; case 2: inv=xx%3===0; break; case 3: inv=(xx+yy)%3===0; break;
+          case 4: inv=(Math.floor(xx/3)+Math.floor(yy/2))%2===0; break; case 5: inv=xx*yy%2+xx*yy%3===0; break; case 6: inv=(xx*yy%2+xx*yy%3)%2===0; break; default: inv=((xx+yy)%2+xx*yy%3)%2===0; }
+        if(!fn[yy][xx] && inv) mod[yy][xx]=!mod[yy][xx];
+      }
+    }
+    function penalty(){
+      var s=0, dark=0, r, c, k;
+      for(r=0;r<size;r++) for(c=0;c<size;c++) if(mod[r][c]) dark++;
+      for(var dir=0;dir<2;dir++) for(r=0;r<size;r++){
+        var run=1, line=[]; for(c=0;c<size;c++) line.push(dir?mod[c][r]:mod[r][c]);
+        for(c=1;c<size;c++){ if(line[c]===line[c-1]) run++; else { if(run>=5) s+=3+run-5; run=1; } } if(run>=5) s+=3+run-5;
+        var str=line.map(function(b){ return b?'1':'0'; }).join('');
+        [/10111010000/g,/00001011101/g].forEach(function(re){ var m; while((m=re.exec(str))){ s+=40; re.lastIndex=m.index+1; } });
+      }
+      for(r=0;r<size-1;r++) for(c=0;c<size-1;c++){ var a=mod[r][c]; if(a===mod[r][c+1]&&a===mod[r+1][c]&&a===mod[r+1][c+1]) s+=3; }
+      k=Math.floor(Math.abs(dark*100/(size*size)-50)/5); s+=10*k;
+      return s;
+    }
+    var best=0, bestP=1e9;
+    for(var m=0;m<8;m++){ applyMask(m); drawFormat(m); var pp=penalty(); if(pp<bestP){ bestP=pp; best=m; } applyMask(m); }
+    applyMask(best); drawFormat(best);
+    return mod;
+  }
+  // draws the code on a white rounded box; box is the side of the box in points
+  function qrDraw(pb,x,y,box,text,color){
+    var m=qrMatrix(text); if(!m) return false;
+    var n=m.length, q=3, ms=box/(n+2*q);
+    pb.rrect(x,y,box,box,3,{fill:'#FFFFFF'});
+    for(var r=0;r<n;r++){ var c=0; while(c<n){ if(!m[r][c]){ c++; continue; } var st=c; while(c<n&&m[r][c]) c++; pb.rect(x+(q+st)*ms,y+(q+r)*ms,(c-st)*ms+0.03,ms+0.03,{fill:color||'#111111'}); } }
+    return true;
+  }
+
+  /* ---------- employee ID cards ---------- */
+  // Four designs. Card size is the standard 54 x 86 mm (CR80): 153 x 243 points, turned on its side for the landscape design.
+  var ID_TYPES=[
+    {key:'classic',   name:'Classic',          note:'White card, dark header and gold frame around the photo. Works for every role.'},
+    {key:'landscape', name:'Landscape',        note:'Sideways card with a dark photo panel. Easy to read on a lanyard or a badge holder.'},
+    {key:'colour',    name:'Colour-coded',     note:'The top band changes colour by role (guard, supervisor, lady guard, housekeeping), so staff can be told apart at a glance.'},
+    {key:'premium',   name:'Premium dark',     note:'Dark card with gold edging. Suits supervisors, officers and managers.'}];
+  function idRoleColor(role){
+    var r=String(role||'').toLowerCase();
+    if(/supervisor|inspector/.test(r)) return '#2F5D8A';
+    if(/lady/.test(r)) return '#7A3E7A';
+    if(/housekeeping|cleaner|sweeper/.test(r)) return '#2F7D4F';
+    if(/officer|manager|head/.test(r)) return '#8A2F2F';
+    return '#B58220';
+  }
+  function idCardData(e){
+    return {id:e.id, name:String(e.name||'').trim(), role:String(e.role||'').trim(), code:String(e.empCode||'').trim(), site:String(e.site||'').trim(), phone:String(e.phone||'').trim(), doj:e.doj||'', photo:null};
+  }
+  // one side of one card, with its top-left corner at (x0,y0) on the page
+  function idDrawCard(pb,x0,y0,side,type,c,env){
+    var land=(type==='landscape'), w=land?242.65:153.07, h=land?153.07:242.65;
+    var INK='#212322', GOLD='#C9973A', GOLDD='#8A6414', WHITE='#FFFFFF', SOFT='#C9C6B8', MUTE='#6B6B60', color=idRoleColor(c.role);
+    function R(x,y,ww,hh,o){ pb.rect(x0+x,y0+y,ww,hh,o); }
+    function RR(x,y,ww,hh,r,o){ pb.rrect(x0+x,y0+y,ww,hh,r,o); }
+    function T(x,y,s,sz,o){ return pb.text(x0+x,y0+y,s,sz,o); }
+    function L(x1,y1,x2,y2,lw,col){ pb.line(x0+x1,y0+y1,x0+x2,y0+y2,lw,col); }
+    function fit(s,mw,sz,b){ return pdfFit(pb,String(s||''),mw,sz,b); }
+    function nameLines(maxW,sz){ var ls=pb.wrap(String(c.name||'').toUpperCase()||'-',maxW,sz,true); if(ls.length>2) ls=[ls[0],fit(ls.slice(1).join(' '),maxW,sz,true)]; return ls; }
+    function logo(x,y,ww){ pb.image(x0+x,y0+y,ww,ww*214/198); }
+    function photo(x,y,ww,hh,shiftUp){
+      pb.clipRR(x0+x,y0+y,ww,hh,0);
+      if(c.photoIdx>=0){ pb.imageX(c.photoIdx,x0+x,y0+y-(shiftUp||0),ww,ww*1.25); }
+      else { R(x,y,ww,hh,{fill:'#E4E1D6'}); RR(x+ww*0.5-ww*0.17,y+hh*0.2,ww*0.34,ww*0.34,ww*0.17,{fill:'#B9B6AA'}); RR(x+ww*0.12,y+hh*0.62,ww*0.76,hh*0.8,ww*0.38,{fill:'#B9B6AA'}); }
+      pb.restore();
+    }
+    function terms(x,y,mw,col,sz){ var yy=y; ['This card is the property of Public Force Security Services.','Wear it visibly while on duty. It is not transferable.','Report loss at once. If found, please return it to the office below.'].forEach(function(t){ pb.wrap(t,mw,sz,false).forEach(function(l){ T(x,yy,l,sz,{color:col}); yy+=sz+1.7; }); yy+=1.6; }); return yy; }
+    function dates(){ return 'Issued '+xFmt(env.issued)+'    Valid until '+xFmt(env.valid); }
+    function sig(cx,y,maxW,maxH){ if(env.sigIdx<0) return 0; var r=env.sigW/env.sigH, ww=Math.min(maxW,maxH*r), hh=ww/r; pb.imageX(env.sigIdx,x0+cx-ww/2,y0+y+(maxH-hh),ww,hh); return hh; }
+    var qrText='PFSS:'+(c.code||c.name), shortAddr='Maruthi Complex, 4th Phase, Yelahanka New Town, Bengaluru - 560064';
+    pb.clipRR(x0,y0,w,h,8);
+
+    if(type==='classic' && side==='front'){
+      R(0,0,w,h,{fill:WHITE}); R(0,0,w,54,{fill:INK}); R(0,54,w,2.6,{fill:GOLD}); logo(10,9,31);
+      T(48,24,'PUBLIC FORCE',10.6,{bold:true,color:WHITE}); T(48,35,'SECURITY SERVICES',7.2,{bold:true,color:GOLD}); T(48,46,'Your safety, our mission',5.8,{italic:true,color:SOFT});
+      RR((w-80)/2,61,80,90,3,{fill:GOLD}); photo((w-76)/2,63,76,86,0);
+      var nl=nameLines(133,11.5), ny=165; nl.forEach(function(l,i){ T(w/2,ny+i*12,l,11.5,{bold:true,color:INK,align:'center'}); });
+      var dy=ny+(nl.length-1)*12+13; T(w/2,dy,fit(c.role||'-',133,8.6,true),8.6,{bold:true,color:GOLDD,align:'center'}); L(14,dy+7,w-14,dy+7,0.6,'#D9D7CA');
+      T(14,dy+15,'ID NO',5.2,{color:MUTE}); T(14,dy+25,fit(c.code||'-',66,9.4,true),9.4,{bold:true,color:INK});
+      T(84,dy+15,'SITE',5.2,{color:MUTE}); var sl=pb.wrap(c.site||'-',56,6.9,true); if(sl.length>2) sl=[sl[0],fit(sl.slice(1).join(' '),56,6.9,true)];
+      sl.forEach(function(l,i){ T(84,dy+24+i*7.8,l,6.9,{bold:true,color:INK}); });
+      R(0,h-16.5,w,16.5,{fill:GOLD}); T(w/2,h-6,'www.publicforcesecurity.com',6.4,{bold:true,color:INK,align:'center'});
+    }
+    else if(type==='classic'){
+      R(0,0,w,h,{fill:WHITE}); R(0,0,w,22,{fill:INK}); R(0,22,w,2.2,{fill:GOLD}); T(w/2,14,'PUBLIC FORCE SECURITY SERVICES',6.9,{bold:true,color:WHITE,align:'center'});
+      terms(12,35,w-24,INK,5.8);
+      qrDraw(pb,x0+(w-60)/2,y0+84,60,qrText,'#111111'); T(w/2,153,'ID '+(c.code||''),6.4,{bold:true,color:INK,align:'center'});
+      T(w/2,163,dates(),5.6,{color:MUTE,align:'center'});
+      var sh=sig(w/2,166,58,18); L(w/2-32,188,w/2+32,188,0.5,INK); T(w/2,195,'Authorised signatory',5.2,{color:MUTE,align:'center'});
+      R(0,202,w,h-202,{fill:INK});
+      var yy=212; pb.wrap(COMPANY.address,w-24,5.4,false).slice(0,3).forEach(function(l){ T(w/2,yy,l,5.4,{color:SOFT,align:'center'}); yy+=6.8; });
+      T(w/2,h-6,'Phone '+COMPANY.phone+'  |  '+COMPANY.email,5.4,{bold:true,color:GOLD,align:'center'});
+    }
+    else if(type==='landscape' && side==='front'){
+      R(0,0,w,h,{fill:WHITE}); R(0,0,80,h,{fill:INK}); R(80,0,2.6,h,{fill:GOLD}); logo(24,8,32);
+      RR(9,47,62,80,3,{fill:GOLD}); photo(11,49,58,76,0);
+      T(40,139,'ID NO',4.8,{color:GOLD,align:'center'}); T(40,148,fit(c.code||'-',72,7.6,true),7.6,{bold:true,color:WHITE,align:'center'});
+      T(92,19,'PUBLIC FORCE',10,{bold:true,color:INK}); T(92,29,'SECURITY SERVICES',6.8,{bold:true,color:GOLDD}); L(92,35,w-10,35,0.7,GOLD);
+      var lnl=nameLines(142,13), ly=54; lnl.forEach(function(l,i){ T(92,ly+i*14.5,l,13,{bold:true,color:INK}); });
+      var ldy=ly+(lnl.length-1)*14.5+14; T(92,ldy,fit(c.role||'-',142,9,true),9,{bold:true,color:GOLDD});
+      var rows=[['Site',c.site||'-'],['Phone',c.phone||COMPANY.phone],['Joined',c.doj?xFmt(c.doj):'-']], ry=ldy+15;
+      rows.forEach(function(r){ T(92,ry,r[0].toUpperCase(),5.2,{color:MUTE}); T(122,ry,fit(r[1],112,7.6,true),7.6,{bold:true,color:INK}); ry+=12; });
+      R(82.6,h-14,w-82.6,14,{fill:GOLD}); T(82.6+(w-82.6)/2,h-5,'www.publicforcesecurity.com',6.2,{bold:true,color:INK,align:'center'});
+    }
+    else if(type==='landscape'){
+      R(0,0,w,h,{fill:INK}); RR(4,4,w-8,h-8,6,{stroke:GOLD,lw:0.9});
+      qrDraw(pb,x0+14,y0+16,68,qrText,'#111111'); T(48,100,'ID '+(c.code||''),6.6,{bold:true,color:WHITE,align:'center'});
+      var ay=112; pb.wrap(shortAddr,78,5.2,false).slice(0,3).forEach(function(l){ T(48,ay,l,5.2,{color:SOFT,align:'center'}); ay+=6.5; });
+      T(96,24,'PUBLIC FORCE SECURITY SERVICES',6.9,{bold:true,color:GOLD}); terms(96,36,132,WHITE,5.8);
+      T(96,92,dates(),5.4,{color:SOFT});
+      RR(150,104,78,28,3,{fill:WHITE}); sig(189,106,70,18); T(189,141,'Authorised signatory',5.2,{color:SOFT,align:'center'});
+      T(96,141,'Phone '+COMPANY.phone,5.8,{bold:true,color:GOLD});
+    }
+    else if(type==='colour' && side==='front'){
+      R(0,0,w,h,{fill:WHITE}); R(0,0,w,80,{fill:color}); RR(10,9,30,32,4,{fill:INK}); logo(12,10.5,26);
+      T(46,22,'PUBLIC FORCE',9.2,{bold:true,color:WHITE}); T(46,32,'SECURITY SERVICES',6.4,{bold:true,color:WHITE});
+      T(w/2,66,fit(String(c.role||'STAFF').toUpperCase(),135,9.6,true),9.6,{bold:true,color:WHITE,align:'center'});
+      RR(w/2-40,70,80,80,40,{fill:WHITE}); pb.clipRR(x0+w/2-37,y0+73,74,74,37);
+      if(c.photoIdx>=0) pb.imageX(c.photoIdx,x0+w/2-37,y0+67,74,92.5); else { R(w/2-37,73,74,74,{fill:'#E4E1D6'}); RR(w/2-12,87,24,24,12,{fill:'#B9B6AA'}); RR(w/2-28,117,56,56,28,{fill:'#B9B6AA'}); }
+      pb.restore();
+      var cl=nameLines(133,11), cy=165; cl.forEach(function(l,i){ T(w/2,cy+i*11.5,l,11,{bold:true,color:INK,align:'center'}); });
+      var cdy=cy+(cl.length-1)*11.5+12; T(w/2,cdy,fit(c.role||'-',133,8.4,true),8.4,{bold:true,color:color,align:'center'});
+      RR(w/2-44,cdy+7,88,16,8,{fill:color}); T(w/2,cdy+18.2,fit(c.code||'-',80,9.4,true),9.4,{bold:true,color:WHITE,align:'center'});
+      T(w/2,cdy+34,fit(c.site||'',133,7,false),7,{color:MUTE,align:'center'});
+      R(0,h-16.5,w,16.5,{fill:color}); T(w/2,h-6,'www.publicforcesecurity.com',6.4,{bold:true,color:WHITE,align:'center'});
+    }
+    else if(type==='colour'){
+      R(0,0,w,h,{fill:WHITE}); R(0,0,w,24,{fill:color}); T(w/2,15,'PUBLIC FORCE SECURITY SERVICES',6.9,{bold:true,color:WHITE,align:'center'});
+      terms(12,37,w-24,INK,5.8);
+      qrDraw(pb,x0+(w-60)/2,y0+84,60,qrText,'#111111'); T(w/2,153,'ID '+(c.code||''),6.4,{bold:true,color:color,align:'center'});
+      T(w/2,163,dates(),5.6,{color:MUTE,align:'center'});
+      sig(w/2,166,58,18); L(w/2-32,188,w/2+32,188,0.5,INK); T(w/2,195,'Authorised signatory',5.2,{color:MUTE,align:'center'});
+      R(0,202,w,h-202,{fill:color});
+      var by=212; pb.wrap(COMPANY.address,w-24,5.4,false).slice(0,3).forEach(function(l){ T(w/2,by,l,5.4,{color:WHITE,align:'center'}); by+=6.8; });
+      T(w/2,h-6,'Phone '+COMPANY.phone+'  |  '+COMPANY.email,5.4,{bold:true,color:WHITE,align:'center'});
+    }
+    else if(type==='premium' && side==='front'){
+      R(0,0,w,h,{fill:INK}); RR(4,4,w-8,h-8,6,{stroke:GOLD,lw:0.9}); logo((w-34)/2,12,34);
+      T(w/2,62,'PUBLIC FORCE',10.4,{bold:true,color:WHITE,align:'center'}); T(w/2,71,'SECURITY SERVICES',6.6,{bold:true,color:GOLD,align:'center'}); L(w/2-18,76,w/2+18,76,0.8,GOLD);
+      RR((w-70)/2,83,70,88,3,{fill:GOLD}); photo((w-66)/2,85,66,84,0);
+      var pl=nameLines(127,pb.wrap(String(c.name||'').toUpperCase(),127,10.8,true).length>1?9.6:10.8), psz=pl.length>1?9.6:10.8, py=pl.length>1?186:189;
+      pl.forEach(function(l,i){ T(w/2,py+i*10.6,l,psz,{bold:true,color:WHITE,align:'center'}); });
+      var pdy=py+(pl.length-1)*10.6+12.5; T(w/2,pdy,fit(c.role||'-',127,8.2,true),8.2,{bold:true,color:GOLD,align:'center'});
+      T(w/2,pdy+12.5,'ID  '+(c.code||'-'),8.6,{bold:true,color:WHITE,align:'center'}); T(w/2,pdy+22,fit(c.site||'',127,6.4,false),6.4,{color:SOFT,align:'center'});
+      T(w/2,h-8,'Your safety, our mission',5.6,{italic:true,color:GOLD,align:'center'});
+    }
+    else {
+      R(0,0,w,h,{fill:INK}); RR(4,4,w-8,h-8,6,{stroke:GOLD,lw:0.9}); T(w/2,20,'PUBLIC FORCE SECURITY SERVICES',6.6,{bold:true,color:GOLD,align:'center'});
+      qrDraw(pb,x0+(w-64)/2,y0+30,64,qrText,'#111111'); T(w/2,106,'ID '+(c.code||''),6.6,{bold:true,color:WHITE,align:'center'});
+      terms(14,118,w-28,WHITE,5.6);
+      T(w/2,170,dates(),5.4,{color:SOFT,align:'center'});
+      RR((w-66)/2,176,66,24,3,{fill:WHITE}); sig(w/2,177,60,17); T(w/2,208,'Authorised signatory',5.2,{color:SOFT,align:'center'});
+      var qy=219; pb.wrap(shortAddr,w-28,5.2,false).slice(0,2).forEach(function(l){ T(w/2,qy,l,5.2,{color:SOFT,align:'center'}); qy+=6.4; });
+      T(w/2,h-9,'Phone '+COMPANY.phone,5.8,{bold:true,color:GOLD,align:'center'});
+    }
+    pb.restore();
+  }
+  // cards: array from idCardData with an optional photo {bytes,w,h}. opts: type, layout ('sheet' = A4 with cut marks, 'single' = one card per page), issued, valid.
+  function buildIdCardsPdf(cards,opts){
+    opts=opts||{}; var type=ID_TYPES.some(function(t){ return t.key===opts.type; })?opts.type:'classic', layout=opts.layout==='single'?'single':'sheet';
+    var land=(type==='landscape'), w=land?242.65:153.07, h=land?153.07:242.65;
+    var pb=pdfNew(false), env={issued:opts.issued||xToday(), valid:opts.valid||xToday(), sigIdx:-1, sigW:1, sigH:1};
+    var sg=(state.settings&&state.settings.signature)||{};
+    if(sg.b64 && sg.w && sg.h){ env.sigIdx=pb.addImage(pdfB64Bytes(sg.b64),sg.w,sg.h); env.sigW=sg.w; env.sigH=sg.h; }
+    var list=cards.map(function(c){ var k=Object.assign({},c); k.photoIdx=(c.photo&&c.photo.bytes)?pb.addImage(c.photo.bytes,c.photo.w,c.photo.h):-1; return k; });
+    if(!list.length) list=[{name:'',role:'',code:'',site:'',photoIdx:-1}];
+    if(layout==='single'){
+      list.forEach(function(c){ ['front','back'].forEach(function(side){ pb.newPageSize(w,h); idDrawCard(pb,0,0,side,type,c,env); }); });
+      return pb.build();
+    }
+    var cols=land?2:3, rows=land?4:3, gap=16, per=cols*rows, PW=595.28, PH=841.89;
+    var gx=(PW-(cols*w+(cols-1)*gap))/2, gy=(PH-(rows*h+(rows-1)*gap))/2;
+    function marks(x,y){ [[x,y,-1,-1],[x+w,y,1,-1],[x,y+h,-1,1],[x+w,y+h,1,1]].forEach(function(m){ pb.line(m[0]+m[2]*3,m[1],m[0]+m[2]*9,m[1],0.35,'#8A8A80'); pb.line(m[0],m[1]+m[3]*3,m[0],m[1]+m[3]*9,0.35,'#8A8A80'); }); }
+    for(var i=0;i<list.length;i+=per){
+      var batch=list.slice(i,i+per), page=Math.floor(i/per)+1, pages=Math.ceil(list.length/per);
+      ['front','back'].forEach(function(side){
+        pb.newPage(false);
+        pb.text(PW/2,18,'ID cards, '+side+(side==='back'?' (print on the back of the front sheet, flip on the long edge)':'')+'   -   sheet '+page+' of '+pages,6.8,{color:'#8A8A80',align:'center'});
+        batch.forEach(function(c,k){
+          var col=k%cols, row=Math.floor(k/cols), cc=(side==='back')?(cols-1-col):col, x=gx+cc*(w+gap), y=gy+row*(h+gap);
+          idDrawCard(pb,x,y,side,type,c,env); pb.rrect(x,y,w,h,8,{stroke:'#B9B6A8',lw:0.4}); marks(x,y);
+        });
+      });
+    }
+    return pb.build();
+  }
+
+  // ---------- ID cards: the window, the photos and the download ----------
+  var idPick={}, idLastType='classic';
+  function idEligible(){ return state.employees.filter(function(e){ return e.status!=='Left'; }).slice().sort(compareByEmpCode); }
+  function idVisible(){
+    var site=document.getElementById('idSite').value, role=document.getElementById('idRole').value;
+    return idEligible().filter(function(e){ return (!site||e.site===site)&&(!role||e.role===role); });
+  }
+  function idPlusYear(iso){
+    var p=String(iso).split('-').map(Number), d=new Date(p[0]+1,p[1]-1,p[2]-1);
+    return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');
+  }
+  function idRenderList(){
+    var el=document.getElementById('idList'), vis=idVisible(), n=0;
+    el.innerHTML = vis.length ? vis.map(function(e){
+      if(idPick[e.id]) n++;
+      return '<label class="chk" style="display:flex;gap:.5rem;align-items:center;padding:.25rem 0"><input type="checkbox" data-idemp="'+escapeHtml(e.id)+'" '+(idPick[e.id]?'checked':'')+' style="width:auto;min-height:0"> <span><b>'+escapeHtml(e.name||'')+'</b> <span class="muted">'+escapeHtml(e.empCode||'')+' &middot; '+escapeHtml(e.role||'')+' &middot; '+escapeHtml(e.site||'')+(e.photoRef?'':' &middot; no photo')+'</span></span></label>';
+    }).join('') : '<div class="muted" style="padding:.6rem">No employees match.</div>';
+    document.getElementById('idCount').textContent=n+' of '+vis.length+' selected';
+  }
+  function openIdModal(onlyId){
+    var el=function(x){ return document.getElementById(x); }, list=idEligible();
+    el('idSite').innerHTML='<option value="">All sites</option>'+allSites().map(function(s){ return '<option>'+escapeHtml(s)+'</option>'; }).join('');
+    var roles=Object.keys(list.reduce(function(o,e){ if(e.role) o[e.role]=1; return o; },{})).sort();
+    el('idRole').innerHTML='<option value="">All roles</option>'+roles.map(function(r){ return '<option>'+escapeHtml(r)+'</option>'; }).join('');
+    el('idTypes').innerHTML=ID_TYPES.map(function(t){
+      return '<label style="flex:1 1 150px;border:1px solid var(--line);border-radius:10px;padding:.6rem;cursor:pointer;background:var(--surface)"><input type="radio" name="idType" value="'+t.key+'" '+(t.key===idLastType?'checked':'')+' style="width:auto;min-height:0"> <b>'+t.name+'</b><div class="muted" style="margin-top:.2rem">'+escapeHtml(t.note)+'</div></label>';
+    }).join('');
+    var today=xToday(); el('idIssued').value=today; el('idValid').value=idPlusYear(today); el('idLayout').value='sheet';
+    el('idWarn').style.display='none';
+    idPick={}; if(onlyId) idPick[onlyId]=true; else list.forEach(function(e){ idPick[e.id]=true; });
+    idRenderList(); el('idModalBg').classList.add('show');
+  }
+  // the employee's photo as a 4:5 JPEG for the card (faces sit in the upper part, so the crop keeps the top)
+  async function idPhoto(e){
+    if(!e.photoRef) return null;
+    try{
+      var blob=null;
+      if(assetsCap && typeof assetsCap.fetchBlob==='function') blob=await assetsCap.fetchBlob(e.photoRef.ref);
+      else { var r=await fetch(e.photoRef.url); if(r.ok) blob=await r.blob(); }
+      if(!blob) return null;
+      var bmp=await createImageBitmap(blob), W=280, H=350, cv=document.createElement('canvas');
+      cv.width=W; cv.height=H; var g=cv.getContext('2d'), want=W/H, have=bmp.width/bmp.height, sx=0, sy=0, sw=bmp.width, sh=bmp.height;
+      if(have>want){ sw=bmp.height*want; sx=(bmp.width-sw)/2; } else { sh=bmp.width/want; sy=(bmp.height-sh)*0.12; }
+      g.fillStyle='#fff'; g.fillRect(0,0,W,H); g.drawImage(bmp,sx,sy,sw,sh,0,0,W,H);
+      var jb=await new Promise(function(res){ cv.toBlob(res,'image/jpeg',0.88); });
+      return {bytes:new Uint8Array(await jb.arrayBuffer()), w:W, h:H};
+    }catch(err){ return null; }
+  }
+  async function idDownload(){
+    var el=function(x){ return document.getElementById(x); }, chosen=idVisible().filter(function(e){ return idPick[e.id]; });
+    if(!chosen.length){ toast('Select at least one employee.'); return; }
+    var btn=el('btnIdDownload'), old=btn.textContent; btn.disabled=true;
+    try{
+      var cards=[], lost=0;
+      for(var i=0;i<chosen.length;i++){
+        btn.textContent='Loading photos '+(i+1)+' of '+chosen.length+'...';
+        var c=idCardData(chosen[i]); c.photo=await idPhoto(chosen[i]); if(chosen[i].photoRef && !c.photo) lost++; cards.push(c);
+      }
+      btn.textContent='Building the PDF...';
+      var picked=document.querySelector('input[name="idType"]:checked'), type=picked?picked.value:'classic'; idLastType=type;
+      var blob=buildIdCardsPdf(cards,{type:type,layout:el('idLayout').value,issued:el('idIssued').value||xToday(),valid:el('idValid').value||xToday()});
+      await pdfSave(blob,'PFSS-ID-cards-'+type+'.pdf');
+      var nophoto=cards.filter(function(c){ return !c.photo; }).length, w=el('idWarn');
+      if(nophoto){ w.style.display=''; w.textContent=nophoto+' of '+cards.length+' cards have no photo'+(lost?' ('+lost+' uploaded photo'+(lost>1?'s':'')+' could not be loaded)':'')+'. Add or re-upload the photo in the employee form, then make the card again.'; }
+      else w.style.display='none';
+    }catch(err){ toast('Could not build the ID cards.'); }
+    btn.disabled=false; btn.textContent=old;
+  }
+  function setupIdCardsUI(){
+    var el=function(x){ return document.getElementById(x); };
+    el('btnIdCards').addEventListener('click', function(){ openIdModal(null); });
+    el('idModalClose').addEventListener('click', function(){ el('idModalBg').classList.remove('show'); });
+    el('idModalBg').addEventListener('click', function(ev){ if(ev.target===el('idModalBg')) el('idModalBg').classList.remove('show'); });
+    el('idSite').addEventListener('change', idRenderList); el('idRole').addEventListener('change', idRenderList);
+    el('idList').addEventListener('change', function(ev){ var t=ev.target; if(t.dataset && t.dataset.idemp){ if(t.checked) idPick[t.dataset.idemp]=true; else delete idPick[t.dataset.idemp]; idRenderList(); } });
+    el('idAll').addEventListener('click', function(){ idVisible().forEach(function(e){ idPick[e.id]=true; }); idRenderList(); });
+    el('idNone').addEventListener('click', function(){ idVisible().forEach(function(e){ delete idPick[e.id]; }); idRenderList(); });
+    el('btnIdDownload').addEventListener('click', idDownload);
   }
 
   // ---------- ATTENDANCE ----------
@@ -4006,6 +4356,17 @@ tr:hover td{background:var(--line2)}
     function esc(s){ return s.replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)'); }
     api.tw=function(s,size,bold){ var t=bold?HELVB_W:HELV_W, w=0; for(var i=0;i<s.length;i++){ var c=s.charCodeAt(i); w+=(c>=32&&c<=126)?t[c-32]:556; } return w*size/1000; };
     api.newPage=function(l){ if(l===true||l===false){ W=l?841.89:595.28; H=l?595.28:841.89; api.W=W; api.H=H; } cur=[]; pages.push(cur); dims.push([W,H]); return pages.length-1; };
+    api.newPageSize=function(w,h){ W=w; H=h; api.W=W; api.H=H; cur=[]; pages.push(cur); dims.push([W,H]); return pages.length-1; };
+    function rrPath(x,y,w,h,r){
+      r=Math.max(0,Math.min(r,w/2,h/2)); var k=0.5523*r, X=x, Y=H-y-h, f=function(n){ return n.toFixed(2); };
+      return f(X+r)+' '+f(Y)+' m '+f(X+w-r)+' '+f(Y)+' l '+f(X+w-r+k)+' '+f(Y)+' '+f(X+w)+' '+f(Y+r-k)+' '+f(X+w)+' '+f(Y+r)+' c '+
+        f(X+w)+' '+f(Y+h-r)+' l '+f(X+w)+' '+f(Y+h-r+k)+' '+f(X+w-r+k)+' '+f(Y+h)+' '+f(X+w-r)+' '+f(Y+h)+' c '+
+        f(X+r)+' '+f(Y+h)+' l '+f(X+r-k)+' '+f(Y+h)+' '+f(X)+' '+f(Y+h-r+k)+' '+f(X)+' '+f(Y+h-r)+' c '+
+        f(X)+' '+f(Y+r)+' l '+f(X)+' '+f(Y+r-k)+' '+f(X+r-k)+' '+f(Y)+' '+f(X+r)+' '+f(Y)+' c h';
+    }
+    api.rrect=function(x,y,w,h,r,o){ o=o||{}; var op=['q']; if(o.fill) op.push(rgb(o.fill)+' rg'); if(o.stroke) op.push(rgb(o.stroke)+' RG '+(o.lw||0.5)+' w'); op.push(rrPath(x,y,w,h,r)); op.push(o.fill&&o.stroke?'B':(o.fill?'f':'S')); op.push('Q'); cur.push(op.join(' ')); };
+    api.clipRR=function(x,y,w,h,r){ cur.push('q '+rrPath(x,y,w,h,r)+' W n'); };
+    api.restore=function(){ cur.push('Q'); };
     api.setPage=function(i){ cur=pages[i]; W=dims[i][0]; H=dims[i][1]; api.W=W; api.H=H; };
     api.count=function(){ return pages.length; };
     api.text=function(x,y,s,size,o){ o=o||{}; s=pdfAscii(s); var w=api.tw(s,size,o.bold); if(o.align==='right') x-=w; else if(o.align==='center') x-=w/2;
