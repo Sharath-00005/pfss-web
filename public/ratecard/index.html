@@ -101,6 +101,8 @@ tr.sec td{background:var(--bg);color:var(--brand);font-weight:700}
       <datalist id="clientList"></datalist>
       <label for="cl_email">Client email</label>
       <input id="cl_email" type="text" inputmode="email" autocomplete="off" autocapitalize="off" placeholder="name@company.com">
+      <button class="btn ghost" id="btnProfileOnly" type="button" style="margin-top:12px;width:100%">Email the company profile only</button>
+      <div class="muted" style="margin-top:6px">Sends just the company profile, with no rate card.</div>
     </div>
 
     <div class="card">
@@ -239,7 +241,8 @@ tr.sec td{background:var(--bg);color:var(--brand);font-weight:700}
 
 <div class="sheet" id="sheet" hidden>
   <div class="sheetBox" role="dialog" aria-modal="true" aria-label="Email the rate card">
-    <div class="sheetHead"><b>Email the rate card</b><button type="button" id="shClose" aria-label="Close">&times;</button></div>
+    <div class="sheetHead"><b id="shTitle">Email the rate card</b><button type="button" id="shClose" aria-label="Close">&times;</button></div>
+    <div class="seg" id="shMode" style="margin:8px 0 4px"><button type="button" data-mode="card" class="on">Rate card</button><button type="button" data-mode="profile">Company profile only</button></div>
     <div class="note" id="shHelp" hidden></div>
     <label for="sh_from">Send from</label>
     <select id="sh_from"></select>
@@ -252,7 +255,7 @@ tr.sec td{background:var(--bg);color:var(--brand);font-weight:700}
     <label for="sh_msg">Message</label>
     <textarea id="sh_msg" rows="9"></textarea>
     <label class="chk" style="margin-top:12px"><input type="checkbox" id="sh_copy" checked> Keep a copy in the sending mailbox (BCC)</label>
-    <label class="chk" style="margin-top:10px"><input type="checkbox" id="sh_profile"> Also send our company profile (PDF)</label>
+    <label class="chk" id="shProfRow" style="margin-top:10px"><input type="checkbox" id="sh_profile"> Also send our company profile (PDF)</label>
     <div class="muted" id="shProfNote" hidden></div>
     <div class="err" id="shErr" role="alert"></div>
     <div class="actions">
@@ -487,7 +490,7 @@ var COMPANY={tradeName:'PUBLIC FORCE SECURITY SERVICES', legalName:'Satish Kumar
 
   /* ---------- company profile (brochure), 5 pages ---------- */
   function profileData(){ return (state.settings&&state.settings.profile)||{}; }
-  var PROFILE_ABOUT='Public Force Security Services is a Bengaluru-based provider of security services, manpower outsourcing and housekeeping and facility services. Working from Yelahanka New Town, we supply guards, supervisors and support staff to industrial units, offices, business parks and residential communities. We keep our clients\' sites protected and their paperwork in order: our staff are covered by PF and ESIC where applicable, paid at or above the minimum wage notified for the zone, and every monthly invoice comes with the attendance sheet and wage register behind it.';
+  var PROFILE_ABOUT='Public Force Security Services is a Bengaluru-based provider of security services, manpower outsourcing and housekeeping and facility services. Working from Yelahanka New Town, we supply guards, supervisors and support staff to industrial units, offices, business parks and residential communities. We keep our clients\' sites protected and their paperwork in order: our staff are covered by PF and ESIC where applicable, paid at or above the minimum wage notified for the zone, and every monthly invoice comes with the attendance sheet and wage register behind it. Our services are available PAN-India, so a client with sites in more than one city can deal with one agency.';
   // the technology and reporting services; the wording can be changed in Settings (one line each, as  Title: description)
   var PROFILE_TECH_DEFAULT=[
     ['Guard tracking app','Track your guards on duty through a mobile app.'],
@@ -517,6 +520,7 @@ var COMPANY={tradeName:'PUBLIC FORCE SECURITY SERVICES', legalName:'Satish Kumar
     pb.text(W/2,462,'Your safety, our mission',16,{italic:true,color:C.gold,align:'center'});
     pb.text(W/2,520,'COMPANY PROFILE',13,{bold:true,color:'#C9C6B8',align:'center'});
     pb.text(W/2,560,'Security services  |  Manpower outsourcing  |  Housekeeping and facility services',9.6,{color:C.white,align:'center'});
+    pb.text(W/2,590,'Serving clients PAN-India',12,{bold:true,color:C.gold,align:'center'});
     pb.line(ML+60,735,MR-60,735,0.8,C.gold);
     pb.text(W/2,762,'www.publicforcesecurity.com',13,{bold:true,color:C.white,align:'center'});
     pb.text(W/2,782,'Phone '+COMPANY.phone+'   |   '+COMPANY.email,10,{color:'#C9C6B8',align:'center'});
@@ -547,14 +551,16 @@ var COMPANY={tradeName:'PUBLIC FORCE SECURITY SERVICES', legalName:'Satish Kumar
       ['Supervised posts','Supervisors and area officers check every post, with relief cover for weekly offs and leave.'],
       ['Clear monthly billing','Invoice, attendance sheet and wage register come together every month.'],
       ['Statutory compliance','PF, ESIC, professional tax, bonus and leave are managed for all staff.'],
-      ['Rates you can follow','Rate cards are built line by line on the Karnataka minimum wages notification.'],
+      ['Rates you can follow','Rate cards are built line by line on the minimum wages notified for the state of your site.'],
       ['One point of contact','Our Operations Head is a single call away for any requirement.']];
     var colW=(CW-16)/2;
     why.forEach(function(it,i){ var x=ML+(i%2)*(colW+16), yy=y+Math.floor(i/2)*52;
       pb.rect(x,yy+2,8,8,{fill:C.gold}); pb.text(x+16,yy+10,it[0],10.4,{bold:true,color:C.ink});
       var ly=yy+23; pb.wrap(it[1],colW-18,9,false).forEach(function(l){ pb.text(x+16,ly,l,9,{color:C.mute}); ly+=11.5; }); });
     y+=3*52+6;
-    if(tx(prof.keyClients)){ sect('Our clients'); para(tx(prof.keyClients).split(/\s*,\s*/).filter(Boolean).join('   |   '),10,C.ink,14); }
+    var clientsLater=false;
+    function clientsBlock(){ sect('Our clients'); para(tx(prof.keyClients).split(/\s*,\s*/).filter(Boolean).join('   |   '),10,C.ink,14); }
+    if(tx(prof.keyClients)){ if(y+80<=HT-74) clientsBlock(); else clientsLater=true; }
 
     // ---- page 3: services and technology
     y=pdfHead(pb);
@@ -573,7 +579,12 @@ var COMPANY={tradeName:'PUBLIC FORCE SECURITY SERVICES', legalName:'Satish Kumar
       rl.forEach(function(l){ pb.text(ML+18,yy,l,9,{color:C.mute}); yy+=11.5; });
       y+=h+10;
     });
-    y+=8;
+    var panL=pb.wrap('We provide security services, manpower outsourcing and housekeeping and facility services across India. Tell us where your sites are and we will plan the deployment.',CW-44,9.8,false);
+    var panH=24+panL.length*13+14;
+    pb.rect(ML,y,CW,panH,{fill:'#212322'}); pb.rect(ML,y,5,panH,{fill:C.gold});
+    pb.text(ML+18,y+22,'PAN-India services',13,{bold:true,color:C.white});
+    var panY=y+38; panL.forEach(function(l){ pb.text(ML+18,panY,l,9.8,{color:'#E6E3D8'}); panY+=13; });
+    y+=panH+16;
     sect('Technology and reporting');
     var tech=profileTech(prof), tw=(CW-16)/2;
     for(var ti=0;ti<tech.length;ti+=2){
@@ -588,7 +599,7 @@ var COMPANY={tradeName:'PUBLIC FORCE SECURITY SERVICES', legalName:'Satish Kumar
     // ---- page 4: how we work, credentials, compliance
     y=pdfHead(pb);
     sect('How we work');
-    var steps=[['Understand your site','We visit, learn your posts and shifts, and agree what you need.'],['Rate card and proposal','You receive a clear cost sheet built on the Karnataka minimum wages.'],
+    var steps=[['Understand your site','We visit, learn your posts and shifts, and agree what you need.'],['Rate card and proposal','You receive a clear cost sheet built on the minimum wages notified for your state.'],
       ['Deployment','Verified guards and a supervisor are deployed, with relief cover.'],['Monthly service','Attendance, wage register and invoice reach you together each month.']];
     var sw=(CW-30)/4;
     steps.forEach(function(st,i){ var x=ML+i*(sw+10); pb.rect(x,y,sw,122,{fill:C.paper}); pb.rect(x,y,26,26,{fill:C.gold}); pb.text(x+13,y+18,String(i+1),13,{bold:true,color:C.white,align:'center'});
@@ -602,8 +613,9 @@ var COMPANY={tradeName:'PUBLIC FORCE SECURITY SERVICES', legalName:'Satish Kumar
     reg.forEach(function(r,i){ if(i%2===0) pb.rect(ML,y,CW,21,{fill:C.paper}); pb.text(ML+12,y+14,r[0],9.6,{color:C.mute}); pb.text(ML+190,y+14,r[1],10,{bold:true,color:C.ink}); y+=21; });
     y+=18;
     sect('Our commitment to compliance');
-    ['PF and ESIC contributions paid every month for eligible staff.','Wages at or above the minimum wage notified by the Government of Karnataka.','Professional tax, bonus and leave provided for.','A payslip for every employee, and the attendance sheet and wage register (Form XVII) with every invoice.'].forEach(function(t){
+    ['PF and ESIC contributions paid every month for eligible staff.','Wages at or above the minimum wage notified for the state where the staff work.','Professional tax, bonus and leave provided for.','A payslip for every employee, and the attendance sheet and wage register (Form XVII) with every invoice.'].forEach(function(t){
       pb.rect(ML+2,y+3,7,7,{fill:C.gold}); var ls=pb.wrap(t,CW-24,10,false); ls.forEach(function(l,i){ pb.text(ML+18,y+11+i*13.5,l,10,{color:C.ink}); }); y+=ls.length*13.5+6; });
+    if(clientsLater){ y+=14; clientsBlock(); }
 
     // ---- page 5: back cover with the contact details
     darkPage();
@@ -613,7 +625,7 @@ var COMPANY={tradeName:'PUBLIC FORCE SECURITY SERVICES', legalName:'Satish Kumar
     pb.wrap('Call or write to us for a site visit and a rate card for your requirement.',CW-120,11.5,false).forEach(function(l,i){ pb.text(W/2,314+i*16,l,11.5,{color:C.gold,align:'center'}); });
     var cy=392;
     function row(label,val){ pb.text(W/2-14,cy,label,10.5,{bold:true,color:C.gold,align:'right'}); pb.text(W/2+14,cy,val,13,{color:C.white}); cy+=36; }
-    row('Phone',COMPANY.phone); row('Email',COMPANY.email); row('Website','www.publicforcesecurity.com'); row('Operations Head','Sathish Reddy');
+    row('Phone',COMPANY.phone); row('Email',COMPANY.email); row('Website','www.publicforcesecurity.com'); row('Operations Head','Sathish Reddy'); row('Coverage','PAN-India services');
     pb.text(W/2-14,cy,'Address',10.5,{bold:true,color:C.gold,align:'right'});
     pb.wrap(COMPANY.address,236,11,false).forEach(function(l,i){ pb.text(W/2+14,cy+i*15,l,11,{color:'#E6E3D8'}); });
     pb.line(ML+60,735,MR-60,735,0.8,C.gold);
@@ -1213,11 +1225,18 @@ function senderLabel(email){
   if(lp==='hr') return 'HR Team';
   return 'Public Force Security Services';
 }
-function defaultSubject(){ return 'Rate card - '+(cardForPdf().name||'Security services')+' | Public Force Security Services'; }
+function profileOnly(){ return APP.emailMode==='profile'; }
+function defaultSubject(){ return profileOnly() ? 'Company profile - Public Force Security Services' : 'Rate card - '+(cardForPdf().name||'Security services')+' | Public Force Security Services'; }
 function defaultMessage(from){
+  if(profileOnly()){
+    var pn=(APP.card.clientName||'').trim();
+    return 'Dear '+(pn?pn+' Team':'Sir/Madam')+',\n\nThank you for your interest in Public Force Security Services. Please find attached our company profile.\n\n'+
+      'We provide security services, manpower outsourcing and housekeeping and facility services PAN-India, with a guard tracking app and attendance tracking to keep you informed about every site.\n\n'+
+      'We would be happy to discuss your requirements or arrange a site visit. Please reply to this email or call us on 99860 20293.\n\nWarm regards,\n'+senderLabel(from)+'\nPublic Force Security Services';
+  }
   var card=cardForPdf(), roles=rolesForPdf(), name=(APP.card.clientName||'').trim(), cs=card.format==='costsheet';
   var lines=roles.map(function(r){ var c=computeRole(card,r); return '  '+r.roleName+(cs?' ('+r.dutyHrs+' hrs duty)':'')+': Rs. '+fmt2(c.grandTotal).replace('\u20b9',''); }).join('\n');
-  return 'Dear '+(name?name+' Team':'Sir/Madam')+',\n\nThank you for your interest in Public Force Security Services. Please find attached our rate card ('+(card.name||'wage break-up')+') for security manpower services.\n\n'+
+  return 'Dear '+(name?name+' Team':'Sir/Madam')+',\n\nThank you for your interest in Public Force Security Services. Please find attached our rate card ('+(card.name||'wage break-up')+') for security manpower services. We provide security services, manpower outsourcing and housekeeping and facility services PAN-India.\n\n'+
     'Grand total per person per month (service charge included):\n'+lines+'\n\nGST @ '+card.gstPct+'% is charged additionally as applicable.\n\n'+(profileSelected()?'I have also attached our company profile, which tells you more about who we are and how we work.\n\n':'')+
     'We would be happy to discuss your requirements or arrange a site visit. Please reply to this email or call us on 99860 20293.\n\nWarm regards,\n'+senderLabel(from)+'\nPublic Force Security Services';
 }
@@ -1236,7 +1255,7 @@ async function loadSenders(){
   var sel=$('sh_from'), help=$('shHelp');
   try{
     var out=await fnFetch('GET'); APP.senders=out.senders||[]; APP.attachMax=Number(out.maxAttachments)||1;
-    var pn=$('shProfNote'); pn.hidden=APP.attachMax>=2; if(APP.attachMax<2) pn.textContent='Sending the company profile by email needs an update to the email service (see the README). You can still share both PDFs with Share.';
+    var pn=$('shProfNote'); pn.hidden=(APP.attachMax>=2)||profileOnly(); if(APP.attachMax<2) pn.textContent='Sending the company profile by email needs an update to the email service (see the README). You can still share both PDFs with Share.';
     sel.innerHTML=APP.senders.map(function(s){ return '<option value="'+esc(s.email)+'">'+esc(s.email)+' ('+esc(s.label)+')</option>'; }).join('');
     help.hidden=true; $('shSend').disabled=false;
     if(!APP.msgEdited) $('sh_msg').value=defaultMessage(sel.value);
@@ -1247,12 +1266,21 @@ async function loadSenders(){
     else help.textContent='Email is not available right now: '+(e&&e.message||'unknown problem')+'. You can still share the PDF below.';
   }
 }
-function openEmail(){
+function setEmailModeUI(){
+  var po=profileOnly();
+  document.querySelectorAll('#shMode button').forEach(function(b){ b.classList.toggle('on',b.dataset.mode===(po?'profile':'card')); });
+  $('shTitle').textContent=po?'Email the company profile':'Email the rate card';
+  $('shProfRow').hidden=po; if(po) $('shProfNote').hidden=true;
+  $('shShare').textContent=po?'Share the company profile instead':'Share the PDF instead';
+}
+function openEmail(mode){
   syncCardFromForm();
-  if(!ready()){ toast('Enter the wages first.'); return; }
+  mode=(mode==='profile')?'profile':'card';
+  if(mode==='card' && !ready()){ toast('Enter the wages first.'); return; }
+  APP.emailMode=mode; setEmailModeUI();
   APP.msgEdited=false;
   var rememberedProfile=false; try{ rememberedProfile=(window.localStorage&&localStorage.getItem('pfssAttachProfile')==='1'); }catch(e){}
-  $('sh_profile').checked=rememberedProfile; $('shProfNote').hidden=true;
+  $('sh_profile').checked=rememberedProfile; $('shProfNote').hidden=true; setEmailModeUI();
   $('sh_to').value=APP.card.clientEmail||''; $('sh_cc').value=''; $('sh_subject').value=defaultSubject(); $('sh_msg').value=defaultMessage('info@publicforcesecurity.com');
   $('shErr').textContent=''; $('shSend').disabled=true; $('shSend').textContent='Send email';
   $('sheet').hidden=false; loadSenders();
@@ -1261,28 +1289,49 @@ function closeEmail(){ $('sheet').hidden=true; }
 async function sendEmail(){
   var err=$('shErr'), btn=$('shSend'); err.textContent='';
   var to=$('sh_to').value.trim(); if(!to){ err.textContent='Enter the client\'s email address.'; return; }
-  if(profileSelected() && (APP.attachMax||1)<2){ err.textContent='The email service needs an update before it can send the company profile (see the README). Untick the box to send the rate card alone, or use Share.'; return; }
-  btn.disabled=true; btn.textContent='Preparing the PDF...';
+  var po=profileOnly();
+  if(!po && profileSelected() && (APP.attachMax||1)<2){ err.textContent='The email service needs an update before it can send the company profile (see the README). Untick the box to send the rate card alone, or use Share.'; return; }
+  btn.disabled=true; btn.textContent=po?'Preparing the company profile...':'Preparing the PDF...';
   try{
-    var blob=makePdf(), b64=await blobToBase64(blob);
-    var body={from:$('sh_from').value,to:to,cc:$('sh_cc').value.trim(),subject:$('sh_subject').value,message:$('sh_msg').value,keepCopy:$('sh_copy').checked,filename:pdfFileName(),pdfBase64:b64};
-    if(profileSelected()){ btn.textContent='Preparing the company profile...'; body.extra=[{filename:PROFILE_FILE,pdfBase64:await blobToBase64(profileBlob())}]; }
+    var body={from:$('sh_from').value,to:to,cc:$('sh_cc').value.trim(),subject:$('sh_subject').value,message:$('sh_msg').value,keepCopy:$('sh_copy').checked};
+    if(po){ body.filename=PROFILE_FILE; body.pdfBase64=await blobToBase64(profileBlob()); }
+    else {
+      var blob=makePdf(); body.filename=pdfFileName(); body.pdfBase64=await blobToBase64(blob);
+      if(profileSelected()){ btn.textContent='Preparing the company profile...'; body.extra=[{filename:PROFILE_FILE,pdfBase64:await blobToBase64(profileBlob())}]; }
+    }
     btn.textContent='Sending...';
     var out=await fnFetch('POST',body);
-    toast('Email sent to '+to+(body.extra?', with the company profile.':'.')); closeEmail();
-    if(APP.canWrite && !APP.id){ /* keep the card so it can be sent again */ saveCard(); }
+    toast(po?'Company profile sent to '+to+'.':'Email sent to '+to+(body.extra?', with the company profile.':'.')); closeEmail();
+    if(!po && APP.canWrite && !APP.id){ /* keep the card so it can be sent again */ saveCard(); }
   }catch(e){ err.textContent=(e&&e.message)||'Could not send the email.'; }
   btn.disabled=false; btn.textContent='Send email';
 }
+async function shareProfileOnly(){
+  var blob=profileBlob(), file=(typeof File==='function')?new File([blob],PROFILE_FILE,{type:'application/pdf'}):null;
+  if(file && navigator.canShare && navigator.canShare({files:[file]})){
+    try{ await navigator.share({files:[file],title:'Company profile - Public Force Security Services',text:'Company profile of Public Force Security Services'}); }
+    catch(e){ if(e&&e.name!=='AbortError') toast('Could not open the share menu.'); }
+  } else { downloadBlob(blob,PROFILE_FILE); toast('Sharing is not available here, so the PDF was downloaded.'); }
+}
 function bindEmail(){
-  $('btnEmail').addEventListener('click',openEmail);
+  $('btnEmail').addEventListener('click',function(){ openEmail('card'); });
+  $('btnProfileOnly').addEventListener('click',function(){ openEmail('profile'); });
   $('btnShare').addEventListener('click',function(){ sharePdf(false); });
   $('btnProfile').addEventListener('click',function(){ downloadBlob(profileBlob(),PROFILE_FILE); });
   $('btnPdf').addEventListener('click',function(){ if(!ready()){ toast('Enter the wages first.'); return; } downloadBlob(makePdf(),pdfFileName()); });
   $('shClose').addEventListener('click',closeEmail);
   $('sheet').addEventListener('click',function(ev){ if(ev.target===$('sheet')) closeEmail(); });
   $('shSend').addEventListener('click',sendEmail);
-  $('shShare').addEventListener('click',function(){ var wp=profileSelected(); closeEmail(); sharePdf(wp); });
+  $('shShare').addEventListener('click',function(){ var po=profileOnly(), wp=profileSelected(); closeEmail(); if(po) shareProfileOnly(); else sharePdf(wp); });
+  $('shMode').addEventListener('click',function(ev){
+    var b=ev.target.closest('button'); if(!b||!b.dataset.mode) return;
+    var want=b.dataset.mode; if(want===(profileOnly()?'profile':'card')) return;
+    syncCardFromForm();
+    if(want==='card' && !ready()){ toast('To send a rate card, enter the wages first on the New card tab.'); return; }
+    var oldSubject=defaultSubject(); APP.emailMode=want; setEmailModeUI();
+    if($('sh_subject').value===oldSubject) $('sh_subject').value=defaultSubject();
+    if(!APP.msgEdited) $('sh_msg').value=defaultMessage($('sh_from').value);
+  });
   $('sh_profile').addEventListener('change',function(){ try{ localStorage.setItem('pfssAttachProfile',$('sh_profile').checked?'1':'0'); }catch(e){} if(!APP.msgEdited) $('sh_msg').value=defaultMessage($('sh_from').value); });
   $('sh_msg').addEventListener('input',function(){ APP.msgEdited=true; });
   $('sh_from').addEventListener('change',function(){ if(!APP.msgEdited) $('sh_msg').value=defaultMessage($('sh_from').value); });
