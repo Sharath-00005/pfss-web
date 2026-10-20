@@ -59,7 +59,7 @@ td.r,th.r{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
 tr.sub td{background:rgba(201,151,58,.12);font-weight:700}
 tr.grand td{background:var(--dark);color:#fff;font-weight:700}
 tr.sec td{background:var(--bg);color:var(--brand);font-weight:700}
-.tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;display:grid;grid-template-columns:repeat(3,1fr);background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
+.tabs{position:fixed;left:0;right:0;bottom:0;z-index:30;display:grid;grid-template-columns:repeat(4,1fr);background:var(--surface);border-top:1px solid var(--line);padding-bottom:env(safe-area-inset-bottom,0px)}
 .tabs button{appearance:none;border:0;background:transparent;color:var(--muted);font:inherit;font-weight:700;font-size:13px;min-height:62px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px}
 .tabs button.on{color:var(--brand);box-shadow:inset 0 3px 0 var(--gold)}
 .saved{display:flex;justify-content:space-between;align-items:center;gap:10px}
@@ -75,6 +75,17 @@ tr.sec td{background:var(--bg);color:var(--brand);font-weight:700}
 .note{background:var(--bg);border:1px solid var(--line);border-left:4px solid var(--gold);border-radius:8px;padding:10px 12px;font-size:13px;margin:8px 0}
 #toast{position:fixed;left:50%;bottom:calc(84px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--dark);color:#fff;padding:11px 16px;border-radius:10px;z-index:80;max-width:90%;text-align:center;font-size:14px;display:none}
 #toast.show{display:block}
+.seg{display:grid;grid-template-columns:1fr 1fr;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:12px}
+.seg button{appearance:none;border:0;background:var(--bg);color:var(--muted);font:inherit;font-weight:700;min-height:48px}
+.seg button.on{background:var(--brand);color:var(--brand-ink)}
+.qrow{display:flex;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--line)}
+.qrow:last-child{border-bottom:0}
+.qrow b{font-variant-numeric:tabular-nums}
+.qrow.big{font-weight:700;font-size:17px}
+.qrow.sub span:first-child{color:var(--muted)}
+.qtable{min-width:0;font-size:14px}
+.qtable td,.qtable th{padding:9px 6px}
+.qgo{background:rgba(201,151,58,.14)}
 [hidden]{display:none!important}
 </style>
 </head>
@@ -185,6 +196,24 @@ tr.sec td{background:var(--bg);color:var(--brand);font-weight:700}
     </div>
   </section>
 
+  <section id="vQuick" hidden>
+    <div class="card">
+      <h2>Quick quote</h2>
+      <div class="seg" id="qMode"><button type="button" data-mode="billing" class="on">Billing amount</button><button type="button" data-mode="inhand">In-hand salary</button></div>
+      <label for="q_amount" id="q_label">Billing amount per guard (&#8377; per month)</label>
+      <input id="q_amount" type="number" inputmode="decimal" placeholder="e.g. 26000">
+      <div id="qGstBox">
+        <label>Is GST already in this amount?</label>
+        <div class="seg" id="qGst"><button type="button" data-gst="extra" class="on">GST extra</button><button type="button" data-gst="incl">GST included</button></div>
+      </div>
+      <div class="grid2">
+        <div><label for="q_gst">GST %</label><input id="q_gst" type="number" inputmode="decimal" step="0.01" value="18"></div>
+        <div><label for="q_other">Other service charge % (optional)</label><input id="q_other" type="number" inputmode="decimal" step="0.01" placeholder="e.g. 6"></div>
+      </div>
+    </div>
+    <div id="qOut"></div>
+  </section>
+
   <section id="vPreview" hidden>
     <div class="card" id="pvHead"></div>
     <div class="card scroll" id="pvTable"></div>
@@ -202,6 +231,7 @@ tr.sec td{background:var(--bg);color:var(--brand);font-weight:700}
 
 <nav class="tabs" aria-label="Sections">
   <button type="button" data-view="vForm" class="on">New card</button>
+  <button type="button" data-view="vQuick">Quick quote</button>
   <button type="button" data-view="vPreview">Preview</button>
   <button type="button" data-view="vSaved">Saved</button>
 </nav>
@@ -808,13 +838,147 @@ function bindForm(){
   $('btnSave').addEventListener('click',saveCard);
 }
 
+/* ---------- quick quote: from one figure to PF, ESIC and the service charge options ---------- */
+// PF, ESIC and bonus for a given gross salary. PF is on wages up to the PF ceiling; ESIC only when gross is within the ESI limit; bonus on the gross, taken as Basic + D.A.
+// The employer PF, employer ESIC and bonus are paid by the client on top. Only the employee PF, ESIC and PT come out of the guard's pay.
+function quickShares(g){
+  var st=state.settings||{}, rnd=Math.round;
+  var ceilOn=st.pfCeilingEnabled!==false, ceil=num(st.pfCeiling)||15000, pfBase=ceilOn?Math.min(g,ceil):g;
+  var epfPct=num(st.pfRate)||12, rpfPct=num((st.costing||{}).pfPct)||13;
+  var esiOn=g>0 && g<=(num(st.esiThreshold)||21000);
+  var eEsiPct=st.esiRate==null?0.75:num(st.esiRate), rEsiPct=st.esiErRate==null?3.25:num(st.esiErRate);
+  var empPf=rnd(pfBase*epfPct/100), erPf=rnd(pfBase*rpfPct/100);
+  var empEsi=esiOn?rnd(g*eEsiPct/100):0, erEsi=esiOn?rnd(g*rEsiPct/100):0;
+  var bonusPct=((st.costing||{}).bonusPct!=null)?num(st.costing.bonusPct):8.33, bonus=rnd(g*bonusPct/100);
+  var pt=ptForState('Karnataka',g);
+  return {gross:g,empPf:empPf,erPf:erPf,empEsi:empEsi,erEsi:erEsi,esiOn:esiOn,pt:pt,bonus:bonus,bonusPct:bonusPct,inhand:g-empPf-empEsi-pt,costBase:g+erPf+erEsi+bonus,epfPct:epfPct,rpfPct:rpfPct,eEsiPct:eEsiPct,rEsiPct:rEsiPct};
+}
+// the lowest whole-rupee gross that leaves the guard at least this much in hand
+function grossFromInhand(h){
+  if(!(h>0)) return 0;
+  var g=Math.floor(h), top=Math.ceil(h*1.5)+500;
+  for(; g<=top; g++){ if(quickShares(g).inhand>=h) return g; }
+  return top;
+}
+// the highest whole-rupee gross whose cost (gross + employer PF + employer ESIC) stays within the budget
+function grossFromBudget(maxCost){
+  for(var g=Math.floor(maxCost); g>0; g--){ if(quickShares(g).costBase<=maxCost) return g; }
+  return 0;
+}
+function quickCalc(){
+  var gtxt=$('q_gst').value, gst=(gtxt===''||gtxt==null)?18:num(gtxt), amount=num($('q_amount').value), mode=APP.qMode||'billing', other=num($('q_other').value);
+  if(!(amount>0)) return null;
+  var pcts=[5,7,9,10]; if(other>0 && pcts.indexOf(other)<0) pcts.push(other);
+  if(mode==='inhand'){
+    var gross=grossFromInhand(amount), sh=quickShares(gross);
+    return {mode:'inhand',amount:amount,gstPct:gst,gross:gross,sh:sh,rows:pcts.map(function(p,i){
+      var sc=Math.round(sh.costBase*p/100), pays=sh.costBase+sc, gs=Math.round(pays*gst/100);
+      return {pct:p,sc:sc,pays:pays,gst:gs,total:pays+gs,custom:i>3}; })};
+  }
+  var incl=(APP.qGst||'extra')==='incl', pre=incl?Math.floor(amount/(1+gst/100)):amount;
+  return {mode:'billing',amount:amount,incl:incl,gstPct:gst,pre:pre,gstOnBudget:incl?(amount-pre):Math.round(pre*gst/100),rows:pcts.map(function(p,i){
+    var G=grossFromBudget(pre/(1+p/100)), sh=quickShares(G), sc=G?Math.round(sh.costBase*p/100):0, pays=G?sh.costBase+sc:0, gs=Math.round(pays*gst/100);
+    return {pct:p,gross:G,sh:sh,sc:sc,pays:pays,gst:gs,total:pays+gs,custom:i>3}; })};
+}
+function inr(x){ return '\u20b9'+Math.round(x).toLocaleString('en-IN'); }
+function selectedRow(q){ var r=q.rows.filter(function(x){ return x.pct===APP.qSel; })[0]; return r||q.rows[0]; }
+// compares the guard's gross with the minimum wage (Basic + D.A.) of an unskilled guard in each zone
+function minWageCheck(gross){
+  var parts=['1','2','3'].map(function(z){
+    var w=govWage(z,'unskilled'), m=w.basic+w.da, good=gross+0.5>=m;
+    return 'Zone '+z+' '+inr(m)+' <b style="color:var(--'+(good?'ok':'bad')+')">'+(good?'ok':'below')+'</b>';
+  });
+  return '<div class="muted" style="margin-top:8px">Minimum wage for an unskilled guard (Basic + D.A.): '+parts.join(' &middot; ')+'. A guard cannot be paid below the minimum wage for the site\'s zone.</div>';
+}
+// the same breakdown for one service charge: guard's side, employer's side, what the company gets, what the client pays
+function quickBreakdown(title,gross,s,sc,pays,gstPct,gs,total){
+  return '<div class="card"><h2>'+title+'</h2>'+
+    '<div class="qrow big"><span>Guard\'s gross salary</span><b>'+inr(gross)+'</b></div>'+
+    '<div class="qrow sub"><span>Employee PF ('+s.epfPct+'%)</span><b>- '+inr(s.empPf)+'</b></div>'+
+    (s.esiOn?'<div class="qrow sub"><span>Employee ESIC ('+s.eEsiPct+'%)</span><b>- '+inr(s.empEsi)+'</b></div>':'')+
+    (s.pt?'<div class="qrow sub"><span>Professional tax</span><b>- '+inr(s.pt)+'</b></div>':'')+
+    '<div class="qrow big"><span>In-hand salary</span><b>'+inr(s.inhand)+'</b></div>'+minWageCheck(gross)+'</div>'+
+    '<div class="card"><h2>What the client pays</h2>'+
+    '<div class="qrow"><span>Guard\'s gross salary</span><b>'+inr(gross)+'</b></div>'+
+    '<div class="qrow"><span>Employer PF ('+s.rpfPct+'%)</span><b>'+inr(s.erPf)+'</b></div>'+
+    (s.esiOn?'<div class="qrow"><span>Employer ESIC ('+s.rEsiPct+'%)</span><b>'+inr(s.erEsi)+'</b></div>':'<div class="qrow sub"><span>Employer ESIC</span><span>not applicable above '+inr(num(state.settings.esiThreshold)||21000)+'</span></div>')+
+    '<div class="qrow"><span>Bonus ('+s.bonusPct+'%)</span><b>'+inr(s.bonus)+'</b></div>'+
+    '<div class="qrow sub"><span>Cost before service charge</span><b>'+inr(s.costBase)+'</b></div>'+
+    '<div class="qrow qgo"><span><b>Service charge: company gets</b></span><b>'+inr(sc)+'</b></div>'+
+    '<div class="qrow"><span>Billing before GST</span><b>'+inr(pays)+'</b></div>'+
+    '<div class="qrow sub"><span>GST ('+gstPct+'%)</span><b>'+inr(gs)+'</b></div>'+
+    '<div class="qrow big"><span>Total with GST</span><b>'+inr(total)+'</b></div></div>';
+}
+// the lowest minimum wage for a guard (Zone 3, unskilled, Basic + D.A.)
+function lowestMinWage(){ var w=govWage('3','unskilled'); return w.basic+w.da; }
+function renderQuick(){
+  var q=quickCalc(), out=$('qOut'), mode=APP.qMode||'billing';
+  $('q_label').textContent=(mode==='inhand'?'In-hand salary':'Billing amount')+' per guard (\u20b9 per month)';
+  $('qGstBox').hidden=(mode==='inhand');
+  document.querySelectorAll('#qMode button').forEach(function(b){ b.classList.toggle('on',b.dataset.mode===mode); });
+  document.querySelectorAll('#qGst button').forEach(function(b){ b.classList.toggle('on',b.dataset.gst===(APP.qGst||'extra')); });
+  if(!q){ out.innerHTML='<div class="card muted">Enter '+(mode==='inhand'?'the guard\'s in-hand salary':'the billing amount the client will pay per guard')+' above to see the PF and ESIC shares and the service charge options.</div>'; return; }
+  var note='<div class="card"><div class="muted">All figures are per guard, per month. PF is on wages up to '+inr(num(state.settings.pfCeiling)||15000)+'. ESIC applies only when the gross is '+inr(num(state.settings.esiThreshold)||21000)+' or less. Professional tax follows the Karnataka slab. The quick quote has PF, ESIC, bonus ('+((state.settings.costing||{}).bonusPct!=null?num(state.settings.costing.bonusPct):8.33)+'% of the gross) and the service charge only: leave, uniform, training and relieving charges are not included, so use the New card tab for the full cost sheet.</div>'+
+    '<div class="actions" style="margin:12px 0 0"><button class="btn pri" id="qShare">Share this quote</button></div></div>';
+  if(q.mode==='inhand'){
+    var s=q.sh;
+    var head='<div class="card"><h2>Guard\'s gross salary</h2><div class="qrow sub"><span>To get '+inr(q.amount)+' in hand, the gross must be</span><b>'+inr(q.gross)+'</b></div></div>';
+    var tb='<div class="card scroll"><h2 style="padding:14px 14px 0">Service charge options</h2><table class="qtable"><thead><tr><th>Service charge</th><th class="r">Company gets</th><th class="r">Billing</th><th class="r">GST '+q.gstPct+'%</th><th class="r">Total</th></tr></thead><tbody>'+
+      q.rows.map(function(r){ return '<tr data-sel="'+r.pct+'" class="'+((r.custom||r.pct===selectedRow(q).pct)?'qgo':'')+'"><td>'+r.pct+'%</td><td class="r"><b>'+inr(r.sc)+'</b></td><td class="r">'+inr(r.pays)+'</td><td class="r">'+inr(r.gst)+'</td><td class="r">'+inr(r.total)+'</td></tr>'; }).join('')+'</tbody></table></div><div class="muted" style="margin:-4px 4px 12px">Tap a row to see its full breakdown.</div>';
+    var r=selectedRow(q);
+    out.innerHTML=head+tb+quickBreakdown('Breakdown at '+r.pct+'% service charge',q.gross,s,r.sc,r.pays,q.gstPct,r.gst,r.total)+note; return;
+  }
+  var budget='<div class="card"><h2>The client\'s billing amount</h2>'+
+    (q.incl?'<div class="qrow"><span>Amount including GST</span><b>'+inr(q.amount)+'</b></div><div class="qrow sub"><span>GST included ('+q.gstPct+'%)</span><b>'+inr(q.gstOnBudget)+'</b></div><div class="qrow big"><span>Before GST</span><b>'+inr(q.pre)+'</b></div>'
+           :'<div class="qrow big"><span>Billing amount, before GST</span><b>'+inr(q.pre)+'</b></div><div class="qrow sub"><span>GST ('+q.gstPct+'%) charged extra</span><b>'+inr(q.gstOnBudget)+'</b></div><div class="qrow"><span>Total with GST</span><b>'+inr(q.pre+q.gstOnBudget)+'</b></div>')+'</div>';
+  var tb2='<div class="card scroll"><h2 style="padding:14px 14px 0">What each service charge leaves for the guard</h2><table class="qtable"><thead><tr><th>Service charge</th><th class="r">Company gets</th><th class="r">Guard gross</th><th class="r">In-hand</th></tr></thead><tbody>'+
+    q.rows.map(function(r){ var low=r.gross>0 && r.gross<lowestMinWage(), red=low?' style="color:var(--bad);font-weight:700"':''; return '<tr data-sel="'+r.pct+'" class="'+((r.custom||r.pct===selectedRow(q).pct)?'qgo':'')+'">'+(r.gross?'<td>'+r.pct+'%</td><td class="r"><b>'+inr(r.sc)+'</b></td><td class="r"'+red+'>'+inr(r.gross)+'</td><td class="r"'+red+'>'+inr(r.sh.inhand)+'</td>':'<td>'+r.pct+'%</td><td class="r" colspan="3">budget too low</td>')+'</tr>'; }).join('')+'</tbody></table></div><div class="muted" style="margin:-4px 4px 12px">Tap a row to see its full breakdown.'+(q.rows.some(function(r){ return r.gross>0 && r.gross<lowestMinWage(); })?' <b style="color:var(--bad)">Red</b> means the guard\'s gross is below the lowest minimum wage ('+inr(lowestMinWage())+', Zone 3), so that option is not possible.':'')+'</div>';
+  var r2=selectedRow(q);
+  out.innerHTML=budget+tb2+(r2.gross?quickBreakdown('Breakdown at '+r2.pct+'% service charge',r2.gross,r2.sh,r2.sc,r2.pays,q.gstPct,r2.gst,r2.total):'')+note;
+}
+function quickText(){
+  var q=quickCalc(); if(!q) return '';
+  var R=function(v){ return 'Rs. '+Math.round(v).toLocaleString('en-IN'); }, L=[];
+  function shares(s){ return ['Employee share: PF '+R(s.empPf)+(s.esiOn?', ESIC '+R(s.empEsi):'')+(s.pt?', PT '+R(s.pt):''),'Employer share: PF '+R(s.erPf)+(s.esiOn?', ESIC '+R(s.erEsi):'')+', Bonus '+s.bonusPct+'% '+R(s.bonus)]; }
+  L.push('Public Force Security Services - quote per guard, per month');
+  if(q.mode==='inhand'){
+    var s=q.sh; L.push('In-hand salary '+R(q.amount)+' needs a gross of '+R(q.gross)); shares(s).forEach(function(x){ L.push(x); });
+    L.push('Cost before service charge: '+R(s.costBase),'Service charge options:');
+    q.rows.forEach(function(r){ L.push('  '+r.pct+'%: service charge '+R(r.sc)+', billing '+R(r.pays)+', GST '+q.gstPct+'% '+R(r.gst)+', total '+R(r.total)); });
+    return L.join('\n');
+  }
+  var r=selectedRow(q); if(!r.gross) return '';
+  L.push('Billing amount: '+R(q.amount)+(q.incl?' including GST':' before GST (GST '+q.gstPct+'% extra)'));
+  L.push('At '+r.pct+'% service charge:','  Guard gross salary '+R(r.gross)+', in-hand '+R(r.sh.inhand)); shares(r.sh).forEach(function(x){ L.push('  '+x); });
+  L.push('  Cost before service charge '+R(r.sh.costBase)+', service charge '+R(r.sc),'  Billing before GST '+R(r.pays)+', GST '+q.gstPct+'% '+R(r.gst)+', total '+R(r.total));
+  var others=q.rows.filter(function(x){ return x.pct!==r.pct && x.gross; });
+  if(others.length){ L.push('Other options:'); others.forEach(function(x){ L.push('  '+x.pct+'%: guard gross '+R(x.gross)+' (in-hand '+R(x.sh.inhand)+'), service charge '+R(x.sc)); }); }
+  return L.join('\n');
+}
+async function shareQuick(){
+  var text=quickText(); if(!text){ toast('Enter an amount first.'); return; }
+  if(navigator.share){ try{ await navigator.share({title:'Quote - Public Force Security Services',text:text}); return; }catch(e){ if(e&&e.name==='AbortError') return; } }
+  try{ await navigator.clipboard.writeText(text); toast('Quote copied. Paste it into WhatsApp or email.'); }catch(e){ toast('Could not share or copy.'); }
+}
+function bindQuick(){
+  APP.qMode='billing'; APP.qGst='extra'; APP.qSel=5;
+  ['q_amount','q_gst','q_other'].forEach(function(id){ $(id).addEventListener('input',renderQuick); });
+  $('qMode').addEventListener('click',function(ev){ var b=ev.target.closest('button'); if(!b||!b.dataset.mode) return; APP.qMode=b.dataset.mode; renderQuick(); });
+  $('qGst').addEventListener('click',function(ev){ var b=ev.target.closest('button'); if(!b||!b.dataset.gst) return; APP.qGst=b.dataset.gst; renderQuick(); });
+  $('qOut').addEventListener('click',function(ev){
+    if(ev.target.closest('#qShare')){ shareQuick(); return; }
+    var tr=ev.target.closest('[data-sel]'); if(tr){ APP.qSel=Number(tr.dataset.sel); renderQuick(); }
+  });
+}
+
 /* ---------- views ---------- */
 function showView(v){
   APP.view=v;
-  ['vForm','vPreview','vSaved'].forEach(function(id){ $(id).hidden=(id!==v); });
+  ['vForm','vQuick','vPreview','vSaved'].forEach(function(id){ $(id).hidden=(id!==v); });
   document.querySelectorAll('.tabs button').forEach(function(b){ b.classList.toggle('on',b.dataset.view===v); });
   if(v==='vPreview'){ syncCardFromForm(); renderPreview(); }
   if(v==='vSaved') renderSaved();
+  if(v==='vQuick') renderQuick();
   window.scrollTo(0,0);
 }
 function renderPreview(){
@@ -993,7 +1157,7 @@ async function loadData(){
 }
 function init(){
   APP.card=blankCard('costsheet'); APP.roles=starterRoles();
-  fillForm(); bindForm(); bindTabs(); bindEmail();
+  fillForm(); bindForm(); bindTabs(); bindEmail(); bindQuick();
   if('serviceWorker' in navigator){ navigator.serviceWorker.register('sw.js').catch(function(){}); }
   loadData();
 }
