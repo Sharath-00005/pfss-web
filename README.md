@@ -212,3 +212,7 @@ The figures come from your saved invoices. They help you prepare the return; you
 The service now accepts up to two extra PDFs per email (6 MB in all) and logs how many were attached.
 
 The brochure shows one contact number, 99860 20293, and names Sathish Reddy as Operations Head. It does not mention the constitution of the business or the proprietor.
+
+**PAN-India services** are mentioned on the cover, in the About us paragraph, in a "PAN-India services" band on the services page, and on the back cover. The minimum wage wording in the brochure refers to "the state of your site" instead of Karnataka.
+
+**Sending only the company profile (phone app).** On the New card tab, the Client box has **Email the company profile only**. It opens the email sheet with the client's email filled in, no wages needed, and a short message that introduces the profile and mentions PAN-India services. Inside the email sheet, the **Rate card / Company profile only** switch changes between the two, and the subject and message follow. Share offers only the profile in this mode. It works with the email service you already have; it does not need the update that sending the profile together with a rate card needs.
