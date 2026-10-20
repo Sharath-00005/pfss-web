@@ -454,6 +454,7 @@ tr:hover td{background:var(--line2)}
     <div class="card">
       <div class="pill-row" id="cmpTabs" style="margin-top:0">
         <button class="btn small ghost on" data-ctab="calendar">Filing calendar</button>
+        <button class="btn small ghost" data-ctab="gst">GST for the month</button>
         <button class="btn small ghost" data-ctab="licences">Licences and registrations</button>
         <button class="btn small ghost" data-ctab="workforce">Workforce gaps</button>
         <button class="btn small ghost" data-ctab="minwage">Minimum wages</button>
@@ -553,11 +554,40 @@ tr:hover td{background:var(--line2)}
         <div class="field"><label>UPI ID</label><input id="invSetUpi"></div>
       </div>
       <div class="row">
+        <div class="field"><label>SAC code printed on invoices and used in GSTR-1</label><input id="invSetSac" placeholder="998525"></div>
+        <div class="field grow"><div class="muted" style="margin-top:1.6rem">998525 is guard services. Ask your CA if you also supply other services.</div></div>
+      </div>
+      <div class="row">
         <div class="field grow"><label>Terms printed on invoices (blank uses the default)</label><textarea id="invSetTerms" rows="2" placeholder="Payment is due by the date shown on this invoice. Subject to Bengaluru jurisdiction. This is a computer-generated invoice."></textarea></div>
       </div>
       <div class="row" style="margin-top:1rem">
         <button class="btn" id="btnSaveInvSettings">Save invoice details</button>
         <button class="btn ghost" id="btnPreviewLetterhead">Download sample PDF</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Company profile (brochure)</h2>
+      <p class="muted">A 5-page company profile PDF with your registrations and contact details. You can also attach it when you email a rate card from the phone app. Anything you leave empty is left out of the PDF. Please read every line before you send it to a client.</p>
+      <div class="row">
+        <div class="field grow"><label>About us (leave empty to use the standard paragraph)</label><textarea id="profAbout" rows="5"></textarea></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>Years in business</label><input id="profYears" placeholder="e.g. 8"></div>
+        <div class="field"><label>Clients served</label><input id="profClients" placeholder="e.g. 25"></div>
+        <div class="field"><label>Staff deployed</label><input id="profStaff" placeholder="e.g. 300"></div>
+        <div class="field"><label>Sites covered</label><input id="profSites" placeholder="e.g. 30"></div>
+      </div>
+      <div class="row">
+        <div class="field grow"><label>Technology and reporting services (one per line as Title: description; leave empty for the standard list)</label><textarea id="profTech" rows="5" placeholder="Guard tracking app: Track your guards on duty through a mobile app.&#10;Attendance tracking: Every guard's attendance is recorded daily and shared with you."></textarea></div>
+      </div>
+      <div class="row">
+        <div class="field"><label>PSARA licence number</label><input id="profPsara"></div>
+        <div class="field grow"><label>Key clients (separate with commas)</label><input id="profKeyClients" placeholder="e.g. Client A, Client B"></div>
+      </div>
+      <div class="row" style="margin-top:1rem">
+        <button class="btn" id="btnSaveProfile">Save profile details</button>
+        <button class="btn ghost" id="btnDownloadProfile">Download company profile PDF</button>
       </div>
     </div>
 
@@ -1068,6 +1098,7 @@ tr:hover td{background:var(--line2)}
     subscribeContracts();
     subscribeLicences();
     subscribeFilings();
+    subscribeGstMonth();
     subscribeEmpCompliance();
     setupContractUI();
     setupComplianceUI();
@@ -1084,6 +1115,7 @@ tr:hover td{background:var(--line2)}
     setupPayrollUI();
     setupSettingsUI();
     setupInvoiceSettingsUI();
+    setupProfileUI();
     setupSignatureUI();
     setupPackModal();
     subscribeCycleData();
@@ -1136,6 +1168,7 @@ tr:hover td{background:var(--line2)}
     renderCompliance();
     renderAttention();
     renderInvoiceSettings();
+    renderProfileSettings();
     renderSignatureSettings();
     renderCycleSettings();
     renderCycleCard();
@@ -3496,6 +3529,145 @@ tr:hover td{background:var(--line2)}
     catch(e){ toast('Could not save.'); }
   }
 
+  // ---------- GST FOR THE MONTH: GSTR-1 tables and the GSTR-3B payment, worked out from the saved invoices ----------
+  var GST_RE=/^\d{2}[A-Z]{5}\d{4}[A-Z][1-9A-Z]Z[0-9A-Z]$/;
+  var gstMonth=null, gstMonthDocs={};
+  function curGstMonth(){ return gstMonth||cmpMonth; }
+  function invSac(){ var v=(state.settings&&state.settings.invoice)||{}; return String(v.sac||'').trim()||'998525'; }
+
+  // Every invoice of the month, sorted into the GSTR-1 tables. Drafts are left out.
+  function gstr1Data(ym, invs, clientList){
+    var rows=[], warns=[], drafts=0, inMonth=0, nums=[];
+    (invs||[]).forEach(function(inv){
+      if(String(inv.invoiceDate||'').slice(0,7)!==ym) return;
+      if(inv.status==='draft'){ drafts++; return; }
+      inMonth++; nums.push(String(inv.invoiceNo||''));
+      var c=(clientList||[]).find(function(x){ return x.id===inv.clientId; })||null;
+      var gstin=String((c&&c.gstin)||'').trim().toUpperCase(), reg=GST_RE.test(gstin);
+      if(gstin && !reg) warns.push('The GSTIN of '+(inv.clientName||'a client')+' ('+gstin+') does not look valid, so invoice '+(inv.invoiceNo||'')+' is treated as unregistered.');
+      var sp=supplyType(c), rate=Number(inv.gstPct)||0;
+      var rcm=Number(inv.rcmBase)||0, normal=(Number(inv.subtotal)||0)-rcm, gst=Number(inv.gstAmt)||0;
+      var igst=inv.igst, cgst=inv.cgst, sgst=inv.sgst;
+      if(igst==null && cgst==null && sgst==null){ if(sp.inter){ igst=gst; cgst=0; sgst=0; } else { cgst=gst/2; sgst=gst/2; igst=0; } }
+      igst=Number(igst)||0; cgst=Number(cgst)||0; sgst=Number(sgst)||0;
+      var exempt=!!(c&&c.gstExempt), value=Number(inv.total)||0;
+      var base={no:inv.invoiceNo||'', date:inv.invoiceDate||'', client:inv.clientName||(c&&c.name)||'', gstin:reg?gstin:'', pos:sp.pos, posCode:sp.code, inter:sp.inter, rate:rate, value:value, reg:reg, mixed:(normal>0&&rcm>0)};
+      if(normal>0){
+        if(exempt) rows.push(Object.assign({},base,{table:'8',taxable:normal,igst:0,cgst:0,sgst:0,rcm:'N'}));
+        else if(reg) rows.push(Object.assign({},base,{table:'4A',taxable:normal,igst:igst,cgst:cgst,sgst:sgst,rcm:'N'}));
+        else rows.push(Object.assign({},base,{table:(sp.inter&&value>250000)?'5':'7',taxable:normal,igst:igst,cgst:cgst,sgst:sgst,rcm:'N'}));
+      }
+      if(rcm>0){
+        if(!reg) warns.push('Invoice '+(inv.invoiceNo||'')+' has reverse charge lines but '+(inv.clientName||'the client')+' has no valid GSTIN. Reverse charge applies only to registered clients.');
+        rows.push(Object.assign({},base,{table:'4B',taxable:rcm,igst:0,cgst:0,sgst:0,rcmTax:Number(inv.rcmTax)||Math.round(rcm*rate/100),rcm:'Y'}));
+      }
+    });
+    nums.sort(function(a,b){ return a.localeCompare(b,undefined,{numeric:true}); });
+    return {ym:ym, rows:rows, warns:warns, drafts:drafts, inMonth:inMonth, nums:nums};
+  }
+  function gstZero(){ return {n:0,taxable:0,igst:0,cgst:0,sgst:0,rcmTax:0}; }
+  function gstAdd(t,r){ t.n++; t.taxable+=r.taxable; t.igst+=r.igst; t.cgst+=r.cgst; t.sgst+=r.sgst; t.rcmTax+=(r.rcmTax||0); return t; }
+  function gstr1Summary(d){
+    var S={t4a:gstZero(),t4b:gstZero(),t5:gstZero(),t8:gstZero(),t7:{},t7total:gstZero(),b2b:gstZero(),b2c:gstZero(),invoices:d.inMonth,drafts:d.drafts,nums:d.nums};
+    d.rows.forEach(function(r){
+      if(r.table==='4A') gstAdd(S.t4a,r); else if(r.table==='4B') gstAdd(S.t4b,r); else if(r.table==='5') gstAdd(S.t5,r); else if(r.table==='8') gstAdd(S.t8,r);
+      else if(r.table==='7'){ var k=r.pos+'|'+r.rate; S.t7[k]=S.t7[k]||Object.assign(gstZero(),{pos:r.pos,rate:r.rate}); gstAdd(S.t7[k],r); gstAdd(S.t7total,r); }
+      gstAdd(r.reg?S.b2b:S.b2c, r);
+    });
+    S.first=d.nums.length?d.nums[0]:''; S.last=d.nums.length?d.nums[d.nums.length-1]:'';
+    return S;
+  }
+  // How the ITC is used against the tax: IGST credit first (IGST, then CGST, then SGST), CGST credit on CGST then IGST, SGST credit on SGST then IGST.
+  function gstOffset(liab, itc){
+    var L={igst:liab.igst||0,cgst:liab.cgst||0,sgst:liab.sgst||0}, C={igst:itc.igst||0,cgst:itc.cgst||0,sgst:itc.sgst||0}, used={igst:0,cgst:0,sgst:0};
+    function pay(from,to){ var u=Math.min(C[from],L[to]); if(u>0){ C[from]-=u; L[to]-=u; used[to]+=u; } }
+    pay('igst','igst'); pay('igst','cgst'); pay('igst','sgst'); pay('cgst','cgst'); pay('cgst','igst'); pay('sgst','sgst'); pay('sgst','igst');
+    return {cash:L, used:used, carry:C, cashTotal:L.igst+L.cgst+L.sgst};
+  }
+  function gstr3bData(S, itc){
+    var t=gstZero(); [S.t4a,S.t5,S.t7total].forEach(function(x){ t.n+=x.n; t.taxable+=x.taxable; t.igst+=x.igst; t.cgst+=x.cgst; t.sgst+=x.sgst; });
+    var off=gstOffset({igst:t.igst,cgst:t.cgst,sgst:t.sgst}, itc||{});
+    return {sales:t, liability:t.igst+t.cgst+t.sgst, rcmValue:S.t4b.taxable, rcmTax:S.t4b.rcmTax, exemptValue:S.t8.taxable, off:off};
+  }
+  function gstr1Csv(d){
+    var head=['Table','GSTIN','Client','Invoice no','Invoice date','Invoice value','Taxable value','Rate %','IGST','CGST','SGST','Place of supply','Reverse charge','Note'];
+    var lines=[head].concat(d.rows.map(function(r){
+      return [r.table,r.gstin,r.client,r.no,r.date,Math.round(r.value),Math.round(r.taxable),r.rate,Math.round(r.igst),Math.round(r.cgst),Math.round(r.sgst),r.pos+' ('+r.posCode+')',r.rcm,
+        (r.rcm==='Y'?'Tax of '+fmtMoney(r.rcmTax||0)+' paid by the client. ':'')+(r.mixed?'Invoice has both reverse charge and normal lines.':'')];
+    }));
+    return lines.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+  }
+  async function saveCsvFile(name, csv){
+    if(downloadsCap){ try{ await downloadsCap.save({filename:name, data:csv}); return; }catch(e){} }
+    var blob=new Blob([csv],{type:'text/csv'}), url=URL.createObjectURL(blob), a=document.createElement('a');
+    a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
+  }
+  function cmpGstHtml(){
+    var ym=curGstMonth(), nm=xAddMonth(ym,1), L=xMonthLabel(ym), d=gstr1Data(ym,invoices,clients), S=gstr1Summary(d);
+    var doc=gstMonthDocs[ym]||{}, itc={igst:Number(doc.itcIgst)||0,cgst:Number(doc.itcCgst)||0,sgst:Number(doc.itcSgst)||0}, B=gstr3bData(S,itc);
+    var m=fmtMoney, e=escapeHtml, h='';
+    function tick(id,label){ return '<label class="chk" style="display:flex;gap:8px;align-items:center;margin:.4rem 0"><input type="checkbox" data-filing="'+id+'|'+ym+'" '+(filingsDone[xDocId(id+'|'+ym)]?'checked':'')+' style="width:auto;min-height:0"> '+label+'</label>'; }
+    function H(arr,from){ arr.rightFrom=from; return arr; }
+    function tbl(head,body,foot){ return '<div class="scrollx"><table><thead><tr>'+head.map(function(x,i){ return '<th'+(i>=head.rightFrom?' class="right"':'')+'>'+x+'</th>'; }).join('')+'</tr></thead><tbody>'+body+'</tbody>'+(foot||'')+'</table></div>'; }
+    function invRows(t){
+      return d.rows.filter(function(r){ return r.table===t; }).map(function(r){
+        return '<tr><td>'+e(r.gstin||'-')+'</td><td>'+e(r.client)+(r.mixed?'<div class="muted">has reverse charge and normal lines</div>':'')+'</td><td>'+e(r.no)+'</td><td>'+xFmt(r.date)+'</td><td class="right">'+m(r.taxable)+'</td><td class="right">'+r.rate+'%</td>'+
+          (t==='4B'?'<td class="right" colspan="3">tax of '+m(r.rcmTax||0)+' paid by the client</td>':'<td class="right">'+m(r.igst)+'</td><td class="right">'+m(r.cgst)+'</td><td class="right">'+m(r.sgst)+'</td>')+'<td>'+e(r.pos)+'</td></tr>';
+      }).join('');
+    }
+    var head1=['GSTIN','Client','Invoice','Date','Taxable value','Rate','IGST','CGST','SGST','Place of supply']; head1.rightFrom=4;
+    function section(title,sub,t,sum){
+      var any=sum.n>0; if(!any) return '';
+      return '<details open style="margin:.8rem 0"><summary><b>'+title+'</b> <span class="muted">'+sub+' &middot; '+sum.n+' invoice'+(sum.n>1?'s':'')+', taxable '+m(sum.taxable)+'</span></summary>'+tbl(head1,invRows(t))+'</details>';
+    }
+    h+='<div class="row" style="align-items:flex-end"><div class="field" style="max-width:220px"><label>GST month</label><input type="month" id="gstMonthSel" value="'+ym+'"></div>'+
+       '<div class="muted" style="max-width:60ch">Worked out from the invoices dated in '+e(L)+' (Invoicing tab). '+d.inMonth+' invoice'+(d.inMonth===1?'':'s')+(d.drafts?', '+d.drafts+' draft'+(d.drafts>1?'s':'')+' left out':'')+'. Check with your CA before filing.</div></div>';
+    d.warns.forEach(function(w){ h+='<div class="banner" style="border-color:var(--bad);margin-top:.6rem">'+e(w)+'</div>'; });
+    // GSTR-1
+    h+='<div class="card" style="margin-top:1rem"><h2>Step 1: GSTR-1, due by '+xFmt(nm+'-11')+'</h2><p class="muted">The list of invoices you issued in '+e(L)+'. It reports only; nothing is paid here.</p>';
+    if(!d.inMonth) h+='<p><b>No invoices are dated in '+e(L)+'.</b> File a nil GSTR-1.</p>';
+    else {
+      h+=section('Table 4A','B2B invoices where you charge GST','4A',S.t4a)+section('Table 4B','B2B invoices where the client pays the GST (reverse charge)','4B',S.t4b)+section('Table 5','B2C large (inter-state, over Rs 2.5 lakh)','5',S.t5);
+      var k7=Object.keys(S.t7);
+      if(k7.length) h+='<details open style="margin:.8rem 0"><summary><b>Table 7</b> <span class="muted">B2C, unregistered clients, by state and rate &middot; taxable '+m(S.t7total.taxable)+'</span></summary>'+
+        tbl(H(['Place of supply','Rate','Taxable value','IGST','CGST','SGST'],2),k7.map(function(k){ var x=S.t7[k]; return '<tr><td>'+e(x.pos)+'</td><td>'+x.rate+'%</td><td class="right">'+m(x.taxable)+'</td><td class="right">'+m(x.igst)+'</td><td class="right">'+m(x.cgst)+'</td><td class="right">'+m(x.sgst)+'</td></tr>'; }).join(''))+'</details>';
+      h+=section('Table 8','Nil-rated or exempt (GST-exempt clients)','8',S.t8);
+      var sac=invSac();
+      h+='<details open style="margin:.8rem 0"><summary><b>Table 12</b> <span class="muted">SAC summary</span></summary>'+tbl(H(['SAC','Description','Taxable value','IGST','CGST','SGST'],2),
+        [['B2B',S.b2b],['B2C',S.b2c]].map(function(p){ return p[1].n?'<tr><td>'+e(sac)+' ('+p[0]+')</td><td>Guard services</td><td class="right">'+m(p[1].taxable)+'</td><td class="right">'+m(p[1].igst)+'</td><td class="right">'+m(p[1].cgst)+'</td><td class="right">'+m(p[1].sgst)+'</td></tr>':''; }).join(''))+
+        '<p class="muted">Pick the SAC from the dropdown on the GST portal. The B2B total includes the reverse charge invoices.</p></details>';
+      h+='<details open style="margin:.8rem 0"><summary><b>Table 13</b> <span class="muted">Invoices issued</span></summary><p>From <b>'+e(S.first)+'</b> to <b>'+e(S.last)+'</b>: '+S.invoices+' issued, 0 cancelled.</p></details>';
+    }
+    h+=tick('gst1','GSTR-1 filed')+'<div class="row" style="margin-top:.6rem"><button class="btn" data-act="gstCsv">Download the invoice list (CSV)</button>'+govLinkA('gst','Open GST portal')+'</div></div>';
+    // GSTR-3B
+    var s=B.sales, o=B.off;
+    h+='<div class="card"><h2>Step 2: GSTR-3B and tax payment, due by '+xFmt(nm+'-20')+'</h2><p class="muted">The monthly summary. The tax is paid here, after setting off the GST on your purchases (input tax credit).</p>'+
+      '<h3 style="font-size:1rem">Tax on your sales</h3>'+tbl(H(['','Taxable value','IGST','CGST','SGST'],1),'<tr><td>Outward taxable supplies (Tables 4A, 5, 7)</td><td class="right">'+m(s.taxable)+'</td><td class="right">'+m(s.igst)+'</td><td class="right">'+m(s.cgst)+'</td><td class="right">'+m(s.sgst)+'</td></tr>')+
+      (B.rcmValue>0?'<p class="muted">Reverse charge invoices (Table 4B): '+m(B.rcmValue)+', where the clients pay GST of '+m(B.rcmTax)+' themselves. Nothing is payable by you on them. Ask your CA which line of Table 3.1 to show them on.</p>':'')+
+      (B.exemptValue>0?'<p class="muted">Nil-rated or exempt: '+m(B.exemptValue)+'.</p>':'')+
+      '<h3 style="font-size:1rem;margin-top:1rem">GST on your purchases (input tax credit)</h3><p class="muted">Enter the eligible GST on purchase bills for '+e(L)+', from your GST portal purchase statement (GSTR-2B), plus any balance carried from earlier months. Your CA decides what qualifies.</p>'+
+      '<div class="row"><div class="field"><label>IGST credit (Rs)</label><input type="number" min="0" step="1" data-itc="igst" value="'+(itc.igst||'')+'"></div><div class="field"><label>CGST credit (Rs)</label><input type="number" min="0" step="1" data-itc="cgst" value="'+(itc.cgst||'')+'"></div><div class="field"><label>SGST credit (Rs)</label><input type="number" min="0" step="1" data-itc="sgst" value="'+(itc.sgst||'')+'"></div></div>'+
+      '<h3 style="font-size:1rem;margin-top:1rem">What to pay</h3>'+tbl(H(['','Tax on sales','Paid from credit','Cash to pay','Credit left'],1),
+        [['IGST','igst'],['CGST','cgst'],['SGST','sgst']].map(function(p){ var k=p[1]; return '<tr><td>'+p[0]+'</td><td class="right">'+m(s[k])+'</td><td class="right">'+m(o.used[k])+'</td><td class="right"><b>'+m(o.cash[k])+'</b></td><td class="right">'+m(o.carry[k])+'</td></tr>'; }).join(''),
+        '<tfoot><tr><td>Total</td><td class="right">'+m(B.liability)+'</td><td class="right">'+m(o.used.igst+o.used.cgst+o.used.sgst)+'</td><td class="right"><b>'+m(o.cashTotal)+'</b></td><td class="right">'+m(o.carry.igst+o.carry.cgst+o.carry.sgst)+'</td></tr></tfoot>')+
+      '<div class="banner" style="margin-top:.8rem"><b>Cash to pay for '+e(L)+': '+m(o.cashTotal)+'</b>'+(o.cashTotal?'. Create a challan on the GST portal and pay it, then file GSTR-3B.':'. Nothing to pay in cash. File GSTR-3B anyway.')+'</div>'+
+      tick('gst3','GSTR-3B filed and tax paid')+'<div class="row" style="margin-top:.6rem">'+govLinkA('gst','Open GST portal to pay and file')+'</div></div>';
+    return h;
+  }
+  async function saveGstItc(el){
+    if(!db){ toast('Storage unavailable.'); return; }
+    var ym=curGstMonth(), cur=Object.assign({}, gstMonthDocs[ym]||{}), k={igst:'itcIgst',cgst:'itcCgst',sgst:'itcSgst'}[el.dataset.itc];
+    cur[k]=Math.max(0,Number(el.value)||0); cur.by=(me&&me.id)||null; cur.at=Date.now();
+    try{ await db.doc('gstMonth/'+ym).set(cur); }catch(e){ toast('Could not save.'); }
+  }
+  function subscribeGstMonth(){
+    if(!db) return;
+    try{ db.collection('gstMonth').onSnapshot(function(snap){
+      gstMonthDocs={}; snap.docs.forEach(function(d){ gstMonthDocs[d.id]=d.data()||{}; });
+      if(typeof cmpTab!=='undefined' && cmpTab==='gst') renderCompliance();
+    }, function(err){}); }catch(e){}
+  }
+
   // ---------- COMPLIANCE ----------
   function xTasksFor(ym){
     var nm=xAddMonth(ym,1), L=xMonthLabel(ym);
@@ -3560,6 +3732,7 @@ tr:hover td{background:var(--line2)}
     if(cmpTab==='calendar') el.innerHTML=cmpCalendarHtml();
     else if(cmpTab==='licences') el.innerHTML=cmpLicencesHtml();
     else if(cmpTab==='workforce') el.innerHTML=cmpWorkforceHtml();
+    else if(cmpTab==='gst') el.innerHTML=cmpGstHtml();
     else if(cmpTab==='links') el.innerHTML=cmpLinksHtml();
     else el.innerHTML=cmpMinWageHtml();
   }
@@ -3668,11 +3841,14 @@ tr:hover td{background:var(--line2)}
       if(t.dataset.act==='addLic') openLicModal(null);
       if(t.dataset.act==='editLic') openLicModal(t.dataset.id);
       if(t.dataset.act==='seedLic') seedLicences();
+      if(t.dataset.act==='gstCsv') saveCsvFile('gstr1-'+curGstMonth()+'.csv', gstr1Csv(gstr1Data(curGstMonth(),invoices,clients)));
     });
     root.addEventListener('change', async function(ev){
       var el=ev.target;
       if(el.id==='cmpMonth'){ if(el.value){ cmpMonth=el.value; renderCompliance(); } return; }
       if(el.id==='onlyGaps'){ cmpOnlyGaps=el.checked; renderCompliance(); return; }
+      if(el.id==='gstMonthSel'){ if(el.value){ gstMonth=el.value; renderCompliance(); } return; }
+      if(el.dataset.itc){ await saveGstItc(el); return; }
       if(el.dataset.filing){ await saveFilingTick(el); return; }
       if(el.dataset.govlink){
         var gk=el.dataset.govlink, val=String(el.value||'').trim();
@@ -3921,7 +4097,7 @@ tr:hover td{background:var(--line2)}
     pb.text(rx,ry,'GSTIN: '+COMPANY.gstin+'    PAN: '+COMPANY.pan,8.8,{color:C.mute}); ry+=11;
     pb.wrap('Phone: '+COMPANY.phone+'    '+COMPANY.email,half,8.4,false).forEach(function(l){ pb.text(rx,ry,l,8.4,{color:C.mute}); ry+=10.5; });
     ry+=8;
-    [['Place of supply',m.pos+' ('+m.posCode+')'],['Service','Manpower, security and housekeeping services']].forEach(function(r){
+    [['Place of supply',m.pos+' ('+m.posCode+')'],['Service','Manpower, security and housekeeping services'],['SAC code',invSac()]].forEach(function(r){
       pb.text(rx,ry,r[0]+':',8.8,{color:C.mute}); var lines=pb.wrap(r[1],half-82,8.8,true); lines.forEach(function(l,i){ pb.text(rx+82,ry,l,8.8,{bold:true}); if(i<lines.length-1) ry+=11; }); ry+=12;
     });
     y=Math.max(ly,ry)+8;
@@ -4004,6 +4180,28 @@ tr:hover td{background:var(--line2)}
     await saveInvoicePdf(m);
   }
 
+  // ---------- company profile settings ----------
+  var profDirty=false;
+  var PROF_FIELDS=[['profAbout','about'],['profYears','years'],['profClients','clients'],['profStaff','staff'],['profSites','sites'],['profTech','tech'],['profPsara','psara'],['profKeyClients','keyClients']];
+  function renderProfileSettings(){
+    if(profDirty || !document.getElementById('profAbout')) return;
+    var v=profileData();
+    PROF_FIELDS.forEach(function(f){ document.getElementById(f[0]).value=v[f[1]]||''; });
+  }
+  function setupProfileUI(){
+    PROF_FIELDS.forEach(function(f){ document.getElementById(f[0]).addEventListener('input', function(){ profDirty=true; }); });
+    document.getElementById('btnSaveProfile').addEventListener('click', async function(){
+      var o={}; PROF_FIELDS.forEach(function(f){ o[f[1]]=document.getElementById(f[0]).value.trim(); });
+      state.settings.profile=o;
+      if(!db){ toast('Storage unavailable.'); return; }
+      try{ await db.doc('settings/config').set(state.settings); profDirty=false; toast('Profile details saved.'); }catch(e){ toast('Could not save. Only an administrator can change the profile details.'); }
+    });
+    document.getElementById('btnDownloadProfile').addEventListener('click', async function(){
+      var o={}; PROF_FIELDS.forEach(function(f){ o[f[1]]=document.getElementById(f[0]).value.trim(); });
+      var blob; try{ blob=buildCompanyProfilePdf(o); }catch(e){ toast('Could not build the company profile.'); return; }
+      await pdfSave(blob,'PFSS-Company-Profile.pdf');
+    });
+  }
   // ---------- invoice letterhead settings (bank details, terms) ----------
   var invSetDirty=false;
   function renderInvoiceSettings(){
@@ -4016,14 +4214,15 @@ tr:hover td{background:var(--line2)}
     document.getElementById('invSetBranch').value=v.branch||'';
     document.getElementById('invSetUpi').value=v.upi||'';
     document.getElementById('invSetTerms').value=v.terms||'';
+    document.getElementById('invSetSac').value=v.sac||'';
   }
   function setupInvoiceSettingsUI(){
-    var ids=['invSetAcctName','invSetBank','invSetAcctNo','invSetIfsc','invSetBranch','invSetUpi','invSetTerms'];
+    var ids=['invSetAcctName','invSetBank','invSetAcctNo','invSetIfsc','invSetBranch','invSetUpi','invSetTerms','invSetSac'];
     ids.forEach(function(id){ document.getElementById(id).addEventListener('input', function(){ invSetDirty=true; }); });
     document.getElementById('btnSaveInvSettings').addEventListener('click', async function(){
       state.settings.invoice={acctName:document.getElementById('invSetAcctName').value.trim(), bankName:document.getElementById('invSetBank').value.trim(),
         acctNo:document.getElementById('invSetAcctNo').value.trim(), ifsc:document.getElementById('invSetIfsc').value.trim(), branch:document.getElementById('invSetBranch').value.trim(),
-        upi:document.getElementById('invSetUpi').value.trim(), terms:document.getElementById('invSetTerms').value.trim()};
+        upi:document.getElementById('invSetUpi').value.trim(), terms:document.getElementById('invSetTerms').value.trim(), sac:document.getElementById('invSetSac').value.trim()};
       if(!db){ toast('Storage unavailable.'); return; }
       try{ await db.doc('settings/config').set(state.settings); invSetDirty=false; toast('Invoice details saved.'); }catch(e){ toast('Could not save: '+(e.code||'')); }
     });
@@ -4050,9 +4249,9 @@ tr:hover td{background:var(--line2)}
     pb.line(ML,98,MR,98,2.6,PDFC.gold); pb.line(ML,102,MR,102,0.5,PDFC.ink);
     return 120;
   }
-  function pdfFoot(pb,label,hidePage){
-    var ML=36, MR=pb.W-36, n=pb.count();
-    for(var i=0;i<n;i++){ pb.setPage(i);
+  function pdfFoot(pb,label,hidePage,from,to){
+    var ML=36, MR=pb.W-36, n=pb.count(), end=(to==null?n:to);
+    for(var i=(from||0);i<end;i++){ pb.setPage(i);
       pb.line(ML,pb.H-60,MR,pb.H-60,0.8,PDFC.gold);
       pb.text(pb.W/2,pb.H-47,'GSTIN '+COMPANY.gstin+'  |  PAN '+COMPANY.pan+'  |  Udyam '+COMPANY.udyam+'  |  EPF BGBNG3901490000  |  ESIC 49000731570001099',6.8,{align:'center',color:PDFC.mute});
       pb.text(ML,pb.H-33,'Your safety, our mission',8,{italic:true,color:PDFC.goldDk});
@@ -4171,6 +4370,147 @@ tr:hover td{background:var(--line2)}
     pdfSign(pb,y+10,ML,MR,null,'Authorised signatory, '+COMPANY.legalName+', Proprietor');
     pdfFoot(pb,'Computer-generated rate card');
     return pb.build();
+  }
+
+  /* ---------- company profile (brochure), 5 pages ---------- */
+  function profileData(){ return (state.settings&&state.settings.profile)||{}; }
+  var PROFILE_ABOUT='Public Force Security Services is a Bengaluru-based provider of security services, manpower outsourcing and housekeeping and facility services. Working from Yelahanka New Town, we supply guards, supervisors and support staff to industrial units, offices, business parks and residential communities. We keep our clients\' sites protected and their paperwork in order: our staff are covered by PF and ESIC where applicable, paid at or above the minimum wage notified for the zone, and every monthly invoice comes with the attendance sheet and wage register behind it.';
+  // the technology and reporting services; the wording can be changed in Settings (one line each, as  Title: description)
+  var PROFILE_TECH_DEFAULT=[
+    ['Guard tracking app','Track your guards on duty through a mobile app.'],
+    ['Attendance tracking','Every guard\'s attendance is recorded daily and shared with you.'],
+    ['Duty roster and relief cover','Posts, shifts and weekly offs planned ahead, with relievers arranged.'],
+    ['Payroll and compliance','Salaries, PF, ESIC and professional tax handled for the staff on your site.'],
+    ['Monthly billing pack','Invoice, attendance sheet and wage register together every month.']];
+  function profileTech(prof){
+    var lines=String((prof&&prof.tech)||'').split(/\r?\n/).map(function(l){ return l.trim(); }).filter(Boolean).slice(0,8);
+    if(!lines.length) return PROFILE_TECH_DEFAULT;
+    return lines.map(function(l){ var i=l.indexOf(':'); return i>0?[l.slice(0,i).trim(),l.slice(i+1).trim()]:[l,'']; });
+  }
+  function buildCompanyProfilePdf(prof){
+    prof=prof||{};
+    var pb=pdfNew(false), C=PDFC, W=pb.W, HT=pb.H, ML=36, MR=W-36, CW=MR-ML, y=0;
+    var tx=function(v){ return String(v==null?'':v).trim(); };
+    function sect(title){ pb.rect(ML,y,4,17,{fill:C.gold}); pb.text(ML+12,y+13,title,14,{bold:true,color:C.ink}); y+=30; }
+    function para(text,size,color,lh,w,x0){ pb.wrap(text,w||CW,size,false).forEach(function(l){ pb.text(x0==null?ML:x0,y+size,l,size,{color:color||C.ink}); y+=lh; }); }
+    function darkPage(){ pb.newPage(false); pb.rect(0,0,W,HT,{fill:'#212322'}); pb.rect(0,0,W,10,{fill:C.gold}); pb.rect(0,HT-10,W,10,{fill:C.gold}); }
+
+    // ---- page 1: cover
+    darkPage();
+    var lw=150, lh=lw*214/198; pb.image((W-lw)/2,128,lw,lh);
+    pb.text(W/2,372,'PUBLIC FORCE',36,{bold:true,color:C.white,align:'center'});
+    pb.text(W/2,404,'SECURITY SERVICES',25,{bold:true,color:C.white,align:'center'});
+    pb.line(W/2-50,430,W/2+50,430,2.6,C.gold);
+    pb.text(W/2,462,'Your safety, our mission',16,{italic:true,color:C.gold,align:'center'});
+    pb.text(W/2,520,'COMPANY PROFILE',13,{bold:true,color:'#C9C6B8',align:'center'});
+    pb.text(W/2,560,'Security services  |  Manpower outsourcing  |  Housekeeping and facility services',9.6,{color:C.white,align:'center'});
+    pb.line(ML+60,735,MR-60,735,0.8,C.gold);
+    pb.text(W/2,762,'www.publicforcesecurity.com',13,{bold:true,color:C.white,align:'center'});
+    pb.text(W/2,782,'Phone '+COMPANY.phone+'   |   '+COMPANY.email,10,{color:'#C9C6B8',align:'center'});
+    pb.text(W/2,800,'Yelahanka New Town, Bengaluru - 560064, Karnataka',9,{color:'#C9C6B8',align:'center'});
+
+    // ---- page 2: about us
+    y=pdfHead(pb);
+    sect('About us');
+    para(tx(prof.about)||PROFILE_ABOUT,10.2,C.ink,14.5);
+    y+=10;
+    var stats=[['Years in business',prof.years],['Clients served',prof.clients],['Staff deployed',prof.staff],['Sites covered',prof.sites]].filter(function(s){ return tx(s[1]); });
+    if(stats.length){
+      var bw=(CW-(stats.length-1)*10)/stats.length;
+      stats.forEach(function(st,i){ var x=ML+i*(bw+10); pb.rect(x,y,bw,56,{fill:C.paper}); pb.rect(x,y,bw,3,{fill:C.gold});
+        pb.text(x+bw/2,y+33,pdfFit(pb,tx(st[1]),bw-10,22,true),22,{bold:true,color:C.goldDk,align:'center'}); pb.text(x+bw/2,y+48,st[0],8.4,{color:C.mute,align:'center'}); });
+      y+=72;
+    }
+    sect('What we stand for');
+    var pill=[['Reliable','Guards who report on time, supervisors who check every post, and a field team that visits the site.'],
+      ['Compliant','PF, ESIC and professional tax handled every month, wages at or above the notified minimum, and a payslip for every employee.'],
+      ['Transparent','Every invoice comes with the attendance sheet and wage register behind it, so you see exactly what you pay for.']];
+    var pw=(CW-20)/3, ph=104;
+    pill.forEach(function(p,i){ var x=ML+i*(pw+10); pb.rect(x,y,pw,ph,{fill:C.paper}); pb.rect(x,y,pw,3,{fill:C.gold}); pb.text(x+12,y+26,p[0],12.5,{bold:true,color:C.ink});
+      var yy=y+44; pb.wrap(p[1],pw-24,9,false).forEach(function(l){ pb.text(x+12,yy,l,9,{color:C.mute}); yy+=12; }); });
+    y+=ph+22;
+    sect('Why clients choose us');
+    var why=[['Verified staff','Identity documents and police verification are kept on record for every guard.'],
+      ['Supervised posts','Supervisors and area officers check every post, with relief cover for weekly offs and leave.'],
+      ['Clear monthly billing','Invoice, attendance sheet and wage register come together every month.'],
+      ['Statutory compliance','PF, ESIC, professional tax, bonus and leave are managed for all staff.'],
+      ['Rates you can follow','Rate cards are built line by line on the Karnataka minimum wages notification.'],
+      ['One point of contact','Our Operations Head is a single call away for any requirement.']];
+    var colW=(CW-16)/2;
+    why.forEach(function(it,i){ var x=ML+(i%2)*(colW+16), yy=y+Math.floor(i/2)*52;
+      pb.rect(x,yy+2,8,8,{fill:C.gold}); pb.text(x+16,yy+10,it[0],10.4,{bold:true,color:C.ink});
+      var ly=yy+23; pb.wrap(it[1],colW-18,9,false).forEach(function(l){ pb.text(x+16,ly,l,9,{color:C.mute}); ly+=11.5; }); });
+    y+=3*52+6;
+    if(tx(prof.keyClients)){ sect('Our clients'); para(tx(prof.keyClients).split(/\s*,\s*/).filter(Boolean).join('   |   '),10,C.ink,14); }
+
+    // ---- page 3: services and technology
+    y=pdfHead(pb);
+    sect('Our services');
+    para('From a single post to a full site, we supply the people and handle the payroll, statutory contributions and paperwork behind them.',10.2,C.ink,14.5);
+    y+=8;
+    var svc=[['Security services','Uniformed security personnel on day and night shifts, supervised by our field team.','Security guards, lady guards, security supervisors and security officers'],
+      ['Manpower outsourcing','Contract manpower for your business, with payroll, PF, ESIC and compliance handled by us, so you deal with one invoice.','Office support staff, helpers, drivers and other skilled, semi-skilled and unskilled staff'],
+      ['Housekeeping and facility services','Housekeeping teams and supervisors to keep your premises clean and well run.','Housekeeping staff, housekeeping supervisors and facility support staff']];
+    svc.forEach(function(sv){
+      var dl=pb.wrap(sv[1],CW-40,9.8,false), rl=pb.wrap('Roles: '+sv[2],CW-40,9,false);
+      var h=22+dl.length*13+6+rl.length*11.5+14;
+      pb.rect(ML,y,CW,h,{fill:C.paper}); pb.rect(ML,y,5,h,{fill:C.gold});
+      pb.text(ML+18,y+22,sv[0],13,{bold:true,color:C.ink});
+      var yy=y+38; dl.forEach(function(l){ pb.text(ML+18,yy,l,9.8,{color:C.ink}); yy+=13; }); yy+=3;
+      rl.forEach(function(l){ pb.text(ML+18,yy,l,9,{color:C.mute}); yy+=11.5; });
+      y+=h+10;
+    });
+    y+=8;
+    sect('Technology and reporting');
+    var tech=profileTech(prof), tw=(CW-16)/2;
+    for(var ti=0;ti<tech.length;ti+=2){
+      var pair=tech.slice(ti,ti+2), ls=pair.map(function(t){ return pb.wrap(t[1],tw-18,9,false); });
+      var rh=28+Math.max.apply(null,ls.map(function(l){ return l.length; }))*11.5+8;
+      pair.forEach(function(t,k){ var x=ML+k*(tw+16);
+        pb.rect(x,y+2,8,8,{fill:C.gold}); pb.text(x+16,y+10,pdfFit(pb,t[0],tw-18,10.4,true),10.4,{bold:true,color:C.ink});
+        var ly=y+23; ls[k].forEach(function(l){ pb.text(x+16,ly,l,9,{color:C.mute}); ly+=11.5; }); });
+      y+=rh;
+    }
+
+    // ---- page 4: how we work, credentials, compliance
+    y=pdfHead(pb);
+    sect('How we work');
+    var steps=[['Understand your site','We visit, learn your posts and shifts, and agree what you need.'],['Rate card and proposal','You receive a clear cost sheet built on the Karnataka minimum wages.'],
+      ['Deployment','Verified guards and a supervisor are deployed, with relief cover.'],['Monthly service','Attendance, wage register and invoice reach you together each month.']];
+    var sw=(CW-30)/4;
+    steps.forEach(function(st,i){ var x=ML+i*(sw+10); pb.rect(x,y,sw,122,{fill:C.paper}); pb.rect(x,y,26,26,{fill:C.gold}); pb.text(x+13,y+18,String(i+1),13,{bold:true,color:C.white,align:'center'});
+      var yy=y+46; pb.wrap(st[0],sw-18,10,true).forEach(function(l){ pb.text(x+10,yy,l,10,{bold:true,color:C.ink}); yy+=12.5; });
+      yy+=3; pb.wrap(st[1],sw-18,8.6,false).forEach(function(l){ pb.text(x+10,yy,l,8.6,{color:C.mute}); yy+=11; }); });
+    y+=122+22;
+    sect('Credentials and registrations');
+    var reg=[['Business name','Public Force Security Services'],['GSTIN',COMPANY.gstin],['PAN',COMPANY.pan],
+      ['Udyam registration',COMPANY.udyam],['EPF establishment code','BGBNG3901490000'],['ESIC code','49000731570001099'],['Shops and Establishments','24/YH-/CE/0168/2025, valid to 31-12-2029']];
+    if(tx(prof.psara)) reg.push(['PSARA licence number',tx(prof.psara)]);
+    reg.forEach(function(r,i){ if(i%2===0) pb.rect(ML,y,CW,21,{fill:C.paper}); pb.text(ML+12,y+14,r[0],9.6,{color:C.mute}); pb.text(ML+190,y+14,r[1],10,{bold:true,color:C.ink}); y+=21; });
+    y+=18;
+    sect('Our commitment to compliance');
+    ['PF and ESIC contributions paid every month for eligible staff.','Wages at or above the minimum wage notified by the Government of Karnataka.','Professional tax, bonus and leave provided for.','A payslip for every employee, and the attendance sheet and wage register (Form XVII) with every invoice.'].forEach(function(t){
+      pb.rect(ML+2,y+3,7,7,{fill:C.gold}); var ls=pb.wrap(t,CW-24,10,false); ls.forEach(function(l,i){ pb.text(ML+18,y+11+i*13.5,l,10,{color:C.ink}); }); y+=ls.length*13.5+6; });
+
+    // ---- page 5: back cover with the contact details
+    darkPage();
+    var bl=104, bh=bl*214/198; pb.image((W-bl)/2,96,bl,bh);
+    pb.text(W/2,262,'Let us look after your site',26,{bold:true,color:C.white,align:'center'});
+    pb.line(W/2-50,284,W/2+50,284,2.6,C.gold);
+    pb.wrap('Call or write to us for a site visit and a rate card for your requirement.',CW-120,11.5,false).forEach(function(l,i){ pb.text(W/2,314+i*16,l,11.5,{color:C.gold,align:'center'}); });
+    var cy=392;
+    function row(label,val){ pb.text(W/2-14,cy,label,10.5,{bold:true,color:C.gold,align:'right'}); pb.text(W/2+14,cy,val,13,{color:C.white}); cy+=36; }
+    row('Phone',COMPANY.phone); row('Email',COMPANY.email); row('Website','www.publicforcesecurity.com'); row('Operations Head','Sathish Reddy');
+    pb.text(W/2-14,cy,'Address',10.5,{bold:true,color:C.gold,align:'right'});
+    pb.wrap(COMPANY.address,236,11,false).forEach(function(l,i){ pb.text(W/2+14,cy+i*15,l,11,{color:'#E6E3D8'}); });
+    pb.line(ML+60,735,MR-60,735,0.8,C.gold);
+    pb.text(W/2,768,'Your safety, our mission',13,{italic:true,color:C.gold,align:'center'});
+    pdfFoot(pb,'Company profile',false,1,pb.count()-1);
+    return pb.build();
+  }
+  async function downloadCompanyProfile(){
+    var blob; try{ blob=buildCompanyProfilePdf(profileData()); }catch(e){ toast('Could not build the company profile.'); return; }
+    await pdfSave(blob,'PFSS-Company-Profile.pdf');
   }
 
   /* ---------- payslip ---------- */
