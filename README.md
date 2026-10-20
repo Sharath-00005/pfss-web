@@ -216,3 +216,20 @@ The brochure shows one contact number, 99860 20293, and names Sathish Reddy as O
 **PAN-India services** are mentioned on the cover, in the About us paragraph, in a "PAN-India services" band on the services page, and on the back cover. The minimum wage wording in the brochure refers to "the state of your site" instead of Karnataka.
 
 **Sending only the company profile (phone app).** On the New card tab, the Client box has **Email the company profile only**. It opens the email sheet with the client's email filled in, no wages needed, and a short message that introduces the profile and mentions PAN-India services. Inside the email sheet, the **Rate card / Company profile only** switch changes between the two, and the subject and message follow. Share offers only the profile in this mode. It works with the email service you already have; it does not need the update that sending the profile together with a rate card needs.
+
+
+## Employee ID cards
+
+**Where.** Employees tab, **ID cards** (top right) for a batch, or the **ID card** button on an employee's row for one person.
+
+**Designs.** Classic (white card, dark header, gold photo frame), Landscape (sideways card with a dark photo panel), Colour-coded (the top band changes by role: gold for guards, blue for supervisors, plum for lady guards, green for housekeeping, red for officers and managers) and Premium dark (dark card with gold edging, for supervisors and officers). All are the standard 54 x 86 mm card size.
+
+**What is on a card.** Front: name, role, ID number, site, the employee's photo (a blank silhouette if there is none), and on the landscape design the phone number and date of joining. Back: a QR code, issue and expiry dates, short terms of use, the authorised signatory (the signature saved in Settings, Payslip signature), and the company address and phone. The QR code holds the employee ID in the form `PFSS:PFSS-0022`, so any phone camera can read it. Issued on starts as today and Valid until as one year less a day; both can be changed.
+
+**Choosing people.** The window lists active employees. Filter by site or role, tick or untick people, or use Select all and Select none. People who have left are not listed.
+
+**Printing.**
+- *A4 sheets with cut marks:* 9 portrait cards or 8 landscape cards to a sheet. Print the front page, put the paper back, and print the back page on the other side, flipping on the long edge. The backs are in mirror order so each back lines up with its front.
+- *Card printer, one card per page:* every page is exactly card size (54 x 86 mm, or 86 x 54 mm for landscape), front then back, ready for a PVC card printer.
+
+**Photos.** Each photo is cropped to 4:5 from the top, where the face is, and made into a small JPEG. Photos are private, so the app needs the new `pfss-backend.js` to fetch them. If a photo cannot be loaded, that card gets the silhouette and the window says how many.
