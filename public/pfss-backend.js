@@ -255,6 +255,21 @@
         doc: function (id) { return docRef(name, id); }
       };
     },
+    // every record in every collection, for the backup file. Administrators only.
+    exportAll: async function () {
+      if (!profile || profile.role !== 'admin') { var pe = new Error('Only an administrator can make a backup'); pe.code = 'no-permission'; throw pe; }
+      var out = {}, from = 0, size = 1000, total = 0;
+      for (;;) {
+        var r = await sb.from('documents').select('collection,id,data').order('collection').order('id').range(from, from + size - 1);
+        if (r.error) throw dbError(r.error);
+        (r.data || []).forEach(function (row) { (out[row.collection] = out[row.collection] || {})[row.id] = row.data; total++; });
+        if (!r.data || r.data.length < size) break;
+        from += size;
+      }
+      var staff = [];
+      try { var pr = await sb.from('profiles').select('id,email,full_name,role'); if (!pr.error) staff = pr.data || []; } catch (e) {}
+      return { collections: out, total: total, profiles: staff };
+    },
     doc: function (path) {
       var p = String(path).split('/');
       if (p.length !== 2 || !p[0] || !p[1]) throw new Error('Unsupported document path: ' + path);
@@ -304,6 +319,19 @@
       var r = await sb.storage.from(BUCKET).upload(path, file, { contentType: file.type || 'application/octet-stream', upsert: false });
       if (r.error) throw dbError(r.error);
       return { id: path, url: DOC_PREFIX + path, contentType: file.type, sizeBytes: file.size };
+    },
+    // the names of all uploaded files, for the files backup. Administrators only.
+    listFiles: async function () {
+      if (!profile || profile.role !== 'admin') { var pe = new Error('Only an administrator can make a backup'); pe.code = 'no-permission'; throw pe; }
+      var files = [], offset = 0, size = 1000;
+      for (;;) {
+        var r = await sb.storage.from(BUCKET).list('', { limit: size, offset: offset, sortBy: { column: 'name', order: 'asc' } });
+        if (r.error) throw dbError(r.error);
+        (r.data || []).forEach(function (f) { if (f && f.name && f.id) files.push({ path: f.name, size: (f.metadata && f.metadata.size) || 0 }); });
+        if (!r.data || r.data.length < size) break;
+        offset += size;
+      }
+      return files;
     },
     // the file itself (for example an employee photo for an ID card), fetched with the signed-in person's access
     fetchBlob: async function (path) {

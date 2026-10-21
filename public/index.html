@@ -579,7 +579,7 @@ tr:hover td{background:var(--line2)}
         <div class="field"><label>Sites covered</label><input id="profSites" placeholder="e.g. 30"></div>
       </div>
       <div class="row">
-        <div class="field grow"><label>Technology and reporting services (one per line as Title: description; leave empty for the standard list)</label><textarea id="profTech" rows="5" placeholder="Guard tracking app: Track your guards on duty through a mobile app.&#10;Attendance tracking: Every guard's attendance is recorded daily and shared with you."></textarea></div>
+        <div class="field grow"><label>Technology and reporting services (one per line as Title: description; leave empty for the standard list)</label><textarea id="profTech" rows="5" placeholder="Geo-tracking attendance app: Guards check in from the site and the location is recorded.&#10;Attendance you can verify: Every check-in has a time, a place and a photo."></textarea></div>
       </div>
       <div class="row">
         <div class="field"><label>PSARA licence number</label><input id="profPsara"></div>
@@ -589,6 +589,17 @@ tr:hover td{background:var(--line2)}
         <button class="btn" id="btnSaveProfile">Save profile details</button>
         <button class="btn ghost" id="btnDownloadProfile">Download company profile PDF</button>
       </div>
+    </div>
+
+    <div class="card">
+      <h2>Backup</h2>
+      <p class="muted">Download a copy of everything in the system and keep it somewhere safe and private, such as your own computer or a private drive. It holds personal details like Aadhaar numbers and bank accounts, so never send it on WhatsApp or by email.</p>
+      <div class="muted" id="backupInfo" style="margin-top:.4rem"></div>
+      <div class="row" style="margin-top:.8rem">
+        <button class="btn" id="btnBackupData">Download data backup</button>
+        <button class="btn ghost" id="btnBackupFiles">Download uploaded files (ZIP)</button>
+      </div>
+      <p class="muted" style="margin-top:.8rem">The data backup holds employees, attendance, payroll, invoices, clients, contracts, rate cards, licences, settings and the email log. The ZIP holds the photos and documents uploaded in the employee forms. Make both at least once a month. The dashboard reminds you when a month has passed.</p>
     </div>
 
     <div class="card">
@@ -911,6 +922,39 @@ tr:hover td{background:var(--line2)}
 </div>
 
 <!-- Billing pack modal -->
+<div class="modal-bg" id="mailModalBg">
+  <div class="modal" style="max-width:660px">
+    <button class="close-x" id="mailModalClose">&times;</button>
+    <h3 id="mailTitle">Email invoice</h3>
+    <div class="banner" id="mailHelp" style="display:none"></div>
+    <div class="field"><label>What to send</label>
+      <div class="row">
+        <label class="chk" style="display:flex;gap:.4rem;align-items:center"><input type="radio" name="mailKind" value="invoice" checked style="width:auto;min-height:0"> Invoice</label>
+        <label class="chk" style="display:flex;gap:.4rem;align-items:center"><input type="radio" name="mailKind" value="reminder" style="width:auto;min-height:0"> Payment reminder</label>
+      </div></div>
+    <div class="field"><label>Attach</label>
+      <div class="row">
+        <label class="chk" style="display:flex;gap:.4rem;align-items:center"><input type="radio" name="mailAttach" value="inv" checked style="width:auto;min-height:0"> Invoice only</label>
+        <label class="chk" style="display:flex;gap:.4rem;align-items:center"><input type="radio" name="mailAttach" value="pack" style="width:auto;min-height:0"> Billing pack (invoice, wage register and attendance sheet)</label>
+      </div></div>
+    <div id="mailPackBox" style="display:none">
+      <div class="row"><div class="field grow"><label>Site</label><select id="mailSite"></select></div><div class="field"><label>Month</label><input type="month" id="mailMonth"></div></div>
+      <div class="field"><label>Rate card (for the wage register)</label><select id="mailRate"></select></div>
+    </div>
+    <div class="field"><label>Send from</label><select id="mailFrom"></select></div>
+    <div class="row">
+      <div class="field grow"><label>To</label><input id="mailTo" placeholder="accounts@client.com"></div>
+      <div class="field grow"><label>CC (optional)</label><input id="mailCc" placeholder="Separate several with commas"></div>
+    </div>
+    <div class="field"><label>Subject</label><input id="mailSubject"></div>
+    <div class="field"><label>Message</label><textarea id="mailMsg" rows="9"></textarea></div>
+    <label class="chk" style="display:flex;gap:.5rem;align-items:center;margin-top:.4rem"><input type="checkbox" id="mailCopy" checked style="width:auto;min-height:0"> Keep a copy in the sending mailbox (BCC)</label>
+    <div id="mailErr" style="color:var(--bad);min-height:1.3em;margin-top:.6rem" role="alert"></div>
+    <div class="row" style="margin-top:.6rem"><button class="btn" id="btnMailSend">Send email</button></div>
+    <p class="muted" style="margin-top:.8rem">The client's email address comes from the client record. If it is empty, type it here and add it to the client record so it fills in next time.</p>
+  </div>
+</div>
+
 <div class="modal-bg" id="idModalBg">
   <div class="modal" style="max-width:740px">
     <button class="close-x" id="idModalClose">&times;</button>
@@ -1133,6 +1177,8 @@ tr:hover td{background:var(--line2)}
     setupTabs();
     setupEmployeeUI();
     setupIdCardsUI();
+    setupMailUI();
+    setupBackupUI();
     setupAttendanceUI();
     setupAttImportUI();
     setupRosterUI();
@@ -1193,6 +1239,7 @@ tr:hover td{background:var(--line2)}
     renderAttention();
     renderInvoiceSettings();
     renderProfileSettings();
+    renderBackupInfo();
     renderSignatureSettings();
     renderCycleSettings();
     renderCycleCard();
@@ -1874,6 +1921,175 @@ tr:hover td{background:var(--line2)}
     el('idAll').addEventListener('click', function(){ idVisible().forEach(function(e){ idPick[e.id]=true; }); idRenderList(); });
     el('idNone').addEventListener('click', function(){ idVisible().forEach(function(e){ delete idPick[e.id]; }); idRenderList(); });
     el('btnIdDownload').addEventListener('click', idDownload);
+  }
+
+  // ---------- BACKUP: everything in the system, and the uploaded files ----------
+  var CRC_T=null;
+  function crc32(u8){
+    if(!CRC_T){ CRC_T=[]; for(var n=0;n<256;n++){ var c=n; for(var k=0;k<8;k++) c=(c&1)?(0xEDB88320^(c>>>1)):(c>>>1); CRC_T[n]=c>>>0; } }
+    var crc=0xFFFFFFFF; for(var i=0;i<u8.length;i++) crc=CRC_T[(crc^u8[i])&255]^(crc>>>8);
+    return (crc^0xFFFFFFFF)>>>0;
+  }
+  // a plain ZIP file (no compression) from [{name, bytes}], so no extra library is needed
+  function zipStore(files){
+    var parts=[], central=[], offset=0, enc=new TextEncoder(), now=new Date();
+    var dosT=((now.getHours()<<11)|(now.getMinutes()<<5)|(now.getSeconds()>>1))&0xFFFF, dosD=(((now.getFullYear()-1980)<<9)|((now.getMonth()+1)<<5)|now.getDate())&0xFFFF;
+    files.forEach(function(f){
+      var nm=enc.encode(f.name), crc=crc32(f.bytes), sz=f.bytes.length;
+      var h=new DataView(new ArrayBuffer(30));
+      h.setUint32(0,0x04034b50,true); h.setUint16(4,20,true); h.setUint16(6,0x0800,true); h.setUint16(8,0,true); h.setUint16(10,dosT,true); h.setUint16(12,dosD,true);
+      h.setUint32(14,crc,true); h.setUint32(18,sz,true); h.setUint32(22,sz,true); h.setUint16(26,nm.length,true); h.setUint16(28,0,true);
+      parts.push(h.buffer,nm,f.bytes);
+      var c=new DataView(new ArrayBuffer(46));
+      c.setUint32(0,0x02014b50,true); c.setUint16(4,20,true); c.setUint16(6,20,true); c.setUint16(8,0x0800,true); c.setUint16(10,0,true); c.setUint16(12,dosT,true); c.setUint16(14,dosD,true);
+      c.setUint32(16,crc,true); c.setUint32(20,sz,true); c.setUint32(24,sz,true); c.setUint16(28,nm.length,true); c.setUint32(42,offset,true);
+      central.push(c.buffer,nm);
+      offset+=30+nm.length+sz;
+    });
+    var cd=0; central.forEach(function(p){ cd+=(p.byteLength!==undefined?p.byteLength:p.length); });
+    var e=new DataView(new ArrayBuffer(22));
+    e.setUint32(0,0x06054b50,true); e.setUint16(8,files.length,true); e.setUint16(10,files.length,true); e.setUint32(12,cd,true); e.setUint32(16,offset,true);
+    return new Blob(parts.concat(central,[e.buffer]),{type:'application/zip'});
+  }
+  function backupInfoText(){
+    var s=state.settings||{}, d=s.lastBackup||{}, f=s.lastFilesBackup||{}, fmt=function(t){ return new Date(t).toLocaleDateString('en-GB'); };
+    return (d.at?'Last data backup: '+fmt(d.at)+(d.records?' ('+Number(d.records).toLocaleString('en-IN')+' records)':'')+'.':'No data backup has been made yet.')+' '+
+           (f.at?'Last files backup: '+fmt(f.at)+(f.files?' ('+f.files+' files)':'')+'.':'No files backup has been made yet.');
+  }
+  function renderBackupInfo(){ var el=document.getElementById('backupInfo'); if(el) el.textContent=backupInfoText(); }
+  async function backupRemember(key,val){ state.settings[key]=val; try{ if(db) await db.doc('settings/config').set(state.settings); }catch(e){} renderBackupInfo(); }
+  async function backupData(){
+    var btn=document.getElementById('btnBackupData'), old=btn.textContent;
+    if(!db || typeof db.exportAll!=='function'){ toast('Backup works on your own site, with the updated pfss-backend.js.'); return; }
+    btn.disabled=true; btn.textContent='Reading everything...';
+    try{
+      var all=await db.exportAll(), counts={};
+      Object.keys(all.collections).forEach(function(k){ counts[k]=Object.keys(all.collections[k]).length; });
+      var out={app:'Public Force HR, payroll and billing',format:1,exportedAt:new Date().toISOString(),exportedBy:(me&&me.name)||'',records:all.total,counts:counts,staffAccounts:all.profiles||[],collections:all.collections};
+      await pdfSave(new Blob([JSON.stringify(out)],{type:'application/json'}),'PFSS-backup-'+xToday()+'.json');
+      await backupRemember('lastBackup',{at:Date.now(),records:all.total,by:(me&&me.name)||''});
+      toast('Backup downloaded: '+all.total.toLocaleString('en-IN')+' records.');
+    }catch(e){ toast(e&&e.code==='no-permission'?'Only an administrator can make a backup.':'Could not make the backup.'); }
+    btn.disabled=false; btn.textContent=old;
+  }
+  async function backupFiles(){
+    var btn=document.getElementById('btnBackupFiles'), old=btn.textContent;
+    if(!assetsCap || typeof assetsCap.listFiles!=='function'){ toast('Backup works on your own site, with the updated pfss-backend.js.'); return; }
+    btn.disabled=true;
+    try{
+      btn.textContent='Listing files...'; var list=await assetsCap.listFiles();
+      if(!list.length){ toast('There are no uploaded files yet.'); }
+      else {
+        var files=[], failed=0;
+        for(var i=0;i<list.length;i++){
+          btn.textContent='Downloading files '+(i+1)+' of '+list.length+'...';
+          try{ var b=await assetsCap.fetchBlob(list[i].path); files.push({name:list[i].path,bytes:new Uint8Array(await b.arrayBuffer())}); }catch(e){ failed++; }
+        }
+        btn.textContent='Making the ZIP...';
+        await pdfSave(zipStore(files),'PFSS-files-'+xToday()+'.zip');
+        await backupRemember('lastFilesBackup',{at:Date.now(),files:files.length});
+        toast(files.length+' file'+(files.length===1?'':'s')+' downloaded'+(failed?', '+failed+' could not be read':'')+'.');
+      }
+    }catch(e){ toast(e&&e.code==='no-permission'?'Only an administrator can make a backup.':'Could not download the files.'); }
+    btn.disabled=false; btn.textContent=old;
+  }
+  function setupBackupUI(){
+    document.getElementById('btnBackupData').addEventListener('click', backupData);
+    document.getElementById('btnBackupFiles').addEventListener('click', backupFiles);
+  }
+
+  // ---------- EMAIL AN INVOICE (or a payment reminder) from the Invoicing tab ----------
+  var mailInv=null, mailEdited=false;
+  function b64Of(blob){ return new Promise(function(res,rej){ var r=new FileReader(); r.onload=function(){ res(String(r.result).split(',')[1]||''); }; r.onerror=function(){ rej(new Error('Could not read the file.')); }; r.readAsDataURL(blob); }); }
+  async function mailApi(method,body){
+    var A=window.pfssAuth; if(!A){ var e0=new Error('Email works on your own site, not in this preview.'); e0.status=0; throw e0; }
+    var tok=await A.token(); if(!tok){ var e1=new Error('Please sign in again.'); e1.status=401; throw e1; }
+    var cfg=window.PFSS_CONFIG||{}, custom=String(cfg.EMAIL_API_URL||'').replace(/\/+$/,''), headers={Authorization:'Bearer '+tok,'Content-Type':'application/json'};
+    if(!custom) headers.apikey=A.anonKey;
+    var res=await fetch(custom||(A.url+'/functions/v1/send-ratecard'),{method:method,headers:headers,body:body?JSON.stringify(body):undefined});
+    var out={}; try{ out=await res.json(); }catch(e){}
+    if(!res.ok){ var err=new Error(out.error||('Server error '+res.status)); err.status=res.status; throw err; }
+    return out;
+  }
+  function invOverdue(inv){ var today=new Date().toISOString().slice(0,10); return !!(inv.status!=='paid' && inv.dueDate && inv.dueDate<today); }
+  function mailKind(){ var r=document.querySelector('input[name="mailKind"]:checked'); return r?r.value:'invoice'; }
+  function mailAttach(){ var r=document.querySelector('input[name="mailAttach"]:checked'); return r?r.value:'inv'; }
+  function mailSenderLabel(email){ var lp=String(email||'').split('@')[0].toLowerCase(); return lp==='accounts'?'Accounts Team':(lp==='hr'?'HR Team':'Public Force Security Services'); }
+  function mailSubjectFor(inv,kind){ return (kind==='reminder'?'Payment reminder: invoice ':'Invoice ')+(inv.invoiceNo||'')+' - '+xMonthLabel(inv.month||thisMonth())+' | Public Force Security Services'; }
+  function mailMessageFor(inv,kind,withPack,from){
+    var c=clients.find(function(x){ return x.id===inv.clientId; })||{}, nm=String(c.name||inv.clientName||'').trim();
+    var amt='Rs. '+Math.round(inv.total||0).toLocaleString('en-IN'), mon=xMonthLabel(inv.month||thisMonth());
+    var body = kind==='reminder'
+      ? 'This is a gentle reminder that invoice '+(inv.invoiceNo||'')+' dated '+xFmt(inv.invoiceDate)+' for '+mon+', amount '+amt+', was due on '+xFmt(inv.dueDate)+' and is still pending in our records. A copy is attached.\n\nIf you have already made the payment, please share the payment details so we can update our records. Otherwise, we would be grateful if you could arrange it at the earliest.\n\n'
+      : 'Please find attached invoice '+(inv.invoiceNo||'')+' dated '+xFmt(inv.invoiceDate)+' for the services provided in '+mon+', amount '+amt+(inv.dueDate?', due by '+xFmt(inv.dueDate):'')+'.\n\n'+(withPack?'The wage register and the attendance sheet for the month are attached with it.\n\n':'')+'Our bank details are on the invoice. Please share the payment advice once the payment is made.\n\n';
+    return 'Dear '+(nm?nm+' Team':'Sir/Madam')+',\n\n'+body+'Warm regards,\n'+mailSenderLabel(from)+'\nPublic Force Security Services\nPhone '+COMPANY.phone;
+  }
+  function mailRefreshText(){
+    var el=function(x){ return document.getElementById(x); }; if(!mailInv || mailEdited) return;
+    el('mailSubject').value=mailSubjectFor(mailInv,mailKind());
+    el('mailMsg').value=mailMessageFor(mailInv,mailKind(),mailAttach()==='pack',el('mailFrom').value);
+  }
+  async function openMailModal(inv){
+    if(me && me.canEdit===false){ toast('Only administrators and managers can send email.'); return; }
+    mailInv=inv; mailEdited=false;
+    var el=function(x){ return document.getElementById(x); }, c=clients.find(function(x){ return x.id===inv.clientId; })||{}, k=contracts.find(function(x){ return x.id===inv.contractId; });
+    el('mailTitle').textContent='Email invoice '+(inv.invoiceNo||'');
+    document.querySelector('input[name="mailKind"][value="'+(invOverdue(inv)?'reminder':'invoice')+'"]').checked=true;
+    document.querySelector('input[name="mailAttach"][value="inv"]').checked=true; el('mailPackBox').style.display='none';
+    var sites=allSites(); if(k&&k.site&&sites.indexOf(k.site)<0) sites.push(k.site);
+    el('mailSite').innerHTML='<option value="">Choose site</option>'+sites.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join('');
+    el('mailSite').value=k&&k.site?k.site:(sites.filter(function(s){ return c.name && s.toLowerCase().indexOf(String(c.name).toLowerCase().split(' ')[0])>-1; })[0]||'');
+    el('mailMonth').value=inv.month||thisMonth();
+    el('mailRate').innerHTML='<option value="">Choose rate card</option>'+rateCards.map(function(r){ return '<option value="'+r.id+'">'+escapeHtml(r.name)+'</option>'; }).join('');
+    el('mailRate').value=(k&&k.rateCardId)||c.rateCardId||'';
+    el('mailTo').value=c.email||''; el('mailCc').value=''; el('mailErr').textContent=''; el('mailHelp').style.display='none';
+    el('mailFrom').innerHTML='<option value="">Loading...</option>'; el('btnMailSend').disabled=true;
+    mailRefreshText(); el('mailModalBg').classList.add('show');
+    try{
+      var out=await mailApi('GET'), senders=out.senders||[];
+      el('mailFrom').innerHTML=senders.map(function(s){ return '<option value="'+escapeHtml(s.email)+'">'+escapeHtml(s.email)+' ('+escapeHtml(s.label)+')</option>'; }).join('');
+      el('btnMailSend').disabled=false; mailRefreshText();
+    }catch(e){
+      el('mailFrom').innerHTML='<option value="">Not available</option>'; var h=el('mailHelp'); h.style.display='';
+      h.textContent = e&&e.status===403 ? 'Only administrators and managers can send email.' :
+        (e&&(e.status===404||e.status===0||/Failed to fetch|NetworkError|Load failed/i.test(String(e.message)))) ? 'Email is not set up here yet. It works on your own site once the email service is connected (see the README). You can still download the PDF.' :
+        'Email is not available right now: '+((e&&e.message)||'unknown problem')+'. You can still download the PDF.';
+    }
+  }
+  async function sendInvoiceMail(){
+    var el=function(x){ return document.getElementById(x); }, inv=mailInv; if(!inv) return;
+    var err=el('mailErr'); err.textContent='';
+    var to=el('mailTo').value.trim(); if(!to){ err.textContent='Enter the client\'s email address.'; return; }
+    var kind=mailKind(), withPack=mailAttach()==='pack', btn=el('btnMailSend'), old=btn.textContent;
+    btn.disabled=true; btn.textContent='Preparing the PDF...';
+    try{
+      var blob, name;
+      if(withPack){
+        var site=el('mailSite').value, ym=el('mailMonth').value, rc=rateCards.find(function(r){ return r.id===el('mailRate').value; });
+        if(!site||!ym||!rc) throw new Error('For a billing pack, choose the site, month and rate card.');
+        var client=clients.find(function(x){ return x.id===inv.clientId; })||{name:inv.clientName||''};
+        var data=await gatherBilling(site,ym,rc,client);
+        if(!data.rows.length || !data.rows.some(function(r){ return r.b; })) throw new Error('No employees on that site match the rate card, so the wage register would be empty. Choose another site or rate card, or send the invoice only.');
+        var pb=pdfNew(false); drawInvoice(pb,invoiceModelFromSaved(inv)); drawWageRegister(pb,data); drawAttendanceSheet(pb,data); pdfFoot(pb,'Computer-generated billing documents');
+        blob=pb.build(); name='Billing-pack-'+pdfName(inv.invoiceNo)+'.pdf';
+      } else { blob=buildInvoicePdf(invoiceModelFromSaved(inv)); name='Invoice-'+pdfName(inv.invoiceNo)+'.pdf'; }
+      btn.textContent='Sending...';
+      await mailApi('POST',{from:el('mailFrom').value,to:to,cc:el('mailCc').value.trim(),subject:el('mailSubject').value,message:el('mailMsg').value,keepCopy:el('mailCopy').checked,filename:name,pdfBase64:await b64Of(blob)});
+      var upd={emailedAt:Date.now(),emailedTo:to,emailKind:kind}; if(inv.status==='draft') upd.status='sent';
+      try{ if(db) await db.doc('invoices/'+inv.id).update(upd); }catch(e2){}
+      toast((kind==='reminder'?'Reminder':'Invoice')+' emailed to '+to+'.'); el('mailModalBg').classList.remove('show');
+    }catch(e){ err.textContent=(e&&e.message)||'Could not send the email.'; }
+    btn.disabled=false; btn.textContent=old;
+  }
+  function setupMailUI(){
+    var el=function(x){ return document.getElementById(x); };
+    el('mailModalClose').addEventListener('click', function(){ el('mailModalBg').classList.remove('show'); });
+    el('mailModalBg').addEventListener('click', function(ev){ if(ev.target===el('mailModalBg')) el('mailModalBg').classList.remove('show'); });
+    document.querySelectorAll('input[name="mailKind"]').forEach(function(r){ r.addEventListener('change', function(){ mailEdited=false; mailRefreshText(); }); });
+    document.querySelectorAll('input[name="mailAttach"]').forEach(function(r){ r.addEventListener('change', function(){ el('mailPackBox').style.display=(mailAttach()==='pack')?'':'none'; mailRefreshText(); }); });
+    el('mailFrom').addEventListener('change', mailRefreshText);
+    ['mailSubject','mailMsg'].forEach(function(id){ el(id).addEventListener('input', function(){ mailEdited=true; }); });
+    el('btnMailSend').addEventListener('click', sendInvoiceMail);
   }
 
   // ---------- ATTENDANCE ----------
@@ -3237,8 +3453,8 @@ tr:hover td{background:var(--line2)}
       tr.innerHTML = '<td style="font-weight:700;color:var(--accent)">'+escapeHtml(i.invoiceNo||'—')+'</td>'+
         '<td>'+escapeHtml(i.clientName||'—')+'</td><td>'+escapeHtml(i.month||'—')+'</td><td>'+escapeHtml(i.dueDate||'—')+'</td>'+
         '<td class="right" style="font-weight:700">'+fmtMoney(i.total)+'</td>'+
-        '<td><span class="tag '+tagClass+'">'+effectiveStatus+'</span></td>'+
-        '<td style="white-space:nowrap"><button class="btn small ghost" data-inv-pdf="'+i.id+'">PDF</button> <button class="btn small ghost" data-inv-pack="'+i.id+'">Billing pack</button> <button class="btn small ghost" data-inv-edit="'+i.id+'">Edit</button></td>';
+        '<td><span class="tag '+tagClass+'">'+effectiveStatus+'</span>'+(i.emailedAt?'<div class="muted" style="font-size:.72rem;margin-top:.2rem">'+(i.emailKind==='reminder'?'Reminded ':'Emailed ')+new Date(i.emailedAt).toLocaleDateString('en-GB')+'</div>':'')+'</td>'+
+        '<td style="white-space:nowrap"><button class="btn small ghost" data-inv-pdf="'+i.id+'">PDF</button> <button class="btn small ghost" data-inv-pack="'+i.id+'">Billing pack</button> <button class="btn small ghost" data-inv-mail="'+i.id+'">Email</button> <button class="btn small ghost" data-inv-edit="'+i.id+'">Edit</button></td>';
       tbody.appendChild(tr);
     });
     tbody.querySelectorAll('[data-inv-edit]').forEach(function(b){
@@ -3249,6 +3465,9 @@ tr:hover td{background:var(--line2)}
     });
     tbody.querySelectorAll('[data-inv-pack]').forEach(function(b){
       b.addEventListener('click', function(){ var inv=invoices.find(function(x){return x.id===b.dataset.invPack;}); if(inv) openPackModal(inv); });
+    });
+    tbody.querySelectorAll('[data-inv-mail]').forEach(function(b){
+      b.addEventListener('click', function(){ var inv=invoices.find(function(x){return x.id===b.dataset.invMail;}); if(inv) openMailModal(inv); });
     });
   }
 
@@ -4247,6 +4466,11 @@ tr:hover td{background:var(--line2)}
     contracts.forEach(function(k){ if(contractStatus(k).d<0) return; var v=contractVacancies(k); if(v>0) a.push({k:'bad',t:v+' vacant post'+(v>1?'s':'')+' at '+(k.site||'unassigned site'),go:'contracts'}); });
     licences.forEach(function(l){ var s=licStatus(l); if(s[1]==='bad'||s[1]==='warn') a.push({k:s[1],t:l.name+': '+s[0].toLowerCase(),go:'compliance:licences'}); });
     invoices.forEach(function(i){ if(i.status!=='paid' && i.dueDate && i.dueDate<today) a.push({k:'bad',t:'Invoice '+(i.invoiceNo||'')+' overdue by '+(-xDays(i.dueDate))+' days',go:'invoicing'}); });
+    if(me && me.isOwner){
+      var lb=(state.settings&&state.settings.lastBackup)||{}, lbDays=lb.at?Math.floor((Date.now()-lb.at)/86400000):null;
+      if(lbDays===null) a.push({k:'warn',t:'No backup has been made yet',go:'settings'});
+      else if(lbDays>30) a.push({k:'warn',t:'The last backup was '+lbDays+' days ago',go:'settings'});
+    }
     var g=activeEmps().filter(function(e){return empGaps(e).length;}).length;
     if(g) a.push({k:'warn',t:g+' employee'+(g>1?'s have':' has')+' compliance gaps',go:'compliance:workforce'});
     var m=thisMonth();
@@ -4738,8 +4962,8 @@ tr:hover td{background:var(--line2)}
   var PROFILE_ABOUT='Public Force Security Services is a Bengaluru-based provider of security services, manpower outsourcing and housekeeping and facility services. Working from Yelahanka New Town, we supply guards, supervisors and support staff to industrial units, offices, business parks and residential communities. We keep our clients\' sites protected and their paperwork in order: our staff are covered by PF and ESIC where applicable, paid at or above the minimum wage notified for the zone, and every monthly invoice comes with the attendance sheet and wage register behind it. Our services are available PAN-India, so a client with sites in more than one city can deal with one agency.';
   // the technology and reporting services; the wording can be changed in Settings (one line each, as  Title: description)
   var PROFILE_TECH_DEFAULT=[
-    ['Guard tracking app','Track your guards on duty through a mobile app.'],
-    ['Attendance tracking','Every guard\'s attendance is recorded daily and shared with you.'],
+    ['Geo-tracking attendance app','Guards check in and out from the site on their phone. The location and a time-stamped selfie are recorded, and a check-in away from the site is flagged.'],
+    ['Attendance you can verify','Every check-in and check-out is recorded with the time, the place and a photo, and the records can be shared with you.'],
     ['Duty roster and relief cover','Posts, shifts and weekly offs planned ahead, with relievers arranged.'],
     ['Payroll and compliance','Salaries, PF, ESIC and professional tax handled for the staff on your site.'],
     ['Monthly billing pack','Invoice, attendance sheet and wage register together every month.']];
