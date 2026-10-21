@@ -288,6 +288,17 @@ tr.sec td{background:var(--bg);color:var(--brand);font-weight:700}
     function esc(s){ return s.replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)'); }
     api.tw=function(s,size,bold){ var t=bold?HELVB_W:HELV_W, w=0; for(var i=0;i<s.length;i++){ var c=s.charCodeAt(i); w+=(c>=32&&c<=126)?t[c-32]:556; } return w*size/1000; };
     api.newPage=function(l){ if(l===true||l===false){ W=l?841.89:595.28; H=l?595.28:841.89; api.W=W; api.H=H; } cur=[]; pages.push(cur); dims.push([W,H]); return pages.length-1; };
+    api.newPageSize=function(w,h){ W=w; H=h; api.W=W; api.H=H; cur=[]; pages.push(cur); dims.push([W,H]); return pages.length-1; };
+    function rrPath(x,y,w,h,r){
+      r=Math.max(0,Math.min(r,w/2,h/2)); var k=0.5523*r, X=x, Y=H-y-h, f=function(n){ return n.toFixed(2); };
+      return f(X+r)+' '+f(Y)+' m '+f(X+w-r)+' '+f(Y)+' l '+f(X+w-r+k)+' '+f(Y)+' '+f(X+w)+' '+f(Y+r-k)+' '+f(X+w)+' '+f(Y+r)+' c '+
+        f(X+w)+' '+f(Y+h-r)+' l '+f(X+w)+' '+f(Y+h-r+k)+' '+f(X+w-r+k)+' '+f(Y+h)+' '+f(X+w-r)+' '+f(Y+h)+' c '+
+        f(X+r)+' '+f(Y+h)+' l '+f(X+r-k)+' '+f(Y+h)+' '+f(X)+' '+f(Y+h-r+k)+' '+f(X)+' '+f(Y+h-r)+' c '+
+        f(X)+' '+f(Y+r)+' l '+f(X)+' '+f(Y+r-k)+' '+f(X+r-k)+' '+f(Y)+' '+f(X+r)+' '+f(Y)+' c h';
+    }
+    api.rrect=function(x,y,w,h,r,o){ o=o||{}; var op=['q']; if(o.fill) op.push(rgb(o.fill)+' rg'); if(o.stroke) op.push(rgb(o.stroke)+' RG '+(o.lw||0.5)+' w'); op.push(rrPath(x,y,w,h,r)); op.push(o.fill&&o.stroke?'B':(o.fill?'f':'S')); op.push('Q'); cur.push(op.join(' ')); };
+    api.clipRR=function(x,y,w,h,r){ cur.push('q '+rrPath(x,y,w,h,r)+' W n'); };
+    api.restore=function(){ cur.push('Q'); };
     api.setPage=function(i){ cur=pages[i]; W=dims[i][0]; H=dims[i][1]; api.W=W; api.H=H; };
     api.count=function(){ return pages.length; };
     api.text=function(x,y,s,size,o){ o=o||{}; s=pdfAscii(s); var w=api.tw(s,size,o.bold); if(o.align==='right') x-=w; else if(o.align==='center') x-=w/2;
@@ -493,8 +504,8 @@ var COMPANY={tradeName:'PUBLIC FORCE SECURITY SERVICES', legalName:'Satish Kumar
   var PROFILE_ABOUT='Public Force Security Services is a Bengaluru-based provider of security services, manpower outsourcing and housekeeping and facility services. Working from Yelahanka New Town, we supply guards, supervisors and support staff to industrial units, offices, business parks and residential communities. We keep our clients\' sites protected and their paperwork in order: our staff are covered by PF and ESIC where applicable, paid at or above the minimum wage notified for the zone, and every monthly invoice comes with the attendance sheet and wage register behind it. Our services are available PAN-India, so a client with sites in more than one city can deal with one agency.';
   // the technology and reporting services; the wording can be changed in Settings (one line each, as  Title: description)
   var PROFILE_TECH_DEFAULT=[
-    ['Guard tracking app','Track your guards on duty through a mobile app.'],
-    ['Attendance tracking','Every guard\'s attendance is recorded daily and shared with you.'],
+    ['Geo-tracking attendance app','Guards check in and out from the site on their phone. The location and a time-stamped selfie are recorded, and a check-in away from the site is flagged.'],
+    ['Attendance you can verify','Every check-in and check-out is recorded with the time, the place and a photo, and the records can be shared with you.'],
     ['Duty roster and relief cover','Posts, shifts and weekly offs planned ahead, with relievers arranged.'],
     ['Payroll and compliance','Salaries, PF, ESIC and professional tax handled for the staff on your site.'],
     ['Monthly billing pack','Invoice, attendance sheet and wage register together every month.']];
@@ -1231,7 +1242,7 @@ function defaultMessage(from){
   if(profileOnly()){
     var pn=(APP.card.clientName||'').trim();
     return 'Dear '+(pn?pn+' Team':'Sir/Madam')+',\n\nThank you for your interest in Public Force Security Services. Please find attached our company profile.\n\n'+
-      'We provide security services, manpower outsourcing and housekeeping and facility services PAN-India, with a guard tracking app and attendance tracking to keep you informed about every site.\n\n'+
+      'We provide security services, manpower outsourcing and housekeeping and facility services PAN-India, with a geo-tracking attendance app for our guards, so every check-in is recorded with its time and place.\n\n'+
       'We would be happy to discuss your requirements or arrange a site visit. Please reply to this email or call us on 99860 20293.\n\nWarm regards,\n'+senderLabel(from)+'\nPublic Force Security Services';
   }
   var card=cardForPdf(), roles=rolesForPdf(), name=(APP.card.clientName||'').trim(), cs=card.format==='costsheet';
