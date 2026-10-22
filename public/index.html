@@ -4677,7 +4677,7 @@ tr:hover td{background:var(--line2)}
     var rx=ML+half+16;
     pb.text(rx,ry+8,'Supplier',8.6,{bold:true,color:C.goldDk}); ry+=22;
     pb.text(rx,ry,COMPANY.tradeName,10.4,{bold:true}); ry+=12;
-    pb.text(rx,ry,COMPANY.legalName+', Proprietor',8.4,{color:C.mute}); ry+=11;
+    pb.text(rx,ry,COMPANY.legalName,8.4,{color:C.mute}); ry+=11;
     pb.wrap(COMPANY.address,half,8.8,false).forEach(function(l){ pb.text(rx,ry,l,8.8,{color:C.mute}); ry+=11; });
     pb.text(rx,ry,'GSTIN: '+COMPANY.gstin+'    PAN: '+COMPANY.pan,8.8,{color:C.mute}); ry+=11;
     pb.wrap('Phone: '+COMPANY.phone+'    '+COMPANY.email,half,8.4,false).forEach(function(l){ pb.text(rx,ry,l,8.4,{color:C.mute}); ry+=10.5; });
@@ -4732,7 +4732,7 @@ tr:hover td{background:var(--line2)}
     pb.text(MR,y+10,'For '+COMPANY.tradeName,9,{bold:true,align:'right'});
     pb.line(MR-170,y+62,MR,y+62,0.6,C.ink);
     pb.text(MR,y+74,'Authorised signatory',8.6,{align:'right',color:C.mute});
-    pb.text(MR,y+85,COMPANY.legalName+', Proprietor',8.6,{align:'right',color:C.mute});
+    pb.text(MR,y+85,pdfSignatory().name+', '+pdfSignatory().role,8.6,{align:'right',color:C.mute});
   }
   function buildInvoicePdf(m){ var pb=pdfNew(false); drawInvoice(pb,m); pdfFoot(pb,'Computer-generated invoice'); return pb.build(); }
   function invoiceModelFromModal(){
@@ -4901,11 +4901,17 @@ tr:hover td{background:var(--line2)}
     if(y+notes.length*12+80>LIMIT){ y=pdfHead(pb); }
     pb.text(ML,y+8,'Note:',8.8,{bold:true,color:C.goldDk}); y+=14;
     notes.forEach(function(t,i){ pb.wrap((i+1)+'. '+t,CW,8.4,false).forEach(function(l){ pb.text(ML,y+8,l,8.4,{color:C.mute}); y+=11; }); });
-    pdfSign(pb,y+10,ML,MR,null,'Authorised signatory, '+COMPANY.legalName+', Proprietor');
+    pdfSign(pb,y+10,ML,MR,null,'Authorised signatory, '+pdfSignatory().name+', '+pdfSignatory().role);
     pdfFoot(pb,'Computer-generated rate card');
     return pb.build();
   }
 
+  // who signs the documents: the name and designation saved in Settings, Payslip signature. A saved "Proprietor" (or nothing) shows as "Operations Head".
+  function pdfSignatory(){
+    var sg=(state.settings&&state.settings.signature)||{}, role=String(sg.designation||'').trim();
+    if(!role || /^proprietor$/i.test(role)) role='Operations Head';
+    return {name:String(sg.name||'').trim()||COMPANY.legalName, role:role};
+  }
   // "Prepared for" and the date, shown under the title of a rate card made for one client
   function pdfMetaBand(pb,ML,CW,MR,y,meta,C){
     if(!meta||(!meta.client&&!meta.date)) return y;
@@ -4952,7 +4958,7 @@ tr:hover td{background:var(--line2)}
     if(y+notes.length*24+80>LIMIT){ y=pdfHead(pb); }
     pb.text(ML,y+8,'Note:',8.8,{bold:true,color:C.goldDk}); y+=14;
     notes.forEach(function(t,i){ pb.wrap((i+1)+'. '+t,CW,8.4,false).forEach(function(l){ pb.text(ML,y+8,l,8.4,{color:C.mute}); y+=11; }); });
-    pdfSign(pb,y+10,ML,MR,null,'Authorised signatory, '+COMPANY.legalName+', Proprietor');
+    pdfSign(pb,y+10,ML,MR,null,'Authorised signatory, '+pdfSignatory().name+', '+pdfSignatory().role);
     pdfFoot(pb,'Computer-generated rate card');
     return pb.build();
   }
@@ -5539,7 +5545,7 @@ tr:hover td{background:var(--line2)}
     if(hasImg){ var hh=46, ww=Math.min(160, sg.w*hh/sg.h); pb.imageX(imgIdx,MR-ww-14,y+17,ww,hh); }
     pb.line(MR-170,lineY,MR,lineY,0.6,C.ink);
     pb.text(MR,lineY+12,'Authorised signatory',8.6,{align:'right',color:C.mute});
-    pb.text(MR,lineY+23,(sg.name||COMPANY.legalName)+', '+(sg.designation||'Proprietor'),8.6,{align:'right',color:C.mute});
+    pb.text(MR,lineY+23,pdfSignatory().name+', '+pdfSignatory().role,8.6,{align:'right',color:C.mute});
     pb.line(ML,lineY,ML+170,lineY,0.6,C.ink);
     pb.text(ML,lineY+12,'Employee signature',8.6,{color:C.mute});
   }
@@ -5554,7 +5560,7 @@ tr:hover td{background:var(--line2)}
     if(sigSetDirty || !document.getElementById('sigName')) return;
     var v=(state.settings&&state.settings.signature)||{};
     document.getElementById('sigName').value=v.name||COMPANY.legalName;
-    document.getElementById('sigDesig').value=v.designation||'Proprietor';
+    document.getElementById('sigDesig').value=(v.designation && !/^proprietor$/i.test(v.designation))?v.designation:'Operations Head';
     document.getElementById('sigStamp').checked=v.stamp!==false;
     sigDraft=null; sigPreviewShow(v.b64||'');
   }
@@ -5578,7 +5584,7 @@ tr:hover td{background:var(--line2)}
   }
   function currentSignatureSettings(){
     var cur=(state.settings&&state.settings.signature)||{}, base=sigDraft||cur;
-    return {name:document.getElementById('sigName').value.trim()||COMPANY.legalName, designation:document.getElementById('sigDesig').value.trim()||'Proprietor',
+    return {name:document.getElementById('sigName').value.trim()||COMPANY.legalName, designation:document.getElementById('sigDesig').value.trim()||'Operations Head',
       stamp:document.getElementById('sigStamp').checked, b64:base.b64||'', w:base.w||0, h:base.h||0};
   }
   function setupSignatureUI(){
