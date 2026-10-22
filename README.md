@@ -233,3 +233,34 @@ The brochure shows one contact number, 99860 20293, and names Sathish Reddy as O
 - *Card printer, one card per page:* every page is exactly card size (54 x 86 mm, or 86 x 54 mm for landscape), front then back, ready for a PVC card printer.
 
 **Photos.** Each photo is cropped to 4:5 from the top, where the face is, and made into a small JPEG. Photos are private, so the app needs the new `pfss-backend.js` to fetch them. If a photo cannot be loaded, that card gets the silhouette and the window says how many.
+
+
+## Backup (Settings, Backup)
+
+Administrators only. Two buttons:
+- **Download data backup** makes `PFSS-backup-<date>.json` with every record in the system: employees, attendance, payroll runs, advances, invoices, clients, contracts, rate cards, licences, filings, settings, the email log and the staff accounts with their roles. The card shows the date of the last backup and how many records it held.
+- **Download uploaded files (ZIP)** makes `PFSS-files-<date>.zip` with the photos and documents uploaded in the employee forms. It can take a few minutes if there are many files.
+
+The files hold Aadhaar numbers, bank details and ID copies, so keep them somewhere private (your own computer or a private drive) and never send them on WhatsApp or by email. The dashboard shows a reminder to the administrator when no backup has been made, or when the last one is over 30 days old. A backup that cannot be restored is only half a backup: the JSON file has everything needed, and a restore tool can be added.
+
+This needs the new `pfss-backend.js` (it adds the two read-everything calls, which only an administrator is allowed to use).
+
+## Email an invoice or a payment reminder (Invoicing)
+
+Each invoice row has an **Email** button, and once sent the row shows "Emailed" or "Reminded" with the date. The window offers:
+- **Invoice** or **Payment reminder**. An overdue invoice opens as a reminder, with the due date in the message.
+- **Invoice only** or **Billing pack** (the invoice, the wage register and the attendance sheet in one PDF). For the pack, pick the site, month and rate card; they are filled in from the contract.
+- The sending address (info@, accounts@, hr@), To, CC, subject and message, all editable, and a BCC copy to the sending mailbox.
+
+The client's email comes from the client record. Sending a draft invoice marks it as sent. It uses the same email service as the phone app (`EMAIL_API_URL` in `config.js`) and sends one PDF, so it works with the Worker you already have.
+
+## Guard tracking app wording
+
+The Attendance app checks guards in and out from their phones, records the location and a time-stamped selfie, compares it with the work site's location and radius, flags check-ins away from the site (and can block them), shows who is on duty today, and exports the records. The company profile describes it that way ("Geo-tracking attendance app" and "Attendance you can verify") and does not claim live tracking, because the app records at check-in and check-out. The wording can be changed in Settings, Company profile.
+
+
+## Signatory on the PDFs: Operations Head
+
+Every PDF that has a signature line (invoices, both rate card layouts and payslips) now reads **name, Operations Head** instead of "Proprietor". It comes from **Settings, Payslip signature**: the **Authorised signatory** box is the name and **Designation** is the title. A designation of "Proprietor" saved earlier is shown as Operations Head, and the box starts as Operations Head. To use another name or title, change those two boxes and, if the person is different, upload their signature image in the same card.
+
+On the invoice, the company block at the top shows the registered name (Satish Kumar K) on its own, with no job title, because it is the name on the GST registration, not a role.
