@@ -443,7 +443,7 @@ var COMPANY={tradeName:'PUBLIC FORCE SECURITY SERVICES', legalName:'Satish Kumar
     if(y+notes.length*12+80>LIMIT){ y=pdfHead(pb); }
     pb.text(ML,y+8,'Note:',8.8,{bold:true,color:C.goldDk}); y+=14;
     notes.forEach(function(t,i){ pb.wrap((i+1)+'. '+t,CW,8.4,false).forEach(function(l){ pb.text(ML,y+8,l,8.4,{color:C.mute}); y+=11; }); });
-    pdfSign(pb,y+10,ML,MR,null,'Authorised signatory, '+COMPANY.legalName+', Proprietor');
+    pdfSign(pb,y+10,ML,MR,null,'Authorised signatory, '+COMPANY.legalName+', Operations Head');
     pdfFoot(pb,'Computer-generated rate card');
     return pb.build();
   }
@@ -494,7 +494,7 @@ var COMPANY={tradeName:'PUBLIC FORCE SECURITY SERVICES', legalName:'Satish Kumar
     if(y+notes.length*24+80>LIMIT){ y=pdfHead(pb); }
     pb.text(ML,y+8,'Note:',8.8,{bold:true,color:C.goldDk}); y+=14;
     notes.forEach(function(t,i){ pb.wrap((i+1)+'. '+t,CW,8.4,false).forEach(function(l){ pb.text(ML,y+8,l,8.4,{color:C.mute}); y+=11; }); });
-    pdfSign(pb,y+10,ML,MR,null,'Authorised signatory, '+COMPANY.legalName+', Proprietor');
+    pdfSign(pb,y+10,ML,MR,null,'Authorised signatory, '+COMPANY.legalName+', Operations Head');
     pdfFoot(pb,'Computer-generated rate card');
     return pb.build();
   }
