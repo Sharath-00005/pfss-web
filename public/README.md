@@ -103,3 +103,185 @@ The app builds the PDF on the phone and a small server function sends it from th
 - Every email is logged (who sent it, from which address, to whom, subject). In Supabase, open **Table Editor**, table `documents`, and filter `collection` = `emailLog`.
 - The mailboxes (info@, accounts@, hr@) must exist with your mail provider to receive replies and the BCC copy.
 - If the function is not deployed yet, the app says so and offers **Share** instead.
+
+
+### Option B: send the email from a Cloudflare Worker instead of Supabase
+
+Use this if you would rather not use a Supabase Edge Function. Your login and saved data stay in Supabase. Only the email sender moves to Cloudflare, which already hosts your site. Do this **instead of** steps 2 to 4 above (Resend setup in step 1 is still needed).
+
+1. **Create the Worker:** Cloudflare dashboard, **Workers & Pages**, **Create**, start with **Hello World**, name it `pfss-email`, then **Deploy**. Click **Edit code**, delete everything, paste the contents of `worker/send-ratecard.js`, and **Deploy**.
+2. **Add its settings:** open the Worker, **Settings**, **Variables and Secrets**, and add:
+   - `RESEND_API_KEY` as a **Secret**: your Resend key (starts with `re_`).
+   - `SUPABASE_URL` as **Text**: your Supabase project address (the same one in `config.js`).
+   - `SUPABASE_ANON_KEY` as **Text**: the same anon key that is in `config.js`.
+   - Optional: `ALLOWED_SENDERS` (see above) and `ALLOWED_ORIGIN` (your site address, if it is not `https://pfss-web.sharath9480.workers.dev`).
+3. **Tell the app where it is:** in `public/config.js`, add a line with the Worker's address, for example
+   `EMAIL_API_URL: "https://pfss-email.sharath9480.workers.dev",`
+4. Upload the new `public/ratecard/index.html` and `config.js` to GitHub. The app now sends through the Worker.
+
+The Worker checks each person's login with Supabase, only lets admins and managers send, only allows your sending addresses and your website, and keeps the same daily limit and log as the Supabase version. It needs no Supabase admin key.
+
+
+## Standard cost sheet, minimum wages and pay structure
+
+**The rate card.** New rate cards start as the **cost sheet**, the layout clients receive: Basic, DA, Sub Total A, Extra 4 hrs, Sub Total B, PF, Medical, Bonus, Leave, National Holiday, Uniform, Training, Sub Total C, Relieving Charges, Sub Total D, Service Charge, Grand Total, then PF, PT, Total Deduction and Net Take Home. Each column is a role on a duty (8 or 12 hours). The older 14-line **wage break-up** is still there as a second format; cards saved earlier keep using it.
+
+**How the lines are worked out** (all rounded to the rupee, as on your sheet):
+- Sub Total A = Basic + DA. Extra hours = A x extra hours / 8 (4 for a 12 hour duty). Sub Total B = A + Extra.
+- PF 13% and employee PF 12% are on Basic + DA up to the PF ceiling (15,000). Bonus 8.33% and National Holiday 1% are on Basic + DA.
+- Leave = A x 21 / (26 x 12). Relieving charges 16.67% are on Sub Total C. Service charge 5% is on Sub Total D.
+- ESIC lines appear only when wages are up to 21,000. PT follows the slabs in Settings.
+- Net Take Home = Sub Total B minus PF, ESIC and PT.
+
+**Zones.** The 22-05-2026 notification has three zones, not four. Zone 1: areas within the Greater Bengaluru Authority limits. Zone 2: all other municipal corporations and all district headquarters. Zone 3: every other area. A site that was in the old Zone 4 is now in Zone 3, and one in the old Zone 3 (a district headquarters) is now in Zone 2. Confirm each site's zone with your labour consultant.
+
+**Minimum wages.** Compliance, then Minimum wages, holds the Karnataka rates in force: notification KA 411 LWA 2023 dated 22-05-2026 (three zones, four skill categories, D.A. 1,030.80 a month for all). Rate cards and new employees load Basic and D.A. from it by zone and skill category: security guard = Unskilled, supervisor = Semi-skilled, as on the May 2026 cost sheet. The earlier four-zone schedule (valid to 31-03-2026) is kept there for reference only. Edit any amount when a new notification or VDA revision comes (administrators only).
+
+**Employees.** The employee form has a new box: **Use the standard pay structure**. It takes zone, skill category and duty, fills Basic and D.A., adds Extra hours for a 12 hour duty, and sets the monthly gross. Payroll then pays Basic, D.A. and Extra hours, takes PF on Basic + D.A. up to the ceiling, and the payslip shows those lines. Employees already in the system are **not changed**: they stay on their single wage amount until you open them and tick the box. A pay below the minimum wage for the zone and skill is flagged in the form and in Workforce gaps.
+
+**Wage register and invoices.** A cost sheet rate card gives a wage register in the same layout. A guard on a 12 hour duty is billed from the 12 hour column and one on 8 hours from the 8 hour column, matched through the employee's duty. Invoices bill Sub Total D and add the service charge as a separate line.
+
+
+## Quick quote (phone app)
+
+The **Quick quote** tab turns one figure into the PF and ESIC shares, the guard's pay and the service charge options, with no other settings.
+
+**Billing amount** (the usual case: the client says the most they will pay per guard)
+1. Enter the billing amount and choose **GST extra** or **GST included**. The GST % shows beside it (18 to start, you can change it).
+2. The table shows, for service charges of 5%, 7%, 9% and 10% (and one of your own), what the **company gets**, the guard's **gross** and the guard's **in-hand**. A higher service charge leaves less for the guard.
+3. Tap a row for the full breakdown: employee PF, ESIC and PT, in-hand, employer PF and ESIC, the service charge, billing before GST, GST and the total. It also compares the guard's gross with the minimum wage for an unskilled guard in each zone.
+
+**In-hand salary** (you know what the guard should take home)
+1. Enter the in-hand salary. The app finds the lowest gross that gives at least that much.
+2. The table shows the service charge options with billing, GST and total.
+
+**Share this quote** sends a short text for the client (WhatsApp or email). It does not say what the company gets.
+
+How it is worked out: employee PF 12% and employer PF 13% on wages up to the PF ceiling (15,000); ESIC (0.75% employee, 3.25% employer) only when gross is within the ESI limit (21,000); bonus 8.33% of the gross (taken as Basic + D.A.), paid by the client and not taken from the guard's pay; professional tax by the Karnataka slab. The service charge is on gross plus employer PF, employer ESIC and bonus. All figures are per guard, per month. Options where the guard's gross falls below the lowest minimum wage (Zone 3) are shown in red. Leave, uniform, training and relieving charges are **not** in a quick quote: use the New card tab for the full cost sheet.
+
+
+## Paying the government: links in the payroll tool
+
+**Pay cycle, step 7 (Reports)** has a **Pay to government** card for the month. For each of provident fund, ESIC and professional tax it shows the amount, the due date, a **Pay online** button that opens the official portal, and a **paid** tick. The ticks are shared with the Compliance calendar. Below it, **Other payments and filings** covers GST, TDS and the Labour Welfare Fund with their portals.
+
+**Compliance, Filing calendar** has a **Portal** column with an **Open** link on every row that has one.
+
+**Compliance, Pay and file links** lists every portal with what to do there and when. Each address can be changed (administrators only) if a government site moves; clear the box to go back to the standard link.
+
+The standard portals: EPFO https://unifiedportal-emp.epfindia.gov.in/epfo/ | ESIC https://www.esic.gov.in/ | Karnataka professional tax https://pt.kar.nic.in/ | GST https://www.gst.gov.in/ | Income tax (TDS) https://www.incometax.gov.in/ | TRACES https://www.tdscpc.gov.in/ | Karnataka Labour Welfare Board https://klwb.karnataka.gov.in/
+
+The links only open the official sites. Payments are made there with your own login. The app never asks for or stores portal passwords. PF admin and insurance charges are shown as about 1% of the PF wages; the EPFO challan has the exact amount.
+
+
+## GST for the month (Compliance, GST for the month)
+
+Pick the month. The screen reads the invoices dated in that month (drafts are left out) and sorts them into the GSTR-1 tables:
+- **Table 4A:** B2B invoices where you charge GST.
+- **Table 4B:** B2B invoices where the client pays the GST (reverse charge).
+- **Table 5 and Table 7:** invoices to unregistered clients (Table 5 only for inter-state invoices over Rs 2.5 lakh; otherwise Table 7, by state and rate).
+- **Table 8:** invoices to GST-exempt clients.
+- **Table 12:** the SAC summary, B2B and B2C.
+- **Table 13:** the first and last invoice number and how many were issued.
+An invoice with both reverse charge and normal lines is split between 4A and 4B.
+
+**GSTR-3B.** The screen shows the tax on your sales (IGST, CGST, SGST). Enter the input tax credit for the month (from your GST portal purchase statement, plus any balance carried forward) and it shows the credit used, the **cash to pay** and the credit left over. IGST credit pays IGST, then CGST, then SGST. CGST credit pays CGST, then IGST. SGST credit pays SGST, then IGST. The credit you enter is saved for the month.
+
+The two **filed** ticks are shared with the filing calendar. **Download the invoice list (CSV)** gives one row per invoice per table for your CA.
+
+**SAC code.** Settings, Invoice letterhead and bank details, has a SAC code box (998525, guard services, to start). It prints on every invoice and is used in Table 12.
+
+The figures come from your saved invoices. They help you prepare the return; your CA should check them before you file.
+
+
+## Company profile (brochure)
+
+**Settings, Company profile (brochure)** builds a 5-page PDF: a cover, About us, Our services with Technology and reporting, How we work with your credentials, and a back cover with the contact details. It uses your registrations, address and contacts. The Settings card lets an administrator add things that only you can vouch for. Each prints only if you fill it in:
+- the About us paragraph (a standard one is used if you leave it empty)
+- the technology and reporting services, one per line as `Title: description` (the standard list is the guard tracking app, attendance tracking, duty roster and relief cover, payroll and compliance, and the monthly billing pack). Change the wording to match exactly what you offer, and add more lines for anything else
+- years in business, clients served, staff deployed and sites covered
+- your PSARA licence number
+- the names of key clients
+
+**Download company profile PDF** builds it from what is in the boxes. Please read every line before you send it to a client, especially the "Why clients choose us" and "Our commitment to compliance" points.
+
+**In the phone app**, the email sheet has **Also send our company profile (PDF)**. The rate card and the profile go in one email as two PDFs. The app remembers your choice. Share offers both files too, and the preview has a **Download the company profile** button.
+
+**The email service must be updated once** for the profile to go by email. Until then the app says so, sends nothing, and still lets you use Share:
+- **Cloudflare Worker:** open the Worker in Cloudflare, click Edit code, replace everything with the new `worker/send-ratecard.js`, and click Deploy.
+- **Supabase function** (if you use that instead): replace the code of `send-ratecard` with the new `supabase/functions/send-ratecard/index.ts`, and deploy.
+The service now accepts up to two extra PDFs per email (6 MB in all) and logs how many were attached.
+
+The brochure shows one contact number, 99860 20293, and names Sathish Reddy as Operations Head. It does not mention the constitution of the business or the proprietor.
+
+**PAN-India services** are mentioned on the cover, in the About us paragraph, in a "PAN-India services" band on the services page, and on the back cover. The minimum wage wording in the brochure refers to "the state of your site" instead of Karnataka.
+
+**Sending only the company profile (phone app).** On the New card tab, the Client box has **Email the company profile only**. It opens the email sheet with the client's email filled in, no wages needed, and a short message that introduces the profile and mentions PAN-India services. Inside the email sheet, the **Rate card / Company profile only** switch changes between the two, and the subject and message follow. Share offers only the profile in this mode. It works with the email service you already have; it does not need the update that sending the profile together with a rate card needs.
+
+
+## Employee ID cards
+
+**Where.** Employees tab, **ID cards** (top right) for a batch, or the **ID card** button on an employee's row for one person.
+
+**Designs.** Classic (white card, dark header, gold photo frame), Landscape (sideways card with a dark photo panel), Colour-coded (the top band changes by role: gold for guards, blue for supervisors, plum for lady guards, green for housekeeping, red for officers and managers) and Premium dark (dark card with gold edging, for supervisors and officers). All are the standard 54 x 86 mm card size.
+
+**What is on a card.** Front: name, role, ID number, site, the employee's photo (a blank silhouette if there is none), and on the landscape design the phone number and date of joining. Back: a QR code, issue and expiry dates, short terms of use, the authorised signatory (the signature saved in Settings, Payslip signature), and the company address and phone. The QR code holds the employee ID in the form `PFSS:PFSS-0022`, so any phone camera can read it. Issued on starts as today and Valid until as one year less a day; both can be changed.
+
+**Choosing people.** The window lists active employees. Filter by site or role, tick or untick people, or use Select all and Select none. People who have left are not listed.
+
+**Printing.**
+- *A4 sheets with cut marks:* 9 portrait cards or 8 landscape cards to a sheet. Print the front page, put the paper back, and print the back page on the other side, flipping on the long edge. The backs are in mirror order so each back lines up with its front.
+- *Card printer, one card per page:* every page is exactly card size (54 x 86 mm, or 86 x 54 mm for landscape), front then back, ready for a PVC card printer.
+
+**Photos.** Each photo is cropped to 4:5 from the top, where the face is, and made into a small JPEG. Photos are private, so the app needs the new `pfss-backend.js` to fetch them. If a photo cannot be loaded, that card gets the silhouette and the window says how many.
+
+
+## Backup (Settings, Backup)
+
+Administrators only. Two buttons:
+- **Download data backup** makes `PFSS-backup-<date>.json` with every record in the system: employees, attendance, payroll runs, advances, invoices, clients, contracts, rate cards, licences, filings, settings, the email log and the staff accounts with their roles. The card shows the date of the last backup and how many records it held.
+- **Download uploaded files (ZIP)** makes `PFSS-files-<date>.zip` with the photos and documents uploaded in the employee forms. It can take a few minutes if there are many files.
+
+The files hold Aadhaar numbers, bank details and ID copies, so keep them somewhere private (your own computer or a private drive) and never send them on WhatsApp or by email. The dashboard shows a reminder to the administrator when no backup has been made, or when the last one is over 30 days old. A backup that cannot be restored is only half a backup: the JSON file has everything needed, and a restore tool can be added.
+
+This needs the new `pfss-backend.js` (it adds the two read-everything calls, which only an administrator is allowed to use).
+
+## Email an invoice or a payment reminder (Invoicing)
+
+Each invoice row has an **Email** button, and once sent the row shows "Emailed" or "Reminded" with the date. The window offers:
+- **Invoice** or **Payment reminder**. An overdue invoice opens as a reminder, with the due date in the message.
+- **Invoice only** or **Billing pack** (the invoice, the wage register and the attendance sheet in one PDF). For the pack, pick the site, month and rate card; they are filled in from the contract.
+- The sending address (info@, accounts@, hr@), To, CC, subject and message, all editable, and a BCC copy to the sending mailbox.
+
+The client's email comes from the client record. Sending a draft invoice marks it as sent. It uses the same email service as the phone app (`EMAIL_API_URL` in `config.js`) and sends one PDF, so it works with the Worker you already have.
+
+## Guard tracking app wording
+
+The Attendance app checks guards in and out from their phones, records the location and a time-stamped selfie, compares it with the work site's location and radius, flags check-ins away from the site (and can block them), shows who is on duty today, and exports the records. The company profile describes it that way ("Geo-tracking attendance app" and "Attendance you can verify") and does not claim live tracking, because the app records at check-in and check-out. The wording can be changed in Settings, Company profile.
+
+
+## Signatory on the PDFs: Operations Head
+
+Every PDF that has a signature line (invoices, both rate card layouts and payslips) now reads **name, Operations Head** instead of "Proprietor". It comes from **Settings, Payslip signature**: the **Authorised signatory** box is the name and **Designation** is the title. A designation of "Proprietor" saved earlier is shown as Operations Head, and the box starts as Operations Head. To use another name or title, change those two boxes and, if the person is different, upload their signature image in the same card.
+
+On the invoice, the company block at the top shows the registered name (Satish Kumar K) on its own, with no job title, because it is the name on the GST registration, not a role.
+
+
+## Pay changes: raising or lowering an employee's wages
+
+**Where.** Employees tab: **Change pay** on an employee's row (or **Change pay...** inside the employee form), and **Change pay for many** at the top for a whole site or role.
+
+**How it works.** Each change has a start date, a reason and a note, and is kept in a history on the employee. Payroll works out each day at the pay in force that day, so a change in the middle of a month is shared out by days. For example, 30,000 rising to 36,000 from 16 September pays 15 days at 1,000 and 15 days at 1,200, so September's gross is 33,000. Leave days, half days, joining and leaving dates are all handled day by day. The payslip notes the change. Employees who have never had a pay change are paid exactly as before.
+
+**Rises.** A rise can start on any date, including a past one. For months whose payroll is already approved, the difference is paid as **arrears** in the month you choose (this month or next), shown as its own line on the payslip. You can choose not to pay arrears.
+
+**Cuts.** A cut can only start in a month whose payroll is not yet approved, needs a reason and the tick that the employee has been told in writing and has agreed, and is refused if it would take pay below the minimum wage (for pay-structure staff, Basic + D.A. for their zone and skill; for others, the state minimum in Settings). The employee's agreement is recorded in the history.
+
+**Other rules.** A new change must start after the latest one. A change cannot start before joining or after leaving. A change dated in the future is stored and takes effect by itself on its date. A change can be cancelled while nothing has been paid with it (not once an approved month used it). Once an employee has pay changes, the pay boxes in the employee form are locked and the pay is changed only through Change pay.
+
+**Pay-structure staff.** The window shows Basic, D.A. and duty hours with the monthly gross worked out as you type, and a button that fills Basic and D.A. from the current minimum wage table (for a minimum wage or VDA revision).
+
+**For many at once.** Choose a site and role, then raise or lower by a percentage or an amount, or set pay-structure staff to the current minimum wages. A list shows each person's present pay, new pay and change, and why anyone is skipped (already at the minimum, not allowed, or a change already exists from that date). Tick the people you want and apply.
+
+**The letter.** Each change in the history has a **Letter** button. It prints the old and new wages, the start date, the reason and any arrears, with a place for the employee to sign, on your letterhead, signed for the company by the signatory in Settings.
+
+**Please check with your CA.** Arrears are treated as wages of the month they are paid in, so PF (on the Basic share, within the ceiling), ESI and professional tax are worked out on them like any other pay in that month. A pay change here changes what the employee is paid; it does not change what a client is billed, which comes from the rate card, so revise the client's rate card separately when a rise has to be passed on.

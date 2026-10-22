@@ -216,7 +216,7 @@ tr:hover td{background:var(--line2)}
     <div class="card">
       <div class="row" style="justify-content:space-between">
         <h2>Employees</h2>
-        <div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn ghost" id="btnIdCards">ID cards</button><button class="btn" id="btnAddEmp">+ Add employee</button></div>
+        <div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn ghost" id="btnBulkPay">Change pay for many</button><button class="btn ghost" id="btnIdCards">ID cards</button><button class="btn" id="btnAddEmp">+ Add employee</button></div>
       </div>
       <div class="row" style="margin-top:1rem">
         <div class="field grow"><label>Search</label><input id="empSearch" placeholder="Search name or site..."></div>
@@ -675,6 +675,10 @@ tr:hover td{background:var(--line2)}
       <div class="field"><label>Wage type</label><select id="fWageType"><option value="monthly">Monthly</option><option value="daily">Daily</option></select></div>
       <div class="field"><label>Wage amount (₹) *</label><input type="number" id="fWageAmount"></div>
     </div>
+    <div class="row" id="fPayChangeRow" style="display:none;align-items:center">
+      <div class="muted grow" id="payLockNote"></div>
+      <button type="button" class="btn small" id="btnEmpChangePay">Change pay...</button>
+    </div>
     <div class="row">
       <div class="field"><label>Date of joining *</label><input type="date" id="fDoj"></div>
       <div class="field"><label>Status</label><select id="fStatus"><option value="active">Active (working)</option><option value="left">Left the job</option></select></div>
@@ -922,6 +926,71 @@ tr:hover td{background:var(--line2)}
 </div>
 
 <!-- Billing pack modal -->
+<div class="modal-bg" id="payModalBg">
+  <div class="modal" style="max-width:800px">
+    <button class="close-x" id="payModalClose">&times;</button>
+    <h3 id="payTitle">Change pay</h3>
+    <div class="muted" id="payCurrent"></div>
+    <div id="payStdBox" style="display:none;margin-top:.8rem">
+      <div class="row">
+        <div class="field"><label>New Basic (₹ per month)</label><input type="number" id="pBasic" step="0.01"></div>
+        <div class="field"><label>New D.A. (₹ per month)</label><input type="number" id="pDa" step="0.01"></div>
+        <div class="field"><label>Duty</label><select id="pDuty"><option value="8">8 hours</option><option value="12">12 hours</option></select></div>
+        <div class="field"><label>New monthly gross (₹)</label><input id="pGrossStd" readonly style="background:var(--panel);font-weight:700"></div>
+      </div>
+      <button type="button" class="btn small ghost" id="pMinBtn">Set Basic and D.A. to the current minimum wages</button>
+    </div>
+    <div id="paySingleBox" style="display:none;margin-top:.8rem">
+      <div class="row"><div class="field"><label id="pAmtLabel">New monthly wage (₹)</label><input type="number" id="pAmt" step="0.01"></div></div>
+    </div>
+    <div class="banner" id="payDelta" style="margin-top:.8rem"></div>
+    <div class="row" style="margin-top:.6rem">
+      <div class="field"><label>Starts from *</label><input type="date" id="pFrom"></div>
+      <div class="field grow"><label>Reason *</label><select id="pReason"></select></div>
+    </div>
+    <div class="field"><label>Note (optional)</label><input id="pNote" placeholder="Anything worth remembering about this change"></div>
+    <label class="chk" id="payConsentBox" style="display:none;align-items:center;gap:.5rem;margin-top:.4rem"><input type="checkbox" id="pConsent" style="width:auto;min-height:0"> The employee has been told in writing and has agreed to this reduction</label>
+    <div class="banner" id="payArrBox" style="display:none;margin-top:.6rem">
+      <label class="chk" style="display:flex;align-items:center;gap:.5rem"><input type="checkbox" id="pArrOn" checked style="width:auto;min-height:0"> Pay arrears for the months that are already approved</label>
+      <div class="muted" id="pArrText" style="margin:.3rem 0"></div>
+      <div class="field"><label>Pay the arrears with the salary of</label><select id="pArrMonth"></select></div>
+    </div>
+    <div id="payErr" style="color:var(--bad);min-height:1.3em;margin-top:.6rem" role="alert"></div>
+    <div class="row" style="margin-top:.4rem"><button class="btn" id="btnPaySave">Save pay change</button></div>
+    <h4 style="margin-top:1.4rem">Pay history</h4>
+    <div id="payHist"></div>
+    <p class="muted" style="margin-top:.8rem">Pay is worked out day by day, so a change in the middle of a month is shared out by days. A rise can go back to an earlier date and is paid as arrears. A cut can only start in a month whose payroll is not yet approved, needs the employee's agreement, and can never go below the minimum wage. Download the letter from the history and give it to the employee.</p>
+  </div>
+</div>
+
+<div class="modal-bg" id="bulkPayModalBg">
+  <div class="modal" style="max-width:920px">
+    <button class="close-x" id="bulkPayModalClose">&times;</button>
+    <h3>Change pay for many employees</h3>
+    <p class="muted">Raise or lower the pay of a site or a role from one date, for example an annual increment or a minimum wage revision. Check the list before you apply it.</p>
+    <div class="row">
+      <div class="field grow"><label>Site</label><select id="bkSite"></select></div>
+      <div class="field grow"><label>Role</label><select id="bkRole"></select></div>
+    </div>
+    <div class="row">
+      <div class="field grow"><label>Change</label><select id="bkMethod"><option value="pct+">Increase by a percentage</option><option value="amt+">Increase by an amount</option><option value="pct-">Decrease by a percentage</option><option value="amt-">Decrease by an amount</option><option value="min">Set to the current minimum wages (pay-structure staff)</option></select></div>
+      <div class="field"><label id="bkValLabel">Percentage (%)</label><input type="number" id="bkVal" step="0.01"></div>
+      <div class="field"><label>Starts from *</label><input type="date" id="bkFrom"></div>
+    </div>
+    <div class="row">
+      <div class="field grow"><label>Reason *</label><select id="bkReason"></select></div>
+      <div class="field grow"><label>Note (optional)</label><input id="bkNote"></div>
+    </div>
+    <div class="muted">Amounts are per month. For daily-wage staff the amount is per day. For staff on the pay structure, a percentage changes Basic and D.A. together and an amount is added to or taken from Basic.</div>
+    <label class="chk" id="bkConsentBox" style="display:none;align-items:center;gap:.5rem;margin-top:.5rem"><input type="checkbox" id="bkConsent" style="width:auto;min-height:0"> All of these employees have been told in writing and have agreed to the reduction</label>
+    <label class="chk" style="display:flex;align-items:center;gap:.5rem;margin-top:.5rem"><input type="checkbox" id="bkArr" checked style="width:auto;min-height:0"> Pay arrears for months that are already approved, with the salary of <select id="bkArrMonth" style="width:auto"></select></label>
+    <div class="muted" id="bkSummary" style="margin-top:.6rem;font-weight:600"></div>
+    <div id="bkPreview" style="max-height:280px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:.4rem"></div>
+    <div id="bkErr" style="color:var(--bad);min-height:1.3em;margin-top:.5rem" role="alert"></div>
+    <div class="row"><button class="btn" id="btnBulkApply">Apply to the ticked employees</button></div>
+  </div>
+</div>
+
 <div class="modal-bg" id="mailModalBg">
   <div class="modal" style="max-width:660px">
     <button class="close-x" id="mailModalClose">&times;</button>
@@ -1179,6 +1248,7 @@ tr:hover td{background:var(--line2)}
     setupIdCardsUI();
     setupMailUI();
     setupBackupUI();
+    setupPayUI();
     setupAttendanceUI();
     setupAttImportUI();
     setupRosterUI();
@@ -1222,6 +1292,7 @@ tr:hover td{background:var(--line2)}
       db.collection('employees').onSnapshot(function(snap){
         state.employees = snap.docs.map(function(d){ var o=Object.assign({id:d.id}, snapData(d)); return o; });
         renderAll();
+        syncDuePay();
       }, function(err){ toast('Could not load employees: '+err.code); });
     }catch(e){ toast('Employees unavailable.'); }
   }
@@ -1378,7 +1449,7 @@ tr:hover td{background:var(--line2)}
         '<td>'+escapeHtml(e.site||'—')+'</td>'+
         '<td>'+escapeHtml(e.state||'—')+'</td>'+
         '<td>'+escapeHtml(e.role||'—')+'</td>'+
-        '<td>'+fmtMoney(e.wageAmount)+' / '+(e.wageType==='daily'?'day':'mo')+(e.payStd&&e.dutyHrs>8?'<div class="muted">'+e.dutyHrs+' hr duty</div>':'')+'</td>'+
+        '<td>'+fmtMoney(e.wageAmount)+' / '+(e.wageType==='daily'?'day':'mo')+(e.payStd&&e.dutyHrs>8?'<div class="muted">'+e.dutyHrs+' hr duty</div>':'')+payPendingTag(e)+'</td>'+
         '<td>'+maskAadhar(e.aadhar)+'</td>'+
         '<td>'+escapeHtml(e.uan||'—')+'</td>'+
         '<td>'+escapeHtml(e.esic||'—')+'</td>'+
@@ -1386,7 +1457,7 @@ tr:hover td{background:var(--line2)}
         '<td>'+(e.esiApplicable?'<span class="tag ok">Yes</span>':'<span class="tag bad">No</span>')+'</td>'+
         '<td>'+((typeof outstandingBalanceForEmp==='function' && outstandingBalanceForEmp(e.id)>0)?('<span class="tag warn">'+fmtMoney(outstandingBalanceForEmp(e.id))+'</span>'):'—')+'</td>'+
         '<td>'+(e.active===false?'<span class="tag bad">Left'+(e.dol?' '+new Date(e.dol+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'')+'</span>'+(e.leaveReason?'<div class="muted">'+escapeHtml(e.leaveReason)+'</div>':''):'<span class="tag ok">Active</span>')+'</td>'+
-        '<td style="white-space:nowrap"><button class="btn small ghost" data-edit="'+e.id+'">Edit</button> <button class="btn small ghost" data-idcard="'+e.id+'">ID card</button></td>';
+        '<td style="white-space:nowrap"><button class="btn small ghost" data-edit="'+e.id+'">Edit</button> <button class="btn small ghost" data-paychg="'+e.id+'">Change pay</button> <button class="btn small ghost" data-idcard="'+e.id+'">ID card</button></td>';
       tbody.appendChild(tr);
     });
     tbody.querySelectorAll('[data-edit]').forEach(function(b){
@@ -1394,6 +1465,9 @@ tr:hover td{background:var(--line2)}
     });
     tbody.querySelectorAll('[data-idcard]').forEach(function(b){
       b.addEventListener('click', function(){ openIdModal(b.dataset.idcard); });
+    });
+    tbody.querySelectorAll('[data-paychg]').forEach(function(b){
+      b.addEventListener('click', function(){ openPayModal(b.dataset.paychg); });
     });
   }
 
@@ -1466,6 +1540,10 @@ tr:hover td{background:var(--line2)}
     document.getElementById('fDaAmt').value = (e&&e.payStd) ? (e.daAmt||'') : '';
     if(!e) fillStdFromGov();
     syncPayStd(); recalcStd();
+    var hasPayHist=!!(e && (e.payHistory||[]).length);
+    ['fWageType','fWageAmount','fPayStd','fZone','fSkill','fDuty','fBasicAmt','fDaAmt'].forEach(function(x){ document.getElementById(x).disabled=hasPayHist; });
+    document.getElementById('fPayChangeRow').style.display=e?'':'none';
+    document.getElementById('payLockNote').textContent=hasPayHist ? 'The pay above is locked because this employee has dated pay changes. Use Change pay to add a new one, see the history or cancel one.' : 'To raise or lower the pay from a date, with a history and a letter, use Change pay. Edit the boxes above only to correct a mistake.';
     document.getElementById('fPf').checked = e? !!e.pfApplicable : true;
     document.getElementById('fEsi').checked = e? !!e.esiApplicable : true;
     document.getElementById('fDoj').value = e? (e.doj||'') : xToday();
@@ -1537,6 +1615,8 @@ tr:hover td{background:var(--line2)}
       address:document.getElementById('fAddress').value.trim()
     };
     if(!id){ data.empCode = document.getElementById('fEmpCode').value; }
+    var exPay = id ? state.employees.find(function(x){return x.id===id;}) : null;
+    if(exPay && (exPay.payHistory||[]).length){ ['wageType','wageAmount','payStd','zone','skill','dutyHrs','basicAmt','daAmt'].forEach(function(k){ delete data[k]; }); }
     if(!db){ toast('Storage unavailable — cannot save.'); return; }
 
     var existing = id ? state.employees.find(function(x){return x.id===id;}) : null;
@@ -2092,6 +2172,357 @@ tr:hover td{background:var(--line2)}
     el('btnMailSend').addEventListener('click', sendInvoiceMail);
   }
 
+  /* ---------- pay changes: wages that go up or down from a date, with a history ---------- */
+  var PAY_REASONS=['Annual increment','Minimum wage or D.A. revision','Promotion or change of role','Change of site or duty','Performance','Correction of an earlier entry','By mutual agreement','Other'];
+  var PAY_KEYS=['wageType','wageAmount','payStd','basicAmt','daAmt','dutyHrs'];
+  // the pay terms of an employee record or a history entry, in one plain shape
+  function payFieldsOf(T){
+    return {wageType:T.wageType==='daily'?'daily':'monthly', wageAmount:Number(T.wageAmount)||0, payStd:!!T.payStd, basicAmt:Number(T.basicAmt)||0, daAmt:Number(T.daAmt)||0, dutyHrs:Number(T.dutyHrs)||8, zone:T.zone||'', skill:T.skill||''};
+  }
+  function payEntries(e){ return (e.payHistory||[]).slice().sort(function(a,b){ return a.from<b.from?-1:(a.from>b.from?1:((a.at||0)-(b.at||0))); }); }
+  // the pay terms in force on one date. With no pay changes this is the employee record itself, so nothing changes for people who were never revised.
+  function payTermsOn(e, ds){
+    var h=payEntries(e); if(!h.length) return e;
+    var t=e.payBase||payFieldsOf(e);
+    for(var i=0;i<h.length;i++){ if(h[i].from<=ds) t=h[i].terms; else break; }
+    return t;
+  }
+  // gross pay for a full month: Basic + D.A. + extra hours for a structure, the monthly wage, or 26 days of a daily wage
+  function payGrossOf(T){
+    var amt=Number(T.wageAmount)||0;
+    if(T.payStd && (Number(T.basicAmt)||0)>0){ var A=Math.round((Number(T.basicAmt)||0)+(Number(T.daAmt)||0)), xh=Math.max(0,(Number(T.dutyHrs)||8)-8); return A+(xh>0?Math.round(A*xh/8):0); }
+    return T.wageType==='daily'?amt*26:amt;
+  }
+  // arrears that have been set to be paid with this month's pay
+  function arrearsDue(e, ym){
+    var amt=0, notes=[];
+    (e.payHistory||[]).forEach(function(en){
+      if(en.arrears && en.arrears.payYm===ym && Number(en.arrears.amount)){
+        amt+=Number(en.arrears.amount);
+        notes.push('Arrears for the wage revision w.e.f. '+pdfDate(en.from)+' ('+(en.arrears.months||[]).map(function(m){ return xMonthLabel(m.ym); }).join(', ')+')');
+      }
+    });
+    return {amount:Math.round(amt), note:notes.join('; ')};
+  }
+  // the latest month whose payroll is approved; pay cannot be cut for months up to then
+  async function payLockInfo(){
+    var m=thisMonth(), last=null;
+    for(var i=1;i>=-24;i--){ var ym=xAddMonth(m,i), run=await getRun(ym); if(run && run.status==='approved'){ last=ym; break; } }
+    return {lastApproved:last, firstOpen:last?xAddMonth(last,1):null};
+  }
+  function minWageShortfall(e, T){
+    var f=payFieldsOf(T);
+    if(f.payStd && f.basicAmt>0){
+      var zone=f.zone||e.zone, skill=f.skill||e.skill;
+      if(skill){ var gw=govWage(zone,skill), minT=gw.basic+gw.da, paid=f.basicAmt+f.daAmt;
+        if(minT && paid+0.5<minT) return 'Basic + D.A. of '+fmtMoney(paid)+' is below the minimum wage of '+fmtMoney(minT)+' for Zone '+zone+'.'; }
+    } else {
+      var mw=(state.settings.minWages||{})[e.state]||0, monthly=payGrossOf(f);
+      if(mw && monthly && monthly<mw) return 'The monthly pay of '+fmtMoney(monthly)+' is below the minimum wage of '+fmtMoney(mw)+'.';
+    }
+    return '';
+  }
+  // returns a message if the change is not allowed, or an empty string
+  function validatePayRevision(e, T, o, lock){
+    var from=o.from, f=payFieldsOf(T);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(from||'')) return 'Choose the date the new pay starts from.';
+    if(e.doj && from<e.doj) return 'The new pay cannot start before the date of joining ('+pdfDate(e.doj)+').';
+    if(e.dol && from>e.dol) return 'This employee left on '+pdfDate(e.dol)+', so a pay change cannot start after that.';
+    var hs=payEntries(e);
+    if(hs.length && from<=hs[hs.length-1].from) return 'There is already a pay change from '+pdfDate(hs[hs.length-1].from)+'. A new one must start after it, or cancel that one first.';
+    if(f.payStd && f.basicAmt>0 ? !(f.basicAmt>0) : !(f.wageAmount>0)) return 'Enter the new pay.';
+    var oldG=payGrossOf(payTermsOn(e,from)), newG=payGrossOf(f);
+    if(Math.round(oldG)===Math.round(newG)) return 'The new pay is the same as the present pay.';
+    if(!o.reason) return 'Choose the reason for the change.';
+    if(newG<oldG){
+      if(lock && lock.firstOpen && from<lock.firstOpen+'-01') return 'A pay cut cannot start in a month whose payroll is already approved. The earliest date is '+pdfDate(lock.firstOpen+'-01')+'.';
+      var below=minWageShortfall(e,f); if(below) return below+' Pay cannot be cut below the minimum wage.';
+      if(!o.consent) return 'Tick the box to confirm that the employee has been told in writing and has agreed to the reduction.';
+    }
+    return '';
+  }
+  // what the change adds up to for months that were already approved, using the attendance as it stands now
+  async function computeArrears(eNew, entryId, fromYm){
+    var eOld=Object.assign({}, eNew, {payHistory:(eNew.payHistory||[]).filter(function(x){ return x.id!==entryId; })}), months=[], total=0, last=thisMonth(), n=0;
+    for(var ym=fromYm; ym<=last && n<48; ym=xAddMonth(ym,1), n++){
+      var run=await getRun(ym); if(!run || run.status!=='approved') continue;
+      if(!(run.rows||[]).some(function(r){ return r.empId===eNew.id; })) continue;
+      var a=await computePayroll(eNew,ym), b=await computePayroll(eOld,ym), diff=Math.round(a.baseGross)-Math.round(b.baseGross);
+      if(diff){ months.push({ym:ym, amt:diff}); total+=diff; }
+    }
+    return {amount:total, months:months};
+  }
+  async function payRefreshMonths(fromYm, extraYm){
+    var list=[], last=xAddMonth(thisMonth(),1), n=0;
+    for(var ym=fromYm; ym<=last && n<36; ym=xAddMonth(ym,1), n++) list.push(ym);
+    if(extraYm && list.indexOf(extraYm)<0) list.push(extraYm);
+    for(var i=0;i<list.length;i++){ var run=await getRun(list[i]); if(run && run.status==='approved') continue; await invalidateRun(list[i]); }
+  }
+  // o: {from, reason, note, consent, payArrears, arrearsYm}. Returns the saved entry; throws an Error with a plain message when it is not allowed.
+  async function savePayRevision(e, T, o){
+    if(!db) throw new Error('Storage is not available, so nothing was saved.');
+    var lock=await payLockInfo(), msg=validatePayRevision(e,T,o,lock); if(msg) throw new Error(msg);
+    var f=payFieldsOf(T), oldG=payGrossOf(payTermsOn(e,o.from)), newG=payGrossOf(f), today=xToday();
+    var entry={id:'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), from:o.from, terms:f, reason:o.reason, note:o.note||'', consent:!!o.consent,
+      kind:newG>oldG?'increase':'decrease', oldGross:Math.round(oldG), newGross:Math.round(newG), by:(me&&(me.name||me.email))||'', byId:(me&&me.id)||'', at:Date.now(), arrears:null};
+    var base=e.payBase||payFieldsOf(e), eNew=Object.assign({}, e, {payBase:base, payHistory:(e.payHistory||[]).concat([entry])});
+    var payYm=o.arrearsYm||thisMonth();
+    if(newG>oldG && o.payArrears){
+      var a=await computeArrears(eNew, entry.id, o.from.slice(0,7));
+      if(a.amount>0){ var pr=await getRun(payYm); if(pr && pr.status==='approved') throw new Error('Payroll for '+xMonthLabel(payYm)+' is already approved. Choose a later month to pay the arrears.'); entry.arrears={amount:a.amount, months:a.months, payYm:payYm}; }
+    }
+    var fields={payBase:base, payHistory:eNew.payHistory};
+    if(o.from<=today) Object.assign(fields, payFieldsOf(payTermsOn(eNew,today)));
+    await db.doc('employees/'+e.id).update(fields);
+    await payRefreshMonths(o.from.slice(0,7), entry.arrears?entry.arrears.payYm:null);
+    return entry;
+  }
+  // a change can be cancelled only while nothing has been paid with it
+  async function cancelPayRevision(e, entryId){
+    if(!db) throw new Error('Storage is not available.');
+    var en=(e.payHistory||[]).find(function(x){ return x.id===entryId; }); if(!en) throw new Error('That pay change was not found.');
+    var last=xAddMonth(thisMonth(),1), n=0;
+    for(var ym=en.from.slice(0,7); ym<=last && n<48; ym=xAddMonth(ym,1), n++){
+      var run=await getRun(ym);
+      if(run && run.status==='approved' && (!en.arrears || ym>=en.arrears.payYm) && (run.rows||[]).some(function(r){ return r.empId===e.id; }))
+        throw new Error('Payroll for '+xMonthLabel(ym)+' is already approved with this change, so it cannot be cancelled.');
+    }
+    var rest=(e.payHistory||[]).filter(function(x){ return x.id!==entryId; }), eNew=Object.assign({}, e, {payHistory:rest}), fields={payHistory:rest};
+    if(rest.length) Object.assign(fields, payFieldsOf(payTermsOn(eNew,xToday())));
+    else { Object.assign(fields, payFieldsOf(e.payBase||payFieldsOf(e))); fields.payBase=null; }
+    await db.doc('employees/'+e.id).update(fields);
+    await payRefreshMonths(en.from.slice(0,7), en.arrears?en.arrears.payYm:null);
+  }
+  // keeps the pay shown on the employee record equal to the pay in force today (a change dated in the future takes effect by itself)
+  var paySyncBusy={};
+  function syncDuePay(){
+    if(!db || !(me && me.canEdit)) return;
+    var today=xToday();
+    state.employees.forEach(function(e){
+      if(!(e.payHistory||[]).length || paySyncBusy[e.id]) return;
+      var want=payFieldsOf(payTermsOn(e,today)), have=payFieldsOf(e);
+      if(PAY_KEYS.every(function(k){ return want[k]===have[k]; })) return;
+      paySyncBusy[e.id]=true;
+      db.doc('employees/'+e.id).update(want).then(function(){ paySyncBusy[e.id]=false; }, function(){ paySyncBusy[e.id]=false; });
+    });
+  }
+  function payPendingTag(e){
+    var today=xToday(), p=payEntries(e).filter(function(x){ return x.from>today; })[0];
+    return p ? '<div class="muted" style="font-size:.72rem">'+(p.kind==='decrease'?'Lower':'Higher')+' pay from '+pdfDate(p.from)+'</div>' : '';
+  }
+
+  /* ---------- pay changes: the windows and the letter ---------- */
+  var payEmp=null, payLock=null, paySeq=0, bkRows=[], bkLock=null;
+  function pfld(id){ return document.getElementById(id); }
+  function payStructOf(T){ return !!(T.payStd && (Number(T.basicAmt)||0)>0); }
+  function payReasonHtml(){ return '<option value="">Choose</option>'+PAY_REASONS.map(function(r){ return '<option>'+escapeHtml(r)+'</option>'; }).join(''); }
+  function payArrMonths(lock){
+    var m0=(lock.firstOpen && lock.firstOpen>thisMonth())?lock.firstOpen:thisMonth();
+    return [m0, xAddMonth(m0,1)].map(function(m){ return '<option value="'+m+'">'+escapeHtml(xMonthLabel(m))+'</option>'; }).join('');
+  }
+  function payDescribe(T){
+    if(payStructOf(T)){ var A=Math.round((Number(T.basicAmt)||0)+(Number(T.daAmt)||0)), xh=Math.max(0,(Number(T.dutyHrs)||8)-8); return fmtMoney(payGrossOf(T))+' per month (Basic '+fmtMoney(T.basicAmt)+' + D.A. '+fmtMoney(T.daAmt)+(xh?' + '+xh+' extra hours '+fmtMoney(Math.round(A*xh/8)):'')+')'; }
+    return T.wageType==='daily' ? fmtMoney(T.wageAmount)+' per day' : fmtMoney(T.wageAmount)+' per month';
+  }
+  async function openPayModal(id){
+    var e=state.employees.find(function(x){ return x.id===id; }); if(!e) return;
+    if(me && me.canEdit===false){ toast('Only administrators and managers can change pay.'); return; }
+    payEmp=e; payLock=await payLockInfo();
+    var T=payTermsOn(e,xToday()), struct=payStructOf(T), hist=payEntries(e);
+    pfld('payTitle').textContent='Change pay: '+(e.name||'')+(e.empCode?' ('+e.empCode+')':'');
+    pfld('payCurrent').textContent='Present pay: '+payDescribe(T)+'. '+(e.role||'')+(e.site?', '+e.site:'')+'.';
+    pfld('payStdBox').style.display=struct?'':'none'; pfld('paySingleBox').style.display=struct?'none':'';
+    pfld('pBasic').value=struct?T.basicAmt:''; pfld('pDa').value=struct?T.daAmt:''; pfld('pDuty').value=String(Number(T.dutyHrs)||8);
+    pfld('pAmtLabel').textContent=T.wageType==='daily'?'New daily wage (₹)':'New monthly wage (₹)'; pfld('pAmt').value=struct?'':T.wageAmount;
+    var firstOpen=payLock.firstOpen?payLock.firstOpen+'-01':xToday().slice(0,8)+'01', from=firstOpen; if(e.doj && from<e.doj) from=e.doj;
+    var last=hist.length?hist[hist.length-1].from:''; if(last && from<=last){ var d=new Date(last+'T00:00:00'); d.setDate(d.getDate()+1); from=d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+    pfld('pFrom').value=from; pfld('pReason').innerHTML=payReasonHtml(); pfld('pReason').value=''; pfld('pNote').value=''; pfld('pConsent').checked=false;
+    pfld('pArrMonth').innerHTML=payArrMonths(payLock); pfld('pArrOn').checked=true; pfld('payErr').textContent='';
+    pfld('pMinBtn').style.display=(struct && (T.skill||e.skill))?'':'none';
+    renderPayHist(); payPreview(); pfld('payModalBg').classList.add('show');
+  }
+  function payTermsFromForm(){
+    var T=payTermsOn(payEmp,xToday()), f=payFieldsOf(T);
+    if(payStructOf(T)){ f.basicAmt=Number(pfld('pBasic').value)||0; f.daAmt=Number(pfld('pDa').value)||0; f.dutyHrs=Number(pfld('pDuty').value)||8; f.payStd=true; f.wageType='monthly'; f.wageAmount=payGrossOf(f); }
+    else f.wageAmount=Number(pfld('pAmt').value)||0;
+    return f;
+  }
+  async function payPreview(){
+    if(!payEmp) return;
+    var seq=++paySeq, from=pfld('pFrom').value, f=payTermsFromForm(), oldG=payGrossOf(payTermsOn(payEmp,from||xToday())), newG=payGrossOf(f), diff=newG-oldG, box=pfld('payDelta');
+    if(payStructOf(f)) pfld('pGrossStd').value=Math.round(newG);
+    if(!(newG>0) || Math.round(diff)===0){ box.innerHTML='Enter the new pay to see the change.'; }
+    else {
+      var pct=oldG?diff/oldG*100:0, up=diff>0;
+      box.innerHTML='<span class="tag '+(up?'ok':'bad')+'">'+(up?'Increase':'Decrease')+'</span> '+fmtMoney(oldG)+' to '+fmtMoney(newG)+' per month ('+(up?'+':'-')+fmtMoney(Math.abs(diff))+', '+(up?'+':'-')+Math.abs(pct).toFixed(1)+'%)';
+    }
+    var below=newG>0?minWageShortfall(payEmp,f):''; if(below) box.innerHTML+='<div style="color:var(--bad);margin-top:.3rem">'+escapeHtml(below)+(diff<0?' A pay cut below the minimum wage is not allowed.':' The pay is still below the minimum wage.')+'</div>';
+    pfld('payConsentBox').style.display=(newG>0 && diff<0)?'':'none';
+    var arr=pfld('payArrBox'); arr.style.display='none';
+    if(diff>0 && from){
+      var ent={id:'tmp',from:from,terms:f}, eNew=Object.assign({},payEmp,{payBase:payEmp.payBase||payFieldsOf(payEmp),payHistory:(payEmp.payHistory||[]).concat([ent])});
+      var a=await computeArrears(eNew,'tmp',from.slice(0,7)); if(seq!==paySeq) return;
+      if(a.amount>0){ arr.style.display=''; pfld('pArrText').textContent='Arrears for months that are already approved: '+fmtMoney(a.amount)+' ('+a.months.map(function(m){ return xMonthLabel(m.ym)+' '+fmtMoney(m.amt); }).join(', ')+').'; }
+    }
+  }
+  function renderPayHist(){
+    var e=payEmp, el=pfld('payHist'), today=xToday(), h=payEntries(e), cur=null;
+    h.forEach(function(x){ if(x.from<=today) cur=x.id; });
+    if(!h.length){ el.innerHTML='<div class="muted">No pay changes yet. The present pay has been the same since the employee joined or since it was first entered.</div>'; return; }
+    var rows=['<tr><td>Before the first change</td><td>'+escapeHtml(payDescribe(e.payBase||payFieldsOf(e)))+'</td><td></td><td></td><td></td><td></td><td></td></tr>'];
+    h.forEach(function(x){
+      var up=x.kind==='increase', pct=x.oldGross?(x.newGross-x.oldGross)/x.oldGross*100:0, status=x.from>today?'<span class="tag info">Starts '+pdfDate(x.from)+'</span>':(x.id===cur?'<span class="tag ok">In force</span>':'<span class="tag">Earlier</span>');
+      rows.push('<tr><td>'+pdfDate(x.from)+'</td><td>'+escapeHtml(payDescribe(x.terms))+'</td><td><span class="tag '+(up?'ok':'bad')+'">'+(up?'+':'-')+Math.abs(pct).toFixed(1)+'%</span></td><td>'+escapeHtml(x.reason||'')+(x.arrears?'<div class="muted" style="font-size:.74rem">Arrears '+fmtMoney(x.arrears.amount)+' with '+escapeHtml(xMonthLabel(x.arrears.payYm))+'</div>':'')+(x.kind==='decrease'?'<div class="muted" style="font-size:.74rem">Employee agreed</div>':'')+'</td><td>'+escapeHtml(x.by||'')+'<div class="muted" style="font-size:.74rem">'+(x.at?new Date(x.at).toLocaleDateString('en-GB'):'')+'</div></td><td>'+status+'</td>'+
+        '<td style="white-space:nowrap"><button class="btn small ghost" data-payletter="'+x.id+'">Letter</button> <button class="btn small ghost" data-paycancel="'+x.id+'">Cancel</button></td></tr>');
+    });
+    el.innerHTML='<div class="scrollx"><table><thead><tr><th>From</th><th>Pay</th><th>Change</th><th>Reason</th><th>By</th><th>Status</th><th></th></tr></thead><tbody>'+rows.join('')+'</tbody></table></div>';
+    el.querySelectorAll('[data-payletter]').forEach(function(b){ b.addEventListener('click', function(){ var en=payEntries(payEmp).find(function(x){ return x.id===b.dataset.payletter; }); if(en) downloadPayLetter(payEmp,en); }); });
+    el.querySelectorAll('[data-paycancel]').forEach(function(b){ b.addEventListener('click', async function(){
+      if(!confirm('Cancel this pay change? This is only possible while nothing has been paid with it.')) return;
+      try{ await cancelPayRevision(payEmp,b.dataset.paycancel); toast('Pay change cancelled.'); await payAfterSave(null); }catch(err){ toast(err.message||'Could not cancel.'); }
+    }); });
+  }
+  // after a save or a cancel, wait for the list of employees to catch up, then show the new history
+  async function payAfterSave(entryId){
+    var id=payEmp.id, tries=0, e;
+    while(tries++<12){ await new Promise(function(r){ setTimeout(r,250); }); e=state.employees.find(function(x){ return x.id===id; });
+      if(e && (!entryId || (e.payHistory||[]).some(function(x){ return x.id===entryId; }))) break; }
+    if(e){ payEmp=e; payLock=await payLockInfo(); pfld('payCurrent').textContent='Present pay: '+payDescribe(payTermsOn(e,xToday()))+'. '+(e.role||'')+(e.site?', '+e.site:'')+'.'; renderPayHist(); payPreview(); }
+  }
+  async function paySaveClick(){
+    var err=pfld('payErr'); err.textContent=''; var btn=pfld('btnPaySave'), old=btn.textContent; btn.disabled=true; btn.textContent='Saving...';
+    try{
+      var o={from:pfld('pFrom').value, reason:pfld('pReason').value, note:pfld('pNote').value.trim(), consent:pfld('pConsent').checked,
+        payArrears:pfld('payArrBox').style.display!=='none' && pfld('pArrOn').checked, arrearsYm:pfld('pArrMonth').value};
+      var en=await savePayRevision(payEmp,payTermsFromForm(),o);
+      toast('Pay change saved'+(en.arrears?', with arrears of '+fmtMoney(en.arrears.amount):'')+'. You can now download the letter for the employee.');
+      pfld('pReason').value=''; pfld('pNote').value=''; pfld('pConsent').checked=false; await payAfterSave(en.id);
+    }catch(e){ err.textContent=e.message||'Could not save the pay change.'; }
+    btn.disabled=false; btn.textContent=old;
+  }
+  function payFillMinimum(){
+    var T=payTermsOn(payEmp,xToday()), skill=T.skill||payEmp.skill, zone=T.zone||payEmp.zone; if(!skill) return;
+    var gw=govWage(zone,skill); if(!gw.basic){ toast('No minimum wage is loaded for that zone and skill.'); return; }
+    pfld('pBasic').value=gw.basic; pfld('pDa').value=gw.da; payPreview();
+  }
+  // ---- the letter to the employee
+  function payPrevTerms(e,en){
+    var before=(e.payHistory||[]).filter(function(x){ return x.from<en.from; }).sort(function(a,b){ return a.from<b.from?-1:1; });
+    return before.length?before[before.length-1].terms:(e.payBase||payFieldsOf(e));
+  }
+  function buildPayRevisionLetterPdf(e,en){
+    var pb=pdfNew(false), ML=36, CW=pb.W-72, MR=ML+CW, C=PDFC, y=pdfHead(pb,false), oldT=payPrevTerms(e,en), newT=en.terms, up=en.kind==='increase', sig=pdfSignatory();
+    y+=18; pb.text(ML,y+8,'Date: '+pdfDate(xToday()),9.6); pb.text(MR,y+8,'Ref: PAY/'+(e.empCode||'')+'/'+en.from,9,{align:'right',color:C.mute}); y+=34;
+    pb.text(ML,y+8,'To',9.6); y+=14; pb.text(ML,y+8,e.name||'',10.6,{bold:true}); y+=14;
+    pb.text(ML,y+8,'Employee ID: '+(e.empCode||'-')+'     Designation: '+(e.role||'-')+(e.site?'     Site: '+e.site:''),9,{color:C.mute}); y+=12;
+    if(e.address){ pb.wrap(e.address,CW,9,false).slice(0,2).forEach(function(l){ pb.text(ML,y+8,l,9,{color:C.mute}); y+=11; }); }
+    y+=16; pb.text(ML,y+8,'Subject: Revision of your wages with effect from '+pdfDate(en.from),10.6,{bold:true}); y+=28;
+    function para(t){ pb.wrap(t,CW,10,false).forEach(function(l){ pb.text(ML,y+8,l,10); y+=14; }); y+=8; }
+    para('Dear '+(e.name||'Employee')+',');
+    para(up ? 'We are pleased to inform you that, with effect from '+pdfDate(en.from)+', your wages have been revised as shown below.'
+            : 'Further to our discussion, and with your agreement, your wages are revised with effect from '+pdfDate(en.from)+' as shown below.');
+    var rows=[];
+    if(payStructOf(oldT)||payStructOf(newT)){
+      var oA=Math.round((Number(oldT.basicAmt)||0)+(Number(oldT.daAmt)||0)), nA=Math.round((Number(newT.basicAmt)||0)+(Number(newT.daAmt)||0));
+      var oX=Math.max(0,(Number(oldT.dutyHrs)||8)-8), nX=Math.max(0,(Number(newT.dutyHrs)||8)-8);
+      rows.push(['Basic',pdfMoney(oldT.basicAmt),pdfMoney(newT.basicAmt)],['Dearness allowance (D.A.)',pdfMoney(oldT.daAmt),pdfMoney(newT.daAmt)]);
+      if(oX||nX) rows.push(['Extra hours ('+(Number(newT.dutyHrs)||8)+'-hour duty)',pdfMoney(oX?Math.round(oA*oX/8):0),pdfMoney(nX?Math.round(nA*nX/8):0)]);
+      rows.push(['Gross wages per month',pdfMoney(payGrossOf(oldT)),pdfMoney(payGrossOf(newT))]);
+    } else rows.push([newT.wageType==='daily'?'Wage per day':'Wages per month',pdfMoney(oldT.wageAmount),pdfMoney(newT.wageAmount)]);
+    pb.rect(ML,y,CW,20,{fill:C.ink}); pb.text(ML+8,y+13.5,'Wages (Rs.)',8.8,{bold:true,color:C.white}); pb.text(ML+CW-190,y+13.5,'Earlier',8.8,{bold:true,color:C.white,align:'right'}); pb.text(MR-8,y+13.5,'From '+pdfDate(en.from),8.8,{bold:true,color:C.white,align:'right'}); y+=20;
+    rows.forEach(function(r,i){ var last=i===rows.length-1; if(last) pb.rect(ML,y,CW,22,{fill:C.paper}); pb.text(ML+8,y+14.5,r[0],9.4,{bold:last}); pb.text(ML+CW-190,y+14.5,r[1],9.4,{align:'right',bold:last}); pb.text(MR-8,y+14.5,r[2],9.4,{align:'right',bold:last}); pb.line(ML,y+22,MR,y+22,0.35,C.line); y+=22; });
+    y+=16;
+    if(en.reason) para('Reason for the revision: '+en.reason+'.');
+    if(en.arrears) para('Arrears of Rs. '+pdfMoney(en.arrears.amount)+' for '+en.arrears.months.map(function(m){ return xMonthLabel(m.ym); }).join(' and ')+' will be paid with your salary for '+xMonthLabel(en.arrears.payYm)+'.');
+    para('Your payslip will show the revised wages from this date. All other terms of your employment remain unchanged.');
+    if(!up) para('Please sign the copy of this letter below to confirm that you have understood and agreed to the revision.');
+    y+=6; pdfSign(pb,y,ML,MR,'Employee signature and date',sig.name+', '+sig.role);
+    pdfFoot(pb,'Computer-generated letter'); return pb.build();
+  }
+  async function downloadPayLetter(e,en){
+    var blob; try{ blob=buildPayRevisionLetterPdf(e,en); }catch(err){ toast('Could not build the letter.'); return; }
+    await pdfSave(blob,'pay-revision-'+pdfName(e.name)+'-'+en.from+'.pdf');
+  }
+  // ---- many employees at once
+  function bkMethod(){ return pfld('bkMethod').value; }
+  function bkEligible(){ var site=pfld('bkSite').value, role=pfld('bkRole').value; return state.employees.filter(function(e){ return e.active!==false && (!site||e.site===site) && (!role||e.role===role); }).sort(compareByEmpCode); }
+  function bkNewTerms(e,T,method,val){
+    var f=payFieldsOf(T), struct=payStructOf(f), sign=/-$/.test(method)?-1:1, kind=method.slice(0,3);
+    if(method==='min'){
+      if(!struct) return {skip:'Not on the pay structure'};
+      var skill=f.skill||e.skill, zone=f.zone||e.zone, gw=skill?govWage(zone,skill):{basic:0,da:0};
+      if(!gw.basic) return {skip:'Skill category not set'};
+      if(gw.basic+gw.da<=f.basicAmt+f.daAmt+0.5) return {skip:'Already at or above the minimum wage'};
+      f.basicAmt=gw.basic; f.daAmt=gw.da; f.wageAmount=payGrossOf(f); return {terms:f};
+    }
+    if(!(val>0)) return {skip:'Enter the percentage or amount'};
+    if(struct){ if(kind==='pct'){ f.basicAmt=Math.round(f.basicAmt*(1+sign*val/100)); f.daAmt=Math.round(f.daAmt*(1+sign*val/100)*100)/100; } else f.basicAmt=Math.round(f.basicAmt+sign*val); f.wageAmount=payGrossOf(f); }
+    else f.wageAmount=kind==='pct'?Math.round(f.wageAmount*(1+sign*val/100)):Math.round(f.wageAmount+sign*val);
+    return {terms:f};
+  }
+  async function bkRefresh(){
+    var from=pfld('bkFrom').value, method=bkMethod(), val=Number(pfld('bkVal').value)||0, reason=pfld('bkReason').value, consent=pfld('bkConsent').checked, out=[];
+    pfld('bkValLabel').textContent=/^pct/.test(method)?'Percentage (%)':(method==='min'?'(not needed)':'Amount (₹)'); pfld('bkVal').disabled=(method==='min');
+    pfld('bkConsentBox').style.display=/-$/.test(method)?'':'none';
+    if(!bkLock) bkLock=await payLockInfo();
+    bkEligible().forEach(function(e){
+      var T=payTermsOn(e,from||xToday()), r=bkNewTerms(e,T,method,val), row={e:e,old:payGrossOf(T),nw:0,msg:'',terms:null,ok:false};
+      if(r.skip) row.msg=r.skip; else {
+        row.terms=r.terms; row.nw=payGrossOf(r.terms);
+        var err=validatePayRevision(e,r.terms,{from:from,reason:reason||'x',consent:consent},bkLock);
+        if(err && /Choose the reason/.test(err)) err='';
+        if(err && /Tick the box/.test(err)) err='Needs the "agreed" box ticked';
+        row.msg=err; row.ok=!err;
+      }
+      out.push(row);
+    });
+    bkRows=out;
+    var okRows=out.filter(function(r){ return r.ok; }), delta=okRows.reduce(function(s,r){ return s+(r.nw-r.old); },0);
+    pfld('bkPreview').innerHTML=out.length?('<table><thead><tr><th></th><th>ID</th><th>Name</th><th>Role</th><th>Site</th><th class="right">Now</th><th class="right">New</th><th class="right">Change</th><th></th></tr></thead><tbody>'+out.map(function(r,i){
+      var d=r.nw-r.old; return '<tr><td>'+(r.ok?'<input type="checkbox" data-bk="'+i+'" checked style="width:auto;min-height:0">':'')+'</td><td>'+escapeHtml(r.e.empCode||'')+'</td><td>'+escapeHtml(r.e.name||'')+'</td><td>'+escapeHtml(r.e.role||'')+'</td><td>'+escapeHtml(r.e.site||'')+'</td><td class="right">'+fmtMoney(r.old)+'</td><td class="right">'+(r.terms?fmtMoney(r.nw):'-')+'</td><td class="right">'+(r.terms?'<span class="tag '+(d>0?'ok':'bad')+'">'+(d>0?'+':'-')+fmtMoney(Math.abs(d))+'</span>':'')+'</td><td class="muted" style="font-size:.78rem">'+escapeHtml(r.msg||'')+'</td></tr>'; }).join('')+'</tbody></table>'):'<div class="muted" style="padding:.6rem">No employees match.</div>';
+    pfld('bkSummary').textContent=okRows.length+' of '+out.length+' can be changed. Monthly wage bill changes by '+(delta>=0?'+':'-')+fmtMoney(Math.abs(delta))+'.';
+  }
+  async function openBulkPay(){
+    if(me && me.canEdit===false){ toast('Only administrators and managers can change pay.'); return; }
+    bkLock=await payLockInfo();
+    var list=state.employees.filter(function(e){ return e.active!==false; });
+    pfld('bkSite').innerHTML='<option value="">All sites</option>'+allSites().map(function(s){ return '<option>'+escapeHtml(s)+'</option>'; }).join('');
+    pfld('bkRole').innerHTML='<option value="">All roles</option>'+Object.keys(list.reduce(function(o,e){ if(e.role) o[e.role]=1; return o; },{})).sort().map(function(r){ return '<option>'+escapeHtml(r)+'</option>'; }).join('');
+    pfld('bkReason').innerHTML=payReasonHtml(); pfld('bkReason').value='Annual increment'; pfld('bkNote').value=''; pfld('bkVal').value=''; pfld('bkMethod').value='pct+'; pfld('bkConsent').checked=false; pfld('bkErr').textContent='';
+    pfld('bkFrom').value=bkLock.firstOpen?bkLock.firstOpen+'-01':xToday().slice(0,8)+'01'; pfld('bkArr').checked=true; pfld('bkArrMonth').innerHTML=payArrMonths(bkLock);
+    await bkRefresh(); pfld('bulkPayModalBg').classList.add('show');
+  }
+  async function bkApply(){
+    var err=pfld('bkErr'); err.textContent='';
+    var from=pfld('bkFrom').value, reason=pfld('bkReason').value; if(!reason){ err.textContent='Choose the reason.'; return; }
+    var chosen=[]; document.querySelectorAll('#bkPreview [data-bk]').forEach(function(c){ if(c.checked) chosen.push(bkRows[Number(c.dataset.bk)]); });
+    if(!chosen.length){ err.textContent='Nothing is selected.'; return; }
+    var btn=pfld('btnBulkApply'), old=btn.textContent; btn.disabled=true; var done=0, failed=[];
+    for(var i=0;i<chosen.length;i++){
+      btn.textContent='Saving '+(i+1)+' of '+chosen.length+'...';
+      var r=chosen[i], fresh=state.employees.find(function(x){ return x.id===r.e.id; })||r.e;
+      try{ await savePayRevision(fresh,r.terms,{from:from,reason:reason,note:pfld('bkNote').value.trim(),consent:pfld('bkConsent').checked,payArrears:pfld('bkArr').checked,arrearsYm:pfld('bkArrMonth').value}); done++; }
+      catch(e){ failed.push((r.e.name||'')+': '+(e.message||'failed')); }
+    }
+    btn.disabled=false; btn.textContent=old;
+    toast(done+' pay change'+(done===1?'':'s')+' saved'+(failed.length?', '+failed.length+' not saved.':'.'));
+    if(failed.length){ err.textContent=failed.slice(0,3).join(' | ')+(failed.length>3?' ...':''); }
+    else pfld('bulkPayModalBg').classList.remove('show');
+  }
+  function setupPayUI(){
+    pfld('payModalClose').addEventListener('click', function(){ pfld('payModalBg').classList.remove('show'); });
+    pfld('payModalBg').addEventListener('click', function(ev){ if(ev.target===pfld('payModalBg')) pfld('payModalBg').classList.remove('show'); });
+    ['pBasic','pDa','pDuty','pAmt','pFrom'].forEach(function(id){ pfld(id).addEventListener('input', payPreview); pfld(id).addEventListener('change', payPreview); });
+    pfld('pMinBtn').addEventListener('click', payFillMinimum); pfld('btnPaySave').addEventListener('click', paySaveClick);
+    pfld('btnEmpChangePay').addEventListener('click', function(){ var id=pfld('empId').value; if(id){ pfld('empModalBg').classList.remove('show'); openPayModal(id); } });
+    pfld('btnBulkPay').addEventListener('click', openBulkPay);
+    pfld('bulkPayModalClose').addEventListener('click', function(){ pfld('bulkPayModalBg').classList.remove('show'); });
+    pfld('bulkPayModalBg').addEventListener('click', function(ev){ if(ev.target===pfld('bulkPayModalBg')) pfld('bulkPayModalBg').classList.remove('show'); });
+    ['bkSite','bkRole','bkMethod','bkFrom','bkReason'].forEach(function(id){ pfld(id).addEventListener('change', bkRefresh); });
+    ['bkVal'].forEach(function(id){ pfld(id).addEventListener('input', bkRefresh); });
+    pfld('bkConsent').addEventListener('change', bkRefresh); pfld('btnBulkApply').addEventListener('click', bkApply);
+  }
+
   // ---------- ATTENDANCE ----------
   // ---------- ATTENDANCE CSV IMPORT (from the Attendance app) ----------
   function parseCsv(text){
@@ -2291,36 +2722,65 @@ tr:hover td{background:var(--line2)}
     var dim=daysInMonth(ym);
     var doc = await getAttendanceDoc(e.id, ym);
     var days=doc.days||{};
-    var lop=0, present=0, notEmployed=0;
+    var lop=0, present=0, notEmployed=0, dayInfo=[], T0=null, TL=null, same=true;
     for(var d=1; d<=dim; d++){
       var ds = ym+'-'+String(d).padStart(2,'0');
       if((e.doj && ds<e.doj) || (e.dol && ds>e.dol)){ notEmployed+=1; continue; }
-      var st = days[String(d)]||'P';
-      if(st==='A') lop+=1;
-      else if(st==='H') lop+=0.5;
+      var dst = days[String(d)]||'P', f=1;
+      if(dst==='A'){ lop+=1; f=0; }
+      else if(dst==='H'){ lop+=0.5; f=0.5; }
+      var Td=payTermsOn(e, ds);
+      if(T0===null) T0=Td; else if(Td!==T0) same=false;
+      TL=Td; dayInfo.push({ds:ds, f:f, T:Td});
     }
     present = dim - lop - notEmployed;
-    var gross;
-    if(e.wageType==='daily'){ gross = (Number(e.wageAmount)||0) * present; }
-    else { var perDay=(Number(e.wageAmount)||0)/dim; gross = (Number(e.wageAmount)||0) - (lop+notEmployed)*perDay; }
-    gross = Math.max(0, gross);
+    var Tm = TL || payTermsOn(e, ym+'-'+String(dim).padStart(2,'0'));
     var st = state.settings, basicPct = st.basicPct||50;
-    var basic = gross * basicPct/100;
-    // standard pay structure: Basic + D.A. (+ extra hours for a 12-hour duty). PF is on Basic + D.A.
-    var struct = !!(e.payStd && (Number(e.basicAmt)||0)>0), stdA=0, stdBasic=0, stdDa=0, stdExtra=0, stdDuty=0;
-    if(struct){
-      var bA=Number(e.basicAmt)||0, dA=Number(e.daAmt)||0; stdA=Math.round(bA+dA); stdDuty=Number(e.dutyHrs)||8;
-      var xhr=Math.max(0,stdDuty-8), extraM=xhr>0?Math.round(stdA*xhr/8):0, grossM=stdA+extraM, ratio=grossM>0?gross/grossM:0;
-      stdBasic=bA*ratio; stdDa=dA*ratio; stdExtra=extraM*ratio;
-      basic=stdA*ratio;
+    var gross, basic, struct=false, stdA=0, stdBasic=0, stdDa=0, stdExtra=0, stdDuty=0, bshare=basicPct/100, revNote='';
+    if(same){
+      // the pay was the same on every day of the month
+      if(Tm.wageType==='daily'){ gross = (Number(Tm.wageAmount)||0) * present; }
+      else { var perDay=(Number(Tm.wageAmount)||0)/dim; gross = (Number(Tm.wageAmount)||0) - (lop+notEmployed)*perDay; }
+      gross = Math.max(0, gross);
+      basic = gross * basicPct/100;
+      // standard pay structure: Basic + D.A. (+ extra hours for a 12-hour duty). PF is on Basic + D.A.
+      struct = !!(Tm.payStd && (Number(Tm.basicAmt)||0)>0);
+      if(struct){
+        var bA=Number(Tm.basicAmt)||0, dA=Number(Tm.daAmt)||0; stdA=Math.round(bA+dA); stdDuty=Number(Tm.dutyHrs)||8;
+        var xhr=Math.max(0,stdDuty-8), extraM=xhr>0?Math.round(stdA*xhr/8):0, grossM=stdA+extraM, ratio=grossM>0?gross/grossM:0;
+        stdBasic=bA*ratio; stdDa=dA*ratio; stdExtra=extraM*ratio;
+        basic=stdA*ratio; bshare=grossM>0?stdA/grossM:1;
+      }
+    } else {
+      // the pay changed during the month: each day is paid at the pay in force on that day
+      gross=0; basic=0;
+      dayInfo.forEach(function(di){
+        var T=di.T, amt=Number(T.wageAmount)||0, c=(T.wageType==='daily')?amt*di.f:amt/dim*di.f;
+        gross+=c;
+        if(T.payStd && (Number(T.basicAmt)||0)>0){
+          var bB=Number(T.basicAmt)||0, dD=Number(T.daAmt)||0, A=Math.round(bB+dD), xh=Math.max(0,(Number(T.dutyHrs)||8)-8), exM=xh>0?Math.round(A*xh/8):0, gM=A+exM, rt=gM>0?c/gM:0;
+          stdBasic+=bB*rt; stdDa+=dD*rt; stdExtra+=exM*rt; basic+=A*rt; struct=true; stdA=A; stdDuty=Number(T.dutyHrs)||8; bshare=gM>0?A/gM:1;
+        } else basic+=c*basicPct/100;
+      });
+      gross=Math.max(0,gross);
+      var parts=[], prev=null;
+      dayInfo.forEach(function(di){
+        if(prev && di.T!==prev.T){
+          var daily=(di.T.wageType==='daily' && prev.T.wageType==='daily'), o=daily?Number(prev.T.wageAmount):payGrossOf(prev.T), n=daily?Number(di.T.wageAmount):payGrossOf(di.T);
+          parts.push('w.e.f. '+pdfDate(di.ds)+': Rs. '+pdfMoney(o)+' to Rs. '+pdfMoney(n)+(daily?' per day':' per month'));
+        }
+        prev=di;
+      });
+      revNote='Wages revised '+parts.join('; ')+'. Pay is worked out day by day.';
     }
     var ex = extrasMap[e.id+'|'+ym] || {};
     var otHrs = Number(ex.ot)||0, nights = Number(ex.night)||0, otherDed = Number(ex.otherDed)||0;
-    var monthlyBasic = struct ? stdA : ((e.wageType==='daily') ? (Number(e.wageAmount)||0)*basicPct/100*dim : (Number(e.wageAmount)||0)*basicPct/100);
+    var monthlyBasic = struct ? stdA : ((Tm.wageType==='daily') ? (Number(Tm.wageAmount)||0)*basicPct/100*dim : (Number(Tm.wageAmount)||0)*basicPct/100);
     var otPay = Math.round(otHrs * (monthlyBasic/(dim*8)) * (st.otMult||2));
     var nightPay = Math.round(nights * (st.nightAllowance==null?150:st.nightAllowance));
-    var baseGross = gross;
-    gross = baseGross + otPay + nightPay;
+    var baseGross = gross, ar = arrearsDue(e, ym), arrears = ar.amount;
+    gross = baseGross + otPay + nightPay + arrears;
+    if(arrears) basic += arrears*bshare;
     var pf=0, esi=0, pt=0, pfEr=0, esiEr=0;
     if(e.pfApplicable){
       var base = st.pfCeilingEnabled ? Math.min(basic, st.pfCeiling||15000) : basic;
@@ -2335,7 +2795,8 @@ tr:hover td{background:var(--line2)}
     var net = gross - pf - esi - pt - advance - otherDed;
     return {present:present, dim:dim, gross:gross, baseGross:baseGross, basic:basic, pf:pf, esi:esi, pt:pt, advance:advance, net:net,
       otHrs:otHrs, nights:nights, otPay:otPay, nightPay:nightPay, otherDed:otherDed, pfEr:pfEr, esiEr:esiEr,
-      struct:struct, basicPart:stdBasic, daPart:stdDa, extraPart:stdExtra, dutyHrs:stdDuty};
+      struct:struct, basicPart:stdBasic, daPart:stdDa, extraPart:stdExtra, dutyHrs:stdDuty,
+      arrears:arrears, arrearsNote:ar.note, revNote:revNote};
   }
 
   // ---------- DUTY ROSTER ----------
@@ -2680,7 +3141,7 @@ tr:hover td{background:var(--line2)}
       total += r.net;
       lastPayroll.push({emp:e, r:r});
       var tr=document.createElement('tr');
-      tr.innerHTML = '<td style="font-weight:700;color:var(--accent)">'+escapeHtml(e.empCode||'—')+'</td><td>'+escapeHtml(e.name)+'</td><td>'+escapeHtml(e.site||'—')+'</td>'+
+      tr.innerHTML = '<td style="font-weight:700;color:var(--accent)">'+escapeHtml(e.empCode||'—')+'</td><td>'+escapeHtml(e.name)+(r.revNote?'<div class="muted" style="font-size:.72rem">Pay changed this month</div>':'')+(r.arrears?'<div class="muted" style="font-size:.72rem">Includes arrears '+fmtMoney(r.arrears)+'</div>':'')+'</td><td>'+escapeHtml(e.site||'—')+'</td>'+
         '<td class="right">'+r.present+' / '+r.dim+'</td>'+
         '<td class="right">'+fmtMoney(r.gross)+'</td>'+
         '<td class="right">'+fmtMoney(r.pf)+'</td>'+
@@ -2778,7 +3239,8 @@ tr:hover td{background:var(--line2)}
         otherDed:Math.round(x.r.otherDed||0), pfEr:Math.round(x.r.pfEr||0), esiEr:Math.round(x.r.esiEr||0),
         struct:!!x.r.struct, dutyHrs:x.r.dutyHrs||0,
         basicPay:x.r.struct?Math.round(x.r.basicPart):0, daPay:x.r.struct?Math.round(x.r.daPart):0,
-        extraPay:x.r.struct?Math.max(0,Math.round(x.r.baseGross)-Math.round(x.r.basicPart)-Math.round(x.r.daPart)):0};
+        extraPay:x.r.struct?Math.max(0,Math.round(x.r.baseGross)-Math.round(x.r.basicPart)-Math.round(x.r.daPart)):0,
+        arrears:Math.round(x.r.arrears||0), arrearsNote:x.r.arrearsNote||'', revNote:x.r.revNote||''};
     });
     var totalNet = rows.reduce(function(s,r){return s+r.net;},0);
     var run = {ym:ym, status:'draft', rows:rows, totalNet:totalNet, calculatedAt:Date.now(), calculatedBy:identity.id,
@@ -5129,13 +5591,13 @@ tr:hover td{background:var(--line2)}
     var half=(CW-20)/2, lx=ML, rx=ML+half+20;
     function head2(x,t){ pb.rect(x,y,half,20,{fill:C.ink}); pb.text(x+8,y+13.5,t,8.6,{bold:true,color:C.white}); pb.text(x+half-8,y+13.5,'Amount (Rs.)',8.6,{bold:true,color:C.white,align:'right'}); }
     head2(lx,'Earnings'); head2(rx,'Deductions');
-    var ot=r.otPay||0, nt=r.nightPay||0, earn;
+    var ot=r.otPay||0, nt=r.nightPay||0, ar=r.arrears||0, earn;
     if(r.struct){
       earn=[['Basic',r.basicPay||0],['Dearness allowance (D.A.)',r.daPay||0]];
       if(r.extraPay) earn.push(['Extra '+Math.max(0,(r.dutyHrs||8)-8)+' hrs ('+(r.dutyHrs||8)+'-hour duty)',r.extraPay]);
-      if(ot) earn.push(['Overtime ('+(r.otHrs||0)+' hrs)',ot]); if(nt) earn.push(['Night shift allowance ('+(r.nights||0)+')',nt]);
+      if(ot) earn.push(['Overtime ('+(r.otHrs||0)+' hrs)',ot]); if(nt) earn.push(['Night shift allowance ('+(r.nights||0)+')',nt]); if(ar) earn.push(['Arrears (wage revision)',ar]);
     }
-    else if(ot||nt){ earn=[['Pay for days worked',(r.gross||0)-ot-nt]]; if(ot) earn.push(['Overtime ('+(r.otHrs||0)+' hrs)',ot]); if(nt) earn.push(['Night shift allowance ('+(r.nights||0)+')',nt]); }
+    else if(ot||nt||ar){ earn=[['Pay for days worked',(r.gross||0)-ot-nt-ar]]; if(ot) earn.push(['Overtime ('+(r.otHrs||0)+' hrs)',ot]); if(nt) earn.push(['Night shift allowance ('+(r.nights||0)+')',nt]); if(ar) earn.push(['Arrears (wage revision)',ar]); }
     else earn=[['Gross pay',r.gross||0]];
     var ded=[['Provident fund (PF)',r.pf||0],['ESI',r.esi||0],['Professional tax',r.pt||0],['Salary advance',r.advance||0]];
     if(r.otherDed) ded.push(['Other deduction',r.otherDed]);
@@ -5152,6 +5614,7 @@ tr:hover td{background:var(--line2)}
     pb.wrap('Rupees '+pdfWords(rupees)+(paise?' and '+pdfWords(paise)+' Paise':'')+' only',CW,9,true).forEach(function(l){ pb.text(ML,y,l,9,{bold:true}); y+=11.5; });
     y+=4;
     if(r.pfEr!=null){ pb.text(ML,y+6,'Employer contributions this month: PF Rs. '+pdfMoney(r.pfEr)+', ESIC Rs. '+pdfMoney(r.esiEr||0)+'.',8,{color:C.mute}); y+=18; }
+    [r.revNote, r.arrearsNote?(r.arrearsNote+'.'):''].filter(Boolean).forEach(function(n){ pb.wrap(n,CW,8,false).forEach(function(l){ pb.text(ML,y+6,l,8,{color:C.mute}); y+=10.5; }); y+=3; });
     y+=6;
     var sg=(state.settings&&state.settings.signature)||{};
     if(pb._sigIdx===undefined){ pb._sigIdx=(sg.b64 && sg.w && sg.h)? pb.addImage(pdfB64Bytes(sg.b64), sg.w, sg.h) : -1; }
