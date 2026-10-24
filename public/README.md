@@ -285,3 +285,39 @@ On the invoice, the company block at the top shows the registered name (Satish K
 **The letter.** Each change in the history has a **Letter** button. It prints the old and new wages, the start date, the reason and any arrears, with a place for the employee to sign, on your letterhead, signed for the company by the signatory in Settings.
 
 **Please check with your CA.** Arrears are treated as wages of the month they are paid in, so PF (on the Basic share, within the ceiling), ESI and professional tax are worked out on them like any other pay in that month. A pay change here changes what the employee is paid; it does not change what a client is billed, which comes from the rate card, so revise the client's rate card separately when a rise has to be passed on.
+
+
+## Provident fund settings (Settings, Provident fund)
+
+All the PF figures are in one card, with the standard values already filled in.
+- **Shares:** employee share (12%), employer share (12%; if you have never set it, it follows the employee share), the part of the employer share that goes to pension, EPS (8.33%), and the pension wage cap (15,000).
+- **PF wages:** the wage ceiling (15,000) and the switch to apply it, and a switch to round each amount to the nearest rupee, as the EPFO does. PF wages are Basic + D.A.: for staff on the pay structure that is their Basic + D.A., and for staff paid a single wage it is the "Basic % of gross" in Payroll settings.
+- **Charges paid with it:** the admin charge (0.5% of PF wages, with a minimum each month for the whole establishment, 500) and the insurance, EDLI (0.5% of wages up to 15,000).
+- **Try it:** type a monthly Basic + D.A. and see the employee deduction, the employer pension and provident fund parts, the insurance and the admin charge before you save. It uses the numbers in the boxes, saved or not.
+
+**PF on the full Basic.** Tick this in an employee's form to contribute on all of the Basic when it is above the ceiling. Pension and insurance stay capped at the pension and EDLI wage caps.
+
+**Pay to government.** The PF amount for the month is now employees + employer + admin charge + insurance, and the card lists the EPFO challan heads: A/c 01 (employee share + employer provident fund part), A/c 10 (pension), A/c 02 (admin) and A/c 21 (insurance). Months approved before this update still total correctly, estimated from their PF.
+
+Please check the figures with your CA before you rely on them for a payment.
+
+
+## PF and ESI limits in 2026
+
+**PF wage ceiling: Rs 25,000 from 17 September 2026** (it was Rs 15,000 before), under notification S.O. 5109(E). Payroll uses the ceiling in force on each day:
+- Months up to August 2026 are worked out on 15,000, exactly as before.
+- **September 2026 is a split month**: the ceiling is shared out by days, 16 days on 15,000 and 14 days on 25,000. For a Basic of 30,000 that gives PF wages of 19,667, employee PF 2,360, pension 1,638, provident fund 722 and insurance 98.
+- From October 2026 the ceiling is 25,000. A guard with Basic + D.A. of 22,282 now has PF on all of it: 2,674 from the employee and 2,674 from the company (plus the admin and insurance charges), where before it was 1,800.
+- Pension (EPS) and insurance (EDLI) are always on wages up to the ceiling, so they follow it too.
+
+In Settings, Provident fund, the ceiling is now a ceiling now, the date it applies from, and the earlier ceiling. A settings record that still says 15,000 moves to the new rule by itself. The "Try it" box has a month field so you can see September 2026 split.
+
+**Staff who now have to be in PF.** Anyone with Basic + D.A. up to 25,000 must be covered. Workforce gaps (Compliance) now lists employees who have PF switched off but fall within the limit. Once enrolled, a member stays a member even if wages later go above the ceiling.
+
+**ESI is not changed.** The ESI wage limit is still Rs 21,000 a month (Rs 25,000 for a person with a disability), with 0.75% from the employee and 3.25% from the employer. A rise to 30,000 has been discussed but not notified.
+
+**Rate cards and quotes.** New rate cards start with the 25,000 ceiling, which raises the PF cost for a 12-hour guard (about 2,897 a month for the company instead of 1,950). Rate cards you saved earlier keep the 15,000 they were made with, so revise them and tell your clients. In the phone app the quick quote now works PF out on Basic + D.A. (taken as the guard minimum wage of 22,282), up to the ceiling.
+
+**September 2026 payment.** The PF for September was due on 15 October. If it was paid on the old ceiling, the difference is still due. Ask your CA about the supplementary payment and any interest.
+
+Please confirm all of this with your CA. The figures come from the published notification and compliance guidance.

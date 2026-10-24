@@ -469,16 +469,52 @@ tr:hover td{background:var(--line2)}
       <h2>Payroll settings</h2>
       <p class="muted">These defaults drive every calculation. Edit them to match current rules — they are a starting point, not verified legal figures.</p>
       <div class="row">
-        <div class="field"><label>Basic % of gross</label><input type="number" id="setBasicPct" min="1" max="100"></div>
-        <div class="field"><label>PF rate (employee %)</label><input type="number" id="setPfRate" step="0.01"></div>
-        <div class="field"><label>PF wage ceiling (₹)</label><input type="number" id="setPfCeiling"></div>
-        <div class="field"><label><input type="checkbox" id="setPfCeilingEnabled" style="width:auto;margin-right:.4rem">Apply PF ceiling</label></div>
+        <div class="field"><label>Basic % of gross (for staff paid a single wage)</label><input type="number" id="setBasicPct" min="1" max="100"></div>
       </div>
       <div class="row">
         <div class="field"><label>ESI rate (employee %)</label><input type="number" id="setEsiRate" step="0.01"></div>
         <div class="field"><label>ESI eligibility threshold (₹ gross/month)</label><input type="number" id="setEsiThreshold"></div>
       </div>
+      <div class="muted">ESI in 2026: the wage limit is still ₹21,000 a month (₹25,000 for a person with a disability), with 0.75% from the employee and 3.25% from the employer. The 17 September 2026 change was for PF only, and a higher ESI limit has been discussed but not notified.</div>
       <button class="btn" id="btnSaveSettings" style="margin-top:1rem">Save settings</button>
+    </div>
+
+    <div class="card">
+      <h2>Provident fund (PF)</h2>
+      <p class="muted">How PF is worked out in payroll and what is paid to the EPFO each month. The standard figures are filled in. Change them only if the rules change, and confirm with your CA.</p>
+      <div class="banner"><b>New wage ceiling.</b> The PF wage ceiling went from ₹15,000 to ₹25,000 from 17 September 2026 (notification S.O. 5109(E)). Payroll uses the ceiling in force on each day, so September 2026 is split: 1 to 16 September on ₹15,000 and 17 to 30 September on ₹25,000. Staff with Basic + D.A. up to ₹25,000 now have to be covered by PF.</div>
+      <div style="font-weight:700;margin:.8rem 0 .2rem">Shares</div>
+      <div class="row">
+        <div class="field"><label>Employee share (% of PF wages)</label><input type="number" id="setPfRate" step="0.01"></div>
+        <div class="field"><label>Employer share (% of PF wages)</label><input type="number" id="setPfErRate" step="0.01"></div>
+        <div class="field"><label>Part of the employer share that goes to pension, EPS (%)</label><input type="number" id="setPfEps" step="0.01"></div>
+      </div>
+      <div style="font-weight:700;margin:.8rem 0 .2rem">PF wage ceiling</div>
+      <div class="row">
+        <div class="field"><label>Ceiling now (₹)</label><input type="number" id="setPfCeiling"></div>
+        <div class="field"><label>Applies from</label><input type="date" id="setPfCeilingFrom"></div>
+        <div class="field"><label>Earlier ceiling (₹)</label><input type="number" id="setPfCeilingOld"></div>
+      </div>
+      <div class="row">
+        <div class="field"><label><input type="checkbox" id="setPfCeilingEnabled" style="width:auto;margin-right:.4rem">Apply the ceiling</label></div>
+        <div class="field"><label><input type="checkbox" id="setPfRound" style="width:auto;margin-right:.4rem">Round each amount to the nearest rupee</label></div>
+      </div>
+      <div class="muted">PF wages are Basic + D.A. For staff on the pay structure that is their Basic + D.A.; for staff paid a single wage it is the "Basic % of gross" in Payroll settings above. Above the ceiling, PF is on the ceiling unless the employee is marked "PF on full Basic" in the employee form. Pension and insurance are always on wages up to the ceiling.</div>
+      <div style="font-weight:700;margin:.8rem 0 .2rem">Charges paid with it</div>
+      <div class="row">
+        <div class="field"><label>Admin charge (% of PF wages)</label><input type="number" id="setPfAdmin" step="0.01"></div>
+        <div class="field"><label>Admin charge, minimum each month (₹)</label><input type="number" id="setPfAdminMin"></div>
+        <div class="field"><label>Insurance, EDLI (% of wages up to the ceiling)</label><input type="number" id="setPfEdli" step="0.01"></div>
+      </div>
+      <button class="btn" id="btnSavePf" style="margin-top:.8rem">Save PF settings</button>
+      <div style="font-weight:700;margin:1.4rem 0 .2rem">Try it</div>
+      <div class="muted">See what the numbers above give for one person, before you save. Choose September 2026 to see the split month.</div>
+      <div class="row" style="margin-top:.4rem">
+        <div class="field"><label>Monthly Basic + D.A. (₹)</label><input type="number" id="pfTryBasic" value="22282"></div>
+        <div class="field"><label>Month (empty = today)</label><input type="month" id="pfTryMonth"></div>
+        <div class="field"><label><input type="checkbox" id="pfTryFull" style="width:auto;margin-right:.4rem">PF on full Basic</label></div>
+      </div>
+      <div id="pfTryOut"></div>
     </div>
 
     <div class="card">
@@ -687,6 +723,7 @@ tr:hover td{background:var(--line2)}
     </div>
     <div class="row">
       <div class="field"><label><input type="checkbox" id="fPf" style="width:auto;margin-right:.4rem">PF applicable</label></div>
+      <div class="field"><label><input type="checkbox" id="fPfFull" style="width:auto;margin-right:.4rem">PF on the full Basic, above the ceiling</label></div>
       <div class="field"><label><input type="checkbox" id="fEsi" style="width:auto;margin-right:.4rem">ESI applicable</label></div>
       
     </div>
@@ -1194,7 +1231,8 @@ tr:hover td{background:var(--line2)}
   function thisMonth(){ var d=new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0'); }
 
   var DEFAULT_SETTINGS = {
-    basicPct:50, pfRate:12, pfCeiling:15000, pfCeilingEnabled:true,
+    basicPct:50, pfRate:12, pfCeiling:25000, pfCeilingFrom:'2026-09-17', pfCeilingOld:15000, pfCeilingEnabled:true,
+    pfEpsRate:8.33, pfAdminRate:0.5, pfAdminMin:500, pfEdliRate:0.5, pfRound:true,
     esiRate:0.75, esiThreshold:21000,
     ptSlabs:{
       "Karnataka":[{min:0,max:24999,amt:0},{min:25000,max:999999999,amt:200}],
@@ -1545,6 +1583,7 @@ tr:hover td{background:var(--line2)}
     document.getElementById('fPayChangeRow').style.display=e?'':'none';
     document.getElementById('payLockNote').textContent=hasPayHist ? 'The pay above is locked because this employee has dated pay changes. Use Change pay to add a new one, see the history or cancel one.' : 'To raise or lower the pay from a date, with a history and a letter, use Change pay. Edit the boxes above only to correct a mistake.';
     document.getElementById('fPf').checked = e? !!e.pfApplicable : true;
+    document.getElementById('fPfFull').checked = e? !!e.pfFull : false;
     document.getElementById('fEsi').checked = e? !!e.esiApplicable : true;
     document.getElementById('fDoj').value = e? (e.doj||'') : xToday();
     document.getElementById('fStatus').value = (e && e.active===false) ? 'left' : 'active';
@@ -1599,6 +1638,7 @@ tr:hover td{background:var(--line2)}
       basicAmt:payStdOn()?(Number(document.getElementById('fBasicAmt').value)||0):0,
       daAmt:payStdOn()?(Number(document.getElementById('fDaAmt').value)||0):0,
       pfApplicable:document.getElementById('fPf').checked,
+      pfFull:document.getElementById('fPfFull').checked,
       esiApplicable:document.getElementById('fEsi').checked,
       active:!leftV,
       doj:dojV,
@@ -2523,6 +2563,67 @@ tr:hover td{background:var(--line2)}
     pfld('bkConsent').addEventListener('change', bkRefresh); pfld('btnBulkApply').addEventListener('click', bkApply);
   }
 
+  /* ---------- provident fund: settings, the sum for one person, and the EPFO challan ---------- */
+  // The wage ceiling changes with the date: Rs 15,000 until 16 Sep 2026 and Rs 25,000 from 17 Sep 2026 (notification S.O. 5109(E)).
+  function pfRules(s){
+    s=s||{}; var cur=Number(s.pfCeiling)||0, from=s.pfCeilingFrom, old=Number(s.pfCeilingOld)||0;
+    if(from && old) return [{from:'0000-00-00',c:old},{from:from,c:cur||25000}];
+    if(!cur || cur===15000) return [{from:'0000-00-00',c:15000},{from:'2026-09-17',c:25000}];
+    return [{from:'0000-00-00',c:cur}];
+  }
+  function pfCeilOn(rules, ds){ var c=rules[0].c; rules.forEach(function(r){ if(r.from<=ds) c=r.c; }); return c; }
+  function pfCeilNow(){ return pfCeilOn(pfRules(state.settings), xToday()); }
+  // every PF setting with its standard value; the employer share follows the employee share until it is set separately
+  function pfCfg(over){
+    var s=over||state.settings||{}, num=function(v,d){ return (v===undefined||v===null||v==='')?d:Number(v); };
+    var ee=num(s.pfRate,12)||12, rules=pfRules(s);
+    return {ee:ee, er:num(s.pfEmployerRate,ee), ceilOn:!!s.pfCeilingEnabled, rules:rules, ceil:pfCeilOn(rules,xToday()),
+      eps:num(s.pfEpsRate,8.33), admin:num(s.pfAdminRate,0.5), adminMin:num(s.pfAdminMin,500), edli:num(s.pfEdliRate,0.5), round:s.pfRound!==false};
+  }
+  // the ceilings in force during a month and for how many days each applies (a month with the change in it has two)
+  function pfMonthCaps(c, ym){
+    if(!ym) return {dim:1, list:[{c:pfCeilOn(c.rules,xToday()), n:1}]};
+    var dim=daysInMonth(ym), map={}, d, ds, cc;
+    for(d=1; d<=dim; d++){ ds=ym+'-'+String(d).padStart(2,'0'); cc=pfCeilOn(c.rules,ds); map[cc]=(map[cc]||0)+1; }
+    return {dim:dim, list:Object.keys(map).map(function(k){ return {c:Number(k), n:map[k]}; }).sort(function(a,b){ return a.c-b.c; })};
+  }
+  // PF for one person from the Basic (and D.A.) earned in the month ym. full = contributes on all of the Basic, above the ceiling.
+  // Pension and insurance are always on wages up to the statutory ceiling. In a month where the ceiling changes, the ceiling is shared out by days.
+  function pfBreakdown(basic, full, cfg, ym){
+    var c=cfg||pfCfg(), r=function(x){ return c.round?Math.round(x):x; }, caps=pfMonthCaps(c,ym);
+    basic=Math.max(0,Number(basic)||0);
+    var capW=0; caps.list.forEach(function(x){ capW+=Math.min(basic,x.c)*x.n/caps.dim; });
+    var wages=r((c.ceilOn && !full)?capW:basic), capR=r(capW);
+    var ee=r(wages*c.ee/100), er=r(wages*c.er/100), eps=Math.min(er,r(capR*c.eps/100)), epf=er-eps, edli=r(capR*c.edli/100);
+    return {wages:wages, ee:ee, er:er, eps:eps, epf:epf, epsWages:capR, edliWages:capR, edli:edli, caps:caps.list};
+  }
+  // the heads on the EPFO challan for a month, from the totals for everyone who has PF
+  function pfChallan(sumWages, sumEdliWages, ee, er, eps, edli, cfg){
+    var c=cfg||pfCfg(), adminRaw=c.round?Math.round((sumWages||0)*c.admin/100):(sumWages||0)*c.admin/100, admin=(sumWages||0)>0?Math.max(c.adminMin,adminRaw):0;
+    return {acc1:(ee||0)+((er||0)-(eps||0)), acc10:eps||0, acc2:admin, acc21:edli||0, total:(ee||0)+(er||0)+admin+(edli||0)};
+  }
+  function pfFormValues(){
+    var g=function(id){ return document.getElementById(id); }, n=function(id){ var v=g(id).value; return v===''?undefined:Number(v); };
+    return {pfRate:n('setPfRate'), pfEmployerRate:n('setPfErRate'), pfEpsRate:n('setPfEps'), pfCeiling:n('setPfCeiling'), pfCeilingFrom:g('setPfCeilingFrom').value||'', pfCeilingOld:n('setPfCeilingOld'),
+      pfCeilingEnabled:g('setPfCeilingEnabled').checked, pfAdminRate:n('setPfAdmin'), pfAdminMin:n('setPfAdminMin'), pfEdliRate:n('setPfEdli'), pfRound:g('setPfRound').checked};
+  }
+  // the "Try it" box: what the numbers typed in the settings would give for one person, for a chosen month
+  function renderPfTry(){
+    var out=document.getElementById('pfTryOut'); if(!out) return;
+    var basic=Number(document.getElementById('pfTryBasic').value)||0, full=document.getElementById('pfTryFull').checked, ym=(document.getElementById('pfTryMonth').value||'').slice(0,7)||null, cfg=pfCfg(pfFormValues());
+    var b=pfBreakdown(basic,full,cfg,ym), ch=pfChallan(b.wages,b.edliWages,b.ee,b.er,b.eps,b.edli,cfg), line=function(a,v,note){ return '<tr><td>'+a+(note?'<div class="muted" style="font-size:.76rem">'+note+'</div>':'')+'</td><td class="right"><b>'+fmtMoney(v)+'</b></td></tr>'; };
+    var caps=b.caps, top=caps[caps.length-1].c, split=caps.length>1, capped=cfg.ceilOn && !full && basic>caps[0].c;
+    var note1=split?('This month has two ceilings: '+caps.map(function(x){ return fmtMoney(x.c)+' for '+x.n+' days'; }).join(' and ')+', so the ceiling is shared out by days.'):(capped?'The Basic of '+fmtMoney(basic)+' is above the ceiling, so PF is on '+fmtMoney(b.wages)+'.':(full&&cfg.ceilOn&&basic>top?'On the full Basic, above the ceiling.':''));
+    out.innerHTML='<div class="scrollx"><table><tbody>'+
+      line('PF wages',b.wages,note1)+
+      line('Deducted from the employee',b.ee,cfg.ee+'% of the PF wages')+
+      line('Employer: pension (EPS)',b.eps,cfg.eps+'% of wages up to '+fmtMoney(top))+
+      line('Employer: provident fund (EPF)',b.epf,'The rest of the employer share of '+fmtMoney(b.er))+
+      line('Insurance (EDLI), paid by the employer',b.edli,cfg.edli+'% of wages up to '+fmtMoney(top))+
+      line('Admin charge, paid by the employer',Math.round(b.wages*cfg.admin/100),cfg.admin+'% of PF wages. It is charged on the whole establishment with a minimum of '+fmtMoney(cfg.adminMin)+' a month.')+
+      '</tbody></table></div>';
+  }
+
   // ---------- ATTENDANCE ----------
   // ---------- ATTENDANCE CSV IMPORT (from the Attendance app) ----------
   function parseCsv(text){
@@ -2781,10 +2882,9 @@ tr:hover td{background:var(--line2)}
     var baseGross = gross, ar = arrearsDue(e, ym), arrears = ar.amount;
     gross = baseGross + otPay + nightPay + arrears;
     if(arrears) basic += arrears*bshare;
-    var pf=0, esi=0, pt=0, pfEr=0, esiEr=0;
+    var pf=0, esi=0, pt=0, pfEr=0, esiEr=0, pfInfo=null;
     if(e.pfApplicable){
-      var base = st.pfCeilingEnabled ? Math.min(basic, st.pfCeiling||15000) : basic;
-      pf = base * (st.pfRate||12)/100; pfEr = pf;
+      pfInfo = pfBreakdown(basic, !!e.pfFull, null, ym); pf = pfInfo.ee; pfEr = pfInfo.er;
     }
     if(e.esiApplicable && baseGross <= (st.esiThreshold||21000)){
       esi = gross * (st.esiRate||0.75)/100;
@@ -2796,7 +2896,8 @@ tr:hover td{background:var(--line2)}
     return {present:present, dim:dim, gross:gross, baseGross:baseGross, basic:basic, pf:pf, esi:esi, pt:pt, advance:advance, net:net,
       otHrs:otHrs, nights:nights, otPay:otPay, nightPay:nightPay, otherDed:otherDed, pfEr:pfEr, esiEr:esiEr,
       struct:struct, basicPart:stdBasic, daPart:stdDa, extraPart:stdExtra, dutyHrs:stdDuty,
-      arrears:arrears, arrearsNote:ar.note, revNote:revNote};
+      arrears:arrears, arrearsNote:ar.note, revNote:revNote,
+      pfWages:pfInfo?pfInfo.wages:0, epsEr:pfInfo?pfInfo.eps:0, epfEr:pfInfo?pfInfo.epf:0, edliWages:pfInfo?pfInfo.edliWages:0, edliEr:pfInfo?pfInfo.edli:0};
   }
 
   // ---------- DUTY ROSTER ----------
@@ -3240,7 +3341,8 @@ tr:hover td{background:var(--line2)}
         struct:!!x.r.struct, dutyHrs:x.r.dutyHrs||0,
         basicPay:x.r.struct?Math.round(x.r.basicPart):0, daPay:x.r.struct?Math.round(x.r.daPart):0,
         extraPay:x.r.struct?Math.max(0,Math.round(x.r.baseGross)-Math.round(x.r.basicPart)-Math.round(x.r.daPart)):0,
-        arrears:Math.round(x.r.arrears||0), arrearsNote:x.r.arrearsNote||'', revNote:x.r.revNote||''};
+        arrears:Math.round(x.r.arrears||0), arrearsNote:x.r.arrearsNote||'', revNote:x.r.revNote||'',
+        pfWages:Math.round(x.r.pfWages||0), epsEr:Math.round(x.r.epsEr||0), epfEr:Math.round(x.r.epfEr||0), edliWages:Math.round(x.r.edliWages||0), edliEr:Math.round(x.r.edliEr||0)};
     });
     var totalNet = rows.reduce(function(s,r){return s+r.net;},0);
     var run = {ym:ym, status:'draft', rows:rows, totalNet:totalNet, calculatedAt:Date.now(), calculatedBy:identity.id,
@@ -3548,7 +3650,7 @@ tr:hover td{background:var(--line2)}
     function set(id,v){ document.getElementById(id).value=v; }
     if(format==='costsheet'){
       set('rcPf',13); set('rcEsic',3.25); set('rcBonus',8.33); set('rcService',5); set('rcGst',18);
-      set('rcPfCeil',(state.settings.pfCeilingEnabled===false)?0:(state.settings.pfCeiling||15000));
+      set('rcPfCeil',(state.settings.pfCeilingEnabled===false)?0:pfCeilNow());
       set('rcMedical',300); set('rcUniform',250); set('rcTraining',200); set('rcLeaveDays',21); set('rcNatHol',1); set('rcRelieve',16.67);
     } else {
       set('rcPf',cdef.pfPct); set('rcEsic',cdef.esicPct); set('rcBonus',cdef.bonusPct); set('rcService',cdef.servicePct); set('rcGst',cdef.gstPct);
@@ -4128,6 +4230,10 @@ tr:hover td{background:var(--line2)}
 
   function setupSettingsUI(){
     document.getElementById('btnSaveSettings').addEventListener('click', saveSettings);
+    document.getElementById('btnSavePf').addEventListener('click', saveSettings);
+    ['setPfRate','setPfErRate','setPfEps','setPfCeiling','setPfCeilingFrom','setPfCeilingOld','setPfCeilingEnabled','setPfRound','setPfAdmin','setPfAdminMin','setPfEdli','pfTryBasic','pfTryMonth','pfTryFull'].forEach(function(id){
+      var el=document.getElementById(id); el.addEventListener('input', renderPfTry); el.addEventListener('change', renderPfTry);
+    });
     document.getElementById('btnAddSite').addEventListener('click', addSite);
     document.getElementById('btnSaveCosting').addEventListener('click', saveCostingDefaults);
     setupApproversUI();
@@ -4214,9 +4320,12 @@ tr:hover td{background:var(--line2)}
   function renderSettingsForm(){
     if(!state.settings) return;
     document.getElementById('setBasicPct').value = state.settings.basicPct;
-    document.getElementById('setPfRate').value = state.settings.pfRate;
-    document.getElementById('setPfCeiling').value = state.settings.pfCeiling;
-    document.getElementById('setPfCeilingEnabled').checked = !!state.settings.pfCeilingEnabled;
+    var pcf=pfCfg(), g2=function(id){ return document.getElementById(id); }, rl=pcf.rules;
+    g2('setPfRate').value = pcf.ee; g2('setPfErRate').value = pcf.er; g2('setPfEps').value = pcf.eps;
+    g2('setPfCeiling').value = rl[rl.length-1].c; g2('setPfCeilingFrom').value = rl.length>1?rl[rl.length-1].from:''; g2('setPfCeilingOld').value = rl.length>1?rl[0].c:'';
+    g2('setPfCeilingEnabled').checked = pcf.ceilOn; g2('setPfRound').checked = pcf.round;
+    g2('setPfAdmin').value = pcf.admin; g2('setPfAdminMin').value = pcf.adminMin; g2('setPfEdli').value = pcf.edli;
+    renderPfTry();
     document.getElementById('setEsiRate').value = state.settings.esiRate;
     document.getElementById('setEsiThreshold').value = state.settings.esiThreshold;
     var cdef = state.settings.costing || {};
@@ -4278,9 +4387,19 @@ tr:hover td{background:var(--line2)}
 
   async function saveSettings(){
     state.settings.basicPct=Number(document.getElementById('setBasicPct').value)||50;
-    state.settings.pfRate=Number(document.getElementById('setPfRate').value)||12;
-    state.settings.pfCeiling=Number(document.getElementById('setPfCeiling').value)||15000;
-    state.settings.pfCeilingEnabled=document.getElementById('setPfCeilingEnabled').checked;
+    var pfv=pfFormValues();
+    state.settings.pfRate=pfv.pfRate||12;
+    state.settings.pfEmployerRate=(pfv.pfEmployerRate===undefined)?state.settings.pfRate:pfv.pfEmployerRate;
+    state.settings.pfEpsRate=(pfv.pfEpsRate===undefined)?8.33:pfv.pfEpsRate;
+    state.settings.pfCeiling=pfv.pfCeiling||25000;
+    state.settings.pfCeilingFrom=pfv.pfCeilingFrom||'';
+    state.settings.pfCeilingOld=pfv.pfCeilingOld||0;
+    state.settings.pfCeilingEnabled=pfv.pfCeilingEnabled;
+    state.settings.pfRound=pfv.pfRound;
+    state.settings.pfAdminRate=(pfv.pfAdminRate===undefined)?0.5:pfv.pfAdminRate;
+    state.settings.pfAdminMin=(pfv.pfAdminMin===undefined)?500:pfv.pfAdminMin;
+    state.settings.pfEdliRate=(pfv.pfEdliRate===undefined)?0.5:pfv.pfEdliRate;
+    delete state.settings.pfEpsCeiling; delete state.settings.pfEdliCeiling;
     state.settings.esiRate=Number(document.getElementById('setEsiRate').value)||0.75;
     state.settings.esiThreshold=Number(document.getElementById('setEsiThreshold').value)||21000;
     if(db){
@@ -4534,9 +4653,9 @@ tr:hover td{background:var(--line2)}
   function govPayHtml(t, ym){
     var nm=xAddMonth(ym,1), dim=new Date(parseInt(nm.split('-')[0],10), parseInt(nm.split('-')[1],10), 0).getDate();
     function due(d){ return nm+'-'+String(Math.min(d,dim)).padStart(2,'0'); }
-    var admin=Math.round((t.pf||0)/12), L=govLinks();
+    var ch=pfChallan(t.pfWages, t.edliWages, t.pf, t.pfEr, t.eps, t.edli), L=govLinks();
     var rows=[
-      {k:'pf',  what:'Provident fund', amt:t.pf+t.pfEr+admin, d:due(15), sub:'Employees '+fmtMoney(t.pf)+' + employer '+fmtMoney(t.pfEr)+' + admin and insurance charges about '+fmtMoney(admin)},
+      {k:'pf',  what:'Provident fund', amt:ch.total, d:due(15), sub:'Employees '+fmtMoney(t.pf)+' + employer '+fmtMoney(t.pfEr)+' + admin '+fmtMoney(ch.acc2)+' + insurance '+fmtMoney(ch.acc21)+'. On the EPFO challan: A/c 01 '+fmtMoney(ch.acc1)+', A/c 10 pension '+fmtMoney(ch.acc10)+', A/c 02 admin '+fmtMoney(ch.acc2)+', A/c 21 insurance '+fmtMoney(ch.acc21)+'.'},
       {k:'esi', what:'ESIC', amt:t.esi+t.esiEr, d:due(15), sub:'Employees '+fmtMoney(t.esi)+' + employer '+fmtMoney(t.esiEr)},
       {k:'pt',  what:'Professional tax', amt:t.pt, d:due(20), sub:'Deducted from the employees'}
     ];
@@ -4545,7 +4664,7 @@ tr:hover td{background:var(--line2)}
       var id=r.k+'|'+ym, done=!!filingsDone[xDocId(id)];
       h+='<tr><td><input type="checkbox" data-filing="'+escapeHtml(id)+'" '+(done?'checked':'')+' style="width:auto;min-height:0" aria-label="Mark '+escapeHtml(r.what)+' as paid"></td><td><b>'+escapeHtml(r.what)+'</b><div class="muted">'+r.sub+'</div></td><td class="right"><b>'+fmtMoney(r.amt)+'</b></td><td>'+xFmt(r.d)+'</td><td>'+govLinkA(r.k,'Pay online')+'</td></tr>';
     });
-    h+='</tbody></table></div><p class="muted">PF admin and insurance charges are about 1% of the PF wages. The EPFO challan shows the exact amount (the admin charge has a minimum of Rs 500). ESIC and professional tax are as worked out in this payroll.</p></div>';
+    h+='</tbody></table></div><p class="muted">PF is worked out with the rates in Settings, Provident fund. The admin charge has a minimum each month, and the EPFO challan shows the exact amount. ESIC and professional tax are as worked out in this payroll.</p></div>';
     h+='<div class="card"><h2>Other payments and filings</h2><div class="scrollx"><table><tbody>'+
       '<tr><td><b>GST</b><div class="muted">'+escapeHtml(L.gst.how)+'</div></td><td>GSTR-1 by '+xFmt(due(11))+'<br>GSTR-3B by '+xFmt(due(20))+'</td><td>'+govLinkA('gst','Open GST portal')+'</td></tr>'+
       '<tr><td><b>TDS</b><div class="muted">'+escapeHtml(L.tds.how)+'</div></td><td>By '+xFmt(due(7))+'</td><td>'+govLinkA('tds','Open income tax portal')+'</td></tr>'+
@@ -4739,6 +4858,10 @@ tr:hover td{background:var(--line2)}
     var g=[];
     if(e.pfApplicable && !e.uan) g.push('UAN missing');
     if(e.esiApplicable && !e.esic) g.push('ESIC number missing');
+    if(!e.pfApplicable && e.active!==false){
+      var tg=payTermsOn(e,xToday()), pbw=(tg.payStd && Number(tg.basicAmt)>0) ? (Number(tg.basicAmt)||0)+(Number(tg.daAmt)||0) : (tg.wageType==='daily'?(Number(tg.wageAmount)||0)*26:(Number(tg.wageAmount)||0))*((state.settings.basicPct||50)/100);
+      if(pbw>0 && pbw<=pfCeilNow()) g.push('PF is not switched on, but it is compulsory for Basic + D.A. up to '+fmtMoney(pfCeilNow())+' (yours is '+fmtMoney(pbw)+')');
+    }
     if(!e.aadhar) g.push('Aadhaar missing');
     if(!e.bankAcc || !e.ifsc) g.push('Bank details missing');
     if(!e.phone) g.push('Phone missing');
@@ -4999,7 +5122,7 @@ tr:hover td{background:var(--line2)}
         var tag=(c==='rcm'?'security staff':'other staff'), tot={wages:0,pf:0,esic:0,bonus:0};
         grp.forEach(function(g){
           tot.wages+=g.p.gross;
-          if(g.e.pfApplicable){ var b=state.settings.pfCeilingEnabled? Math.min(g.p.basic,state.settings.pfCeiling||15000) : g.p.basic; tot.pf+=b*(costing.pfPct||0)/100; }
+          if(g.e.pfApplicable){ var b=state.settings.pfCeilingEnabled? Math.min(g.p.basic,pfCeilNow()) : g.p.basic; tot.pf+=b*(costing.pfPct||0)/100; }
           if(g.e.esiApplicable && g.p.gross<=(state.settings.esiThreshold||21000)) tot.esic+=g.p.gross*(costing.esicPct||0)/100;
           tot.bonus+=g.p.basic*(costing.bonusPct||0)/100;
         });
@@ -6537,10 +6660,12 @@ tr:hover td{background:var(--line2)}
 
   // ---------- small helpers ----------
   function cycTotals(rows){
-    var t={n:rows.length,gross:0,pf:0,esi:0,pt:0,other:0,net:0,ot:0,pfEr:0,esiEr:0};
+    var t={n:rows.length,gross:0,pf:0,esi:0,pt:0,other:0,net:0,ot:0,pfEr:0,esiEr:0,pfWages:0,edliWages:0,eps:0,epf:0,edli:0};
     rows.forEach(function(r){
       t.gross+=r.gross||0; t.pf+=r.pf||0; t.esi+=r.esi||0; t.pt+=r.pt||0; t.other+=(r.advance||0)+(r.otherDed||0); t.net+=r.net||0; t.ot+=(r.otPay||0)+(r.nightPay||0);
       t.pfEr+= (r.pfEr!=null? r.pfEr : (r.pf||0));
+      if(r.pfWages!=null){ t.pfWages+=r.pfWages||0; t.edliWages+=r.edliWages||0; t.eps+=r.epsEr||0; t.epf+=r.epfEr||0; t.edli+=r.edliEr||0; }
+      else if((r.pf||0)>0){ var pc=pfCfg(), pb0=pfBreakdown((r.pf||0)/(pc.ee/100),true); t.pfWages+=pb0.wages; t.edliWages+=pb0.edliWages; t.eps+=pb0.eps; t.epf+=pb0.epf; t.edli+=pb0.edli; }
       t.esiEr+=(r.esiEr!=null? r.esiEr : ((r.esi||0)>0? Math.ceil((r.gross||0)*(state.settings.esiErRate==null?3.25:state.settings.esiErRate)/100):0));
     });
     t.cost=t.gross+t.pfEr+t.esiEr; return t;
@@ -6594,7 +6719,7 @@ tr:hover td{background:var(--line2)}
       if(!(r.present>0)) add('warn','No payable days this month. Net pay is zero.');
       if(e.esiApplicable && !((r.esi||0)>0) && (r.present>0)) add('warn','Marked ESI applicable, but pay is above the ESI limit, so no ESI is deducted.');
       var basicEarned=r.struct ? ((r.basicPay||0)+(r.daPay||0)) : ((r.gross||0)-(r.otPay||0)-(r.nightPay||0))*(st.basicPct||50)/100;
-      if(e.pfApplicable && st.pfCeilingEnabled && basicEarned>(st.pfCeiling||15000)) add('warn','Basic pay is above the PF wage ceiling. PF is limited to '+fmtMoney((st.pfCeiling||15000)*(st.pfRate||12)/100)+'.');
+      if(e.pfApplicable && st.pfCeilingEnabled && basicEarned>pfCeilNow()) add('warn','Basic pay is above the PF wage ceiling. PF is limited to '+fmtMoney(pfCeilNow()*(st.pfRate||12)/100)+'.');
       if((r.otHrs||0)>(st.otWarnHours||50)) add('warn','Overtime of '+r.otHrs+' hours is unusually high.');
       var acct=String(e.bankAcc||'').replace(/\s/g,''); if(acct) (seen[acct]=seen[acct]||[]).push(r.name);
     });
