@@ -1467,6 +1467,7 @@ tr:hover td{background:var(--line2)}
   }
 
   function renderEmployeeTable(){
+    applyPayRoleUi();
     var q=(document.getElementById('empSearch').value||'').toLowerCase();
     var siteF=document.getElementById('empSiteFilter').value;
     var statusF=document.getElementById('empStatusFilter').value;
@@ -1496,7 +1497,7 @@ tr:hover td{background:var(--line2)}
         '<td>'+(e.esiApplicable?'<span class="tag ok">Yes</span>':'<span class="tag bad">No</span>')+'</td>'+
         '<td>'+((typeof outstandingBalanceForEmp==='function' && outstandingBalanceForEmp(e.id)>0)?('<span class="tag warn">'+fmtMoney(outstandingBalanceForEmp(e.id))+'</span>'):'—')+'</td>'+
         '<td>'+(e.active===false?'<span class="tag bad">Left'+(e.dol?' '+new Date(e.dol+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'}):'')+'</span>'+(e.leaveReason?'<div class="muted">'+escapeHtml(e.leaveReason)+'</div>':''):'<span class="tag ok">Active</span>')+'</td>'+
-        '<td style="white-space:nowrap"><button class="btn small ghost" data-edit="'+e.id+'">Edit</button> <button class="btn small ghost" data-paychg="'+e.id+'">Change pay</button> <button class="btn small ghost" data-idcard="'+e.id+'">ID card</button></td>';
+        '<td style="white-space:nowrap"><button class="btn small ghost" data-edit="'+e.id+'">Edit</button> '+((me && me.isOwner)?'<button class="btn small ghost" data-paychg="'+e.id+'">Change pay</button> ':'')+'<button class="btn small ghost" data-idcard="'+e.id+'">ID card</button></td>';
       tbody.appendChild(tr);
     });
     tbody.querySelectorAll('[data-edit]').forEach(function(b){
@@ -1579,10 +1580,11 @@ tr:hover td{background:var(--line2)}
     document.getElementById('fDaAmt').value = (e&&e.payStd) ? (e.daAmt||'') : '';
     if(!e) fillStdFromGov();
     syncPayStd(); recalcStd();
-    var hasPayHist=!!(e && (e.payHistory||[]).length);
-    ['fWageType','fWageAmount','fPayStd','fZone','fSkill','fDuty','fBasicAmt','fDaAmt'].forEach(function(x){ document.getElementById(x).disabled=hasPayHist; });
-    document.getElementById('fPayChangeRow').style.display=e?'':'none';
-    document.getElementById('payLockNote').textContent=hasPayHist ? 'The pay above is locked because this employee has dated pay changes. Use Change pay to add a new one, see the history or cancel one.' : 'To raise or lower the pay from a date, with a history and a letter, use Change pay. Edit the boxes above only to correct a mistake.';
+    var pfs=payFormState(e);
+    PAY_FORM_IDS.forEach(function(x){ document.getElementById(x).disabled=pfs.locked; });
+    document.getElementById('fPayChangeRow').style.display=pfs.showRow?'':'none';
+    document.getElementById('btnEmpChangePay').style.display=pfs.showBtn?'':'none';
+    document.getElementById('payLockNote').textContent=pfs.note;
     document.getElementById('fPf').checked = e? !!e.pfApplicable : true;
     document.getElementById('fPfFull').checked = e? !!e.pfFull : false;
     document.getElementById('fBasicPct').value = (e && e.basicPct) ? e.basicPct : '';
@@ -1661,7 +1663,7 @@ tr:hover td{background:var(--line2)}
     };
     if(!id){ data.empCode = document.getElementById('fEmpCode').value; }
     var exPay = id ? state.employees.find(function(x){return x.id===id;}) : null;
-    if(exPay && (exPay.payHistory||[]).length){ ['wageType','wageAmount','payStd','zone','skill','dutyHrs','basicAmt','daAmt'].forEach(function(k){ delete data[k]; }); }
+    var pg = payForSave(data, exPay); if(!pg.ok) return; data = pg.data;
     if(!db){ toast('Storage unavailable — cannot save.'); return; }
 
     var existing = id ? state.employees.find(function(x){return x.id===id;}) : null;
@@ -2306,6 +2308,7 @@ tr:hover td{background:var(--line2)}
   // o: {from, reason, note, consent, payArrears, arrearsYm}. Returns the saved entry; throws an Error with a plain message when it is not allowed.
   async function savePayRevision(e, T, o){
     if(!db) throw new Error('Storage is not available, so nothing was saved.');
+    if(!(me && me.isOwner)) throw new Error('Only the administrator can make a dated pay change.');
     var lock=await payLockInfo(), msg=validatePayRevision(e,T,o,lock); if(msg) throw new Error(msg);
     var f=payFieldsOf(T), oldG=payGrossOf(payTermsOn(e,o.from)), newG=payGrossOf(f), today=xToday();
     var entry={id:'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), from:o.from, terms:f, reason:o.reason, note:o.note||'', consent:!!o.consent,
@@ -2325,6 +2328,7 @@ tr:hover td{background:var(--line2)}
   // a change can be cancelled only while nothing has been paid with it
   async function cancelPayRevision(e, entryId){
     if(!db) throw new Error('Storage is not available.');
+    if(!(me && me.isOwner)) throw new Error('Only the administrator can cancel a dated pay change.');
     var en=(e.payHistory||[]).find(function(x){ return x.id===entryId; }); if(!en) throw new Error('That pay change was not found.');
     var last=xAddMonth(thisMonth(),1), n=0;
     for(var ym=en.from.slice(0,7); ym<=last && n<48; ym=xAddMonth(ym,1), n++){
@@ -2341,7 +2345,7 @@ tr:hover td{background:var(--line2)}
   // keeps the pay shown on the employee record equal to the pay in force today (a change dated in the future takes effect by itself)
   var paySyncBusy={};
   function syncDuePay(){
-    if(!db || !(me && me.canEdit)) return;
+    if(!db || !canPay()) return;
     var today=xToday();
     state.employees.forEach(function(e){
       if(!(e.payHistory||[]).length || paySyncBusy[e.id]) return;
@@ -2371,7 +2375,7 @@ tr:hover td{background:var(--line2)}
   }
   async function openPayModal(id){
     var e=state.employees.find(function(x){ return x.id===id; }); if(!e) return;
-    if(me && me.canEdit===false){ toast('Only administrators and managers can change pay.'); return; }
+    if(!(me && me.isOwner)){ toast('Only the administrator uses dated pay changes. Accounts edits pay directly in the employee form.'); return; }
     payEmp=e; payLock=await payLockInfo();
     var T=payTermsOn(e,xToday()), struct=payStructOf(T), hist=payEntries(e);
     pfld('payTitle').textContent='Change pay: '+(e.name||'')+(e.empCode?' ('+e.empCode+')':'');
@@ -2528,7 +2532,7 @@ tr:hover td{background:var(--line2)}
     pfld('bkSummary').textContent=okRows.length+' of '+out.length+' can be changed. Monthly wage bill changes by '+(delta>=0?'+':'-')+fmtMoney(Math.abs(delta))+'.';
   }
   async function openBulkPay(){
-    if(me && me.canEdit===false){ toast('Only administrators and managers can change pay.'); return; }
+    if(!(me && me.isOwner)){ toast('Only the administrator uses dated pay changes. Accounts edits pay directly in the employee form.'); return; }
     bkLock=await payLockInfo();
     var list=state.employees.filter(function(e){ return e.active!==false; });
     pfld('bkSite').innerHTML='<option value="">All sites</option>'+allSites().map(function(s){ return '<option>'+escapeHtml(s)+'</option>'; }).join('');
@@ -2630,6 +2634,33 @@ tr:hover td{background:var(--line2)}
       line('Admin charge, paid by the employer',Math.round(b.wages*cfg.admin/100),cfg.admin+'% of PF wages. It is charged on the whole establishment with a minimum of '+fmtMoney(cfg.adminMin)+' a month.')+
       '</tbody></table></div>';
   }
+
+  /* ---------- who may change pay ---------- */
+  // Accounts and administrators may change the pay of an existing employee. Everyone else can see it, and can enter it only when adding a new employee.
+  function canPay(){ return !!me && (me.canChangePay!==undefined ? !!me.canChangePay : !!me.canEdit); }
+  var PAY_FORM_KEYS=['wageType','wageAmount','payStd','zone','skill','dutyHrs','basicAmt','daAmt','basicPct'];
+  var PAY_FORM_IDS=['fWageType','fWageAmount','fPayStd','fZone','fSkill','fDuty','fBasicAmt','fDaAmt','fBasicPct'];
+  function payFormState(e){
+    var locked=!!e && !canPay(), owner=!!(me && me.isOwner);
+    return {locked:locked, showRow:!!e && (owner||locked), showBtn:!!e && owner,
+      note: locked ? 'Only Accounts or an administrator can change pay. You can see it here but not edit it.'
+                   : (owner ? 'Edit the boxes above directly, as Accounts does. For a change that starts on a date, with a history and a letter, use Change pay.' : '')};
+  }
+  // what to save when an existing employee is saved: pay is left out unless the person may change it,
+  // and a new pay typed in here replaces any dated pay changes (it is then used for every month not yet approved)
+  function payForSave(data, existing){
+    if(!existing) return {data:data, ok:true};
+    if(!canPay()){ PAY_FORM_KEYS.forEach(function(k){ delete data[k]; }); return {data:data, ok:true}; }
+    if((existing.payHistory||[]).length){
+      var was=payFieldsOf(existing), now=payFieldsOf(data), changed=['wageType','wageAmount','payStd','basicAmt','daAmt','dutyHrs'].some(function(k){ return was[k]!==now[k]; });
+      if(changed){
+        if(!confirm('This employee has dated pay changes. Saving a new pay here removes them, and this pay is used for every month that is not yet approved. Continue?')) return {data:data, ok:false};
+        data.payHistory=[]; data.payBase=null;
+      }
+    }
+    return {data:data, ok:true};
+  }
+  function applyPayRoleUi(){ var b=document.getElementById('btnBulkPay'); if(b) b.style.display=(me && me.isOwner)?'':'none'; }
 
   // ---------- ATTENDANCE ----------
   // ---------- ATTENDANCE CSV IMPORT (from the Attendance app) ----------

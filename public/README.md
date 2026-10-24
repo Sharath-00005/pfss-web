@@ -334,3 +334,25 @@ Two ways to fix it:
 - **For everyone:** if the whole wage is Basic + D.A. for all your single-wage staff, set the company figure in Settings to 100.
 
 The same share is used for overtime (paid on Basic + D.A.), the "PF not switched on" check in Compliance, and the Basic pay warning in the payroll review. PF is still limited to the ceiling (25,000 from 17 September 2026).
+
+
+## Who can change pay: the Accounts role
+
+**What each role can do.**
+- **Admin:** everything, including Settings, backups and the dated "Change pay" screens.
+- **Accounts:** reads and writes all records except Settings, and **can edit an employee's gross wage directly** in the employee form, as often as needed. It is the only role besides admin that can.
+- **Manager:** reads and writes all records except Settings, but **cannot change the pay of an existing employee**. In the employee form the pay boxes are greyed out with a note. A manager can still enter a starting pay when adding a new employee.
+- **Viewer:** read only.
+
+**How Accounts changes pay.** Open the employee and type the new wage (or Basic and D.A. for someone on the pay structure, or the Basic + D.A. share) and save. There is no start date and no history: the new pay is used for every month whose payroll is not yet approved. Months already approved are not touched. Anyone who had dated pay changes from the earlier Change pay screens is asked once, and those changes are cleared when Accounts saves a new pay. The Change pay and "Change pay for many" buttons are shown only to the admin, and can be ignored.
+
+**Why the database also checks it.** Hiding the boxes stops accidents. The database rule stops everything else: even if someone edits the page, an update that changes pay from a manager or viewer login is refused with "Only Accounts or an administrator can change pay". Saving an employee without touching pay is always fine.
+
+**Set it up (once).**
+1. In Supabase, open SQL Editor, paste `supabase/accounts_role.sql` and run it. It is safe to run again. (`schema.sql` has the same rules for a new install.)
+2. Create the Accounts person's login: Authentication, Users, Add user.
+3. Give them the role: `update public.profiles set role = 'accounts' where email = 'their-email@example.com';`
+4. Upload the new `public/index.html` and `public/pfss-backend.js`, then press Ctrl + Shift + R.
+5. Sign in as a manager and check that an existing employee's pay boxes are greyed out. Sign in as Accounts and check that they can be edited.
+
+Anyone who is a manager today keeps working as before, apart from pay. Accounts can also be chosen as a payroll approver.

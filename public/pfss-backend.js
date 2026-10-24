@@ -26,7 +26,9 @@
     var e = new Error((err && err.message) || 'Database error'); e.code = code; return e;
   }
   function toast(msg) { var t = document.getElementById('toast'); if (!t) return; t.textContent = msg; t.classList.add('show'); setTimeout(function () { t.classList.remove('show'); }, 2600); }
-  function canWrite() { return !!profile && (profile.role === 'admin' || profile.role === 'manager'); }
+  function canWrite() { return !!profile && (profile.role === 'admin' || profile.role === 'manager' || profile.role === 'accounts'); }
+  // only admin and accounts may change the pay of an existing employee (the database enforces this too)
+  function canChangePay() { return !!profile && (profile.role === 'admin' || profile.role === 'accounts'); }
 
   /* ---------- sign-in screens ---------- */
   var overlay = null;
@@ -280,13 +282,14 @@
   /* ---------- who is signed in; approver search ---------- */
   function nameOf(p) { return p.full_name || p.email || 'Unnamed'; }
   var userApi = {
-    me: async function () { return { id: session.user.id, name: nameOf(profile), email: profile.email, isOwner: profile.role === 'admin', canEdit: canWrite() }; },
+    me: async function () { return { id: session.user.id, name: nameOf(profile), email: profile.email, role: profile.role, isOwner: profile.role === 'admin', canEdit: canWrite(), canChangePay: canChangePay() }; },
     id: async function () { return session.user.id; },
     isOwner: function () { return profile.role === 'admin'; },
     canEdit: function () { return canWrite(); },
+    canChangePay: function () { return canChangePay(); },
     can: function () { return canWrite(); },
     search: async function (q) {
-      var query = sb.from('profiles').select('id,email,full_name,role').in('role', ['admin', 'manager']).limit(20);
+      var query = sb.from('profiles').select('id,email,full_name,role').in('role', ['admin', 'manager', 'accounts']).limit(20);
       var term = String(q || '').replace(/[,()%*]/g, ' ').trim();
       if (term) query = query.or('full_name.ilike.%' + term + '%,email.ilike.%' + term + '%');
       var r = await query; if (r.error) throw dbError(r.error);
