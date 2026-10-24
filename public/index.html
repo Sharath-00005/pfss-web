@@ -469,7 +469,7 @@ tr:hover td{background:var(--line2)}
       <h2>Payroll settings</h2>
       <p class="muted">These defaults drive every calculation. Edit them to match current rules — they are a starting point, not verified legal figures.</p>
       <div class="row">
-        <div class="field"><label>Basic % of gross (for staff paid a single wage)</label><input type="number" id="setBasicPct" min="1" max="100"></div>
+        <div class="field"><label>Basic % of gross (for staff paid a single wage who have no figure of their own)</label><input type="number" id="setBasicPct" min="1" max="100"></div>
       </div>
       <div class="row">
         <div class="field"><label>ESI rate (employee %)</label><input type="number" id="setEsiRate" step="0.01"></div>
@@ -710,6 +710,7 @@ tr:hover td{background:var(--line2)}
     <div class="row" id="fWageRow">
       <div class="field"><label>Wage type</label><select id="fWageType"><option value="monthly">Monthly</option><option value="daily">Daily</option></select></div>
       <div class="field"><label>Wage amount (₹) *</label><input type="number" id="fWageAmount"></div>
+      <div class="field"><label>Basic + D.A. share of the wage (%)</label><input type="number" id="fBasicPct" min="1" max="100" placeholder="Company figure"><div class="muted" style="font-size:.74rem;margin-top:.2rem">PF is worked out on this part. Leave empty to use the company figure in Settings (50). Enter 100 if the whole wage is Basic + D.A.</div></div>
     </div>
     <div class="row" id="fPayChangeRow" style="display:none;align-items:center">
       <div class="muted grow" id="payLockNote"></div>
@@ -1584,6 +1585,7 @@ tr:hover td{background:var(--line2)}
     document.getElementById('payLockNote').textContent=hasPayHist ? 'The pay above is locked because this employee has dated pay changes. Use Change pay to add a new one, see the history or cancel one.' : 'To raise or lower the pay from a date, with a history and a letter, use Change pay. Edit the boxes above only to correct a mistake.';
     document.getElementById('fPf').checked = e? !!e.pfApplicable : true;
     document.getElementById('fPfFull').checked = e? !!e.pfFull : false;
+    document.getElementById('fBasicPct').value = (e && e.basicPct) ? e.basicPct : '';
     document.getElementById('fEsi').checked = e? !!e.esiApplicable : true;
     document.getElementById('fDoj').value = e? (e.doj||'') : xToday();
     document.getElementById('fStatus').value = (e && e.active===false) ? 'left' : 'active';
@@ -1623,6 +1625,8 @@ tr:hover td{background:var(--line2)}
     if(!dojV){ toast('Enter the date of joining.'); return; }
     if(leftV && !dolV){ toast('Enter the last working day for an employee who has left.'); return; }
     if(leftV && dolV<dojV){ toast('The last working day cannot be before the date of joining.'); return; }
+    var bpRaw=document.getElementById('fBasicPct').value.trim(), bpVal=(bpRaw==='')?null:Number(bpRaw);
+    if(bpRaw!=='' && !(bpVal>=1 && bpVal<=100)){ toast('The Basic + D.A. share must be between 1 and 100.'); return; }
     var data={
       name:name,
       phone:document.getElementById('fPhone').value.trim(),
@@ -1639,6 +1643,7 @@ tr:hover td{background:var(--line2)}
       daAmt:payStdOn()?(Number(document.getElementById('fDaAmt').value)||0):0,
       pfApplicable:document.getElementById('fPf').checked,
       pfFull:document.getElementById('fPfFull').checked,
+      basicPct:payStdOn()?null:bpVal,
       esiApplicable:document.getElementById('fEsi').checked,
       active:!leftV,
       doj:dojV,
@@ -2573,6 +2578,8 @@ tr:hover td{background:var(--line2)}
   }
   function pfCeilOn(rules, ds){ var c=rules[0].c; rules.forEach(function(r){ if(r.from<=ds) c=r.c; }); return c; }
   function pfCeilNow(){ return pfCeilOn(pfRules(state.settings), xToday()); }
+  // how much of a single wage counts as Basic + D.A. (this is what PF is worked out on): the employee's own figure, else the company figure in Settings
+  function empBasicPct(e, st){ var v=Number(e && e.basicPct); return (v>=1 && v<=100) ? v : ((st||state.settings||{}).basicPct||50); }
   // every PF setting with its standard value; the employer share follows the employee share until it is set separately
   function pfCfg(over){
     var s=over||state.settings||{}, num=function(v,d){ return (v===undefined||v===null||v==='')?d:Number(v); };
@@ -2836,7 +2843,7 @@ tr:hover td{background:var(--line2)}
     }
     present = dim - lop - notEmployed;
     var Tm = TL || payTermsOn(e, ym+'-'+String(dim).padStart(2,'0'));
-    var st = state.settings, basicPct = st.basicPct||50;
+    var st = state.settings, basicPct = empBasicPct(e, st);
     var gross, basic, struct=false, stdA=0, stdBasic=0, stdDa=0, stdExtra=0, stdDuty=0, bshare=basicPct/100, revNote='';
     if(same){
       // the pay was the same on every day of the month
@@ -4859,7 +4866,7 @@ tr:hover td{background:var(--line2)}
     if(e.pfApplicable && !e.uan) g.push('UAN missing');
     if(e.esiApplicable && !e.esic) g.push('ESIC number missing');
     if(!e.pfApplicable && e.active!==false){
-      var tg=payTermsOn(e,xToday()), pbw=(tg.payStd && Number(tg.basicAmt)>0) ? (Number(tg.basicAmt)||0)+(Number(tg.daAmt)||0) : (tg.wageType==='daily'?(Number(tg.wageAmount)||0)*26:(Number(tg.wageAmount)||0))*((state.settings.basicPct||50)/100);
+      var tg=payTermsOn(e,xToday()), pbw=(tg.payStd && Number(tg.basicAmt)>0) ? (Number(tg.basicAmt)||0)+(Number(tg.daAmt)||0) : (tg.wageType==='daily'?(Number(tg.wageAmount)||0)*26:(Number(tg.wageAmount)||0))*(empBasicPct(e)/100);
       if(pbw>0 && pbw<=pfCeilNow()) g.push('PF is not switched on, but it is compulsory for Basic + D.A. up to '+fmtMoney(pfCeilNow())+' (yours is '+fmtMoney(pbw)+')');
     }
     if(!e.aadhar) g.push('Aadhaar missing');
@@ -6718,7 +6725,7 @@ tr:hover td{background:var(--line2)}
       if((r.net||0)<0) add('error','Deductions are higher than earnings, so net pay is negative.');
       if(!(r.present>0)) add('warn','No payable days this month. Net pay is zero.');
       if(e.esiApplicable && !((r.esi||0)>0) && (r.present>0)) add('warn','Marked ESI applicable, but pay is above the ESI limit, so no ESI is deducted.');
-      var basicEarned=r.struct ? ((r.basicPay||0)+(r.daPay||0)) : ((r.gross||0)-(r.otPay||0)-(r.nightPay||0))*(st.basicPct||50)/100;
+      var basicEarned=r.struct ? ((r.basicPay||0)+(r.daPay||0)) : ((r.gross||0)-(r.otPay||0)-(r.nightPay||0))*empBasicPct(e,st)/100;
       if(e.pfApplicable && st.pfCeilingEnabled && basicEarned>pfCeilNow()) add('warn','Basic pay is above the PF wage ceiling. PF is limited to '+fmtMoney(pfCeilNow()*(st.pfRate||12)/100)+'.');
       if((r.otHrs||0)>(st.otWarnHours||50)) add('warn','Overtime of '+r.otHrs+' hours is unusually high.');
       var acct=String(e.bankAcc||'').replace(/\s/g,''); if(acct) (seen[acct]=seen[acct]||[]).push(r.name);

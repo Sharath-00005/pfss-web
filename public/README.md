@@ -321,3 +321,16 @@ In Settings, Provident fund, the ceiling is now a ceiling now, the date it appli
 **September 2026 payment.** The PF for September was due on 15 October. If it was paid on the old ceiling, the difference is still due. Ask your CA about the supplementary payment and any interest.
 
 Please confirm all of this with your CA. The figures come from the published notification and compliance guidance.
+
+
+## How much of a single wage counts as Basic + D.A. (PF wages)
+
+For staff paid a single wage (not on the pay structure), PF is worked out on the part of the wage that counts as Basic + D.A. By default the tool counts 50% of the wage (Settings, Payroll settings, "Basic % of gross"). That is right only if half of the wage is allowances. **If the whole wage is Basic + D.A., PF would be too low.**
+
+Example: a wage of 16,958.62 that is all Basic + D.A. At 50%, PF wages are 8,479 and PF is 1,017. At 100%, PF wages are 16,959 and PF is 2,035 from the employee and 2,035 from the company.
+
+Two ways to fix it:
+- **For one person:** open the employee, and in **Basic + D.A. share of the wage (%)** enter 100 (or the right share). It wins over the company figure. Leave it empty to use the company figure. Someone on the pay structure does not need it, because their PF is always on Basic + D.A.
+- **For everyone:** if the whole wage is Basic + D.A. for all your single-wage staff, set the company figure in Settings to 100.
+
+The same share is used for overtime (paid on Basic + D.A.), the "PF not switched on" check in Compliance, and the Basic pay warning in the payroll review. PF is still limited to the ceiling (25,000 from 17 September 2026).
