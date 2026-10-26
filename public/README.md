@@ -441,3 +441,25 @@ update public.profiles set role = 'accounts' where email = 'accounts@publicforce
 ```
 
 Keep at least one other admin (for example info@), and give admin only to people you trust: an admin can read and export all personal data, change the PF and ESI rates, and change roles. The person signs out and in again for the change to show.
+
+
+## Payroll groups: run payroll separately for each client or site, and role
+
+Use this when different clients, sites or roles are paid on different days, or need their own approval. Open the **Pay cycle** and click **Payroll groups** (next to the pay month), or use "Set up payroll groups" on the overview.
+
+**Making a group.** Give it a name (for example "Paragon Tapes guards"), choose a **client or site**, a **role**, or both, the **month it starts from**, and optionally a **pay day** (the day of the next month by which that group's salary should be paid) and a note. Only Accounts and the administrator can make or change groups. Managers can see them.
+
+**Who is in which group.** Each employee is in exactly one group: the most specific group that matches their site and role (site and role together beat a site alone, and a site alone beats a role alone). If two match equally, the older group wins. Everyone who matches no group stays in **Everyone else**, which is the normal payroll as before. A group applies only from its first month, so earlier months are not changed.
+
+**Running a group.** Pick the group in the **Payroll group** box at the top of the Pay cycle (or in the Payroll tab). Every step then works on that group's employees only: attendance and shifts, review, calculation, validation, approval, payslips and closing the month. Each group is approved and closed on its own, so one client can be paid on the 5th and another on the 10th. The overview shows a table of all the groups for the month with their status, net pay and pay day, and warns when a group is due soon or overdue.
+
+**Government payments stay together.** PF, ESI and professional tax are paid for the whole month. The Reports step adds up the groups whose payroll is **approved** and lists any group still to be approved, so the EPFO challan covers everyone who has been approved.
+
+**Safety rules.**
+- A group cannot start in a month where payroll is already calculated for employees who would move into it. Choose a later month.
+- The site, role and first month of a group cannot be changed. To change them, end the group (set its last month, which cannot be before its last payroll) and make a new one.
+- A group can be deleted only while it has no payroll.
+- A change to an employee, their attendance, overtime or additional pay sends only that employee's group back to draft, not the other groups.
+- Pay-change locks (for example, a pay cut cannot start in an approved month) look at the employee's own group.
+
+**Pay rates** stay on each employee. A group controls how and when payroll is processed, not the wage. Run `supabase/accounts_role.sql` again in the SQL Editor so the database also refuses changes to groups from anyone but Accounts and the administrator (safe to run again).

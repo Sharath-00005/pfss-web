@@ -205,6 +205,8 @@ tr:hover td{background:var(--line2)}
     <div class="card">
       <div class="row" style="justify-content:space-between;align-items:flex-end">
         <div class="field" style="max-width:200px"><label>Pay month</label><input type="month" id="cycMonth"></div>
+        <div class="field" style="max-width:300px"><label>Payroll group</label><select id="cycGroup"></select></div>
+        <button class="btn small ghost" id="btnPayGroups" type="button" style="align-self:flex-end">Payroll groups</button>
         <div id="cycStatusPill" style="flex:none"></div>
       </div>
       <div id="cycStepper" style="margin-top:.8rem;display:flex;gap:.4rem;flex-wrap:wrap"></div>
@@ -297,6 +299,7 @@ tr:hover td{background:var(--line2)}
       <div class="row" style="justify-content:space-between">
         <h2>Payroll</h2>
         <div class="row" style="flex:none">
+          <div class="field"><label>Payroll group</label><select id="payGroupSel"></select></div>
           <div class="field"><label>Site</label><select id="payFilterSite"><option value="">All sites</option></select></div>
           <div class="field"><label>Sort by</label><select id="payFilterSort"><option value="id">Employee ID</option><option value="name">Name</option></select></div>
           <div class="field"><label>Month</label><input type="month" id="payMonth"></div>
@@ -969,6 +972,34 @@ tr:hover td{background:var(--line2)}
 </div>
 
 <!-- Billing pack modal -->
+<div class="modal-bg" id="groupsModalBg">
+  <div class="modal" style="max-width:900px">
+    <button class="close-x" id="grClose">&times;</button>
+    <h3>Payroll groups</h3>
+    <p class="muted">Run payroll separately for a client or site, and for a role. Each group has its own attendance, calculation, approval and payslips, and its own pay day. Everyone who is not in a group stays in "Everyone else", which is the normal payroll. An employee goes into the most specific group that matches: site and role together beat a site alone, and a site alone beats a role alone.</p>
+    <div id="grList"></div>
+    <div id="grForm" style="border-top:1px solid var(--line);padding-top:.8rem;margin-top:.8rem">
+      <div style="font-weight:700;margin-bottom:.4rem" id="grFormTitle">New group</div>
+      <div class="row">
+        <div class="field grow"><label>Group name *</label><input id="grName" maxlength="60" placeholder="For example: Paragon Tapes guards"></div>
+        <div class="field"><label>Pay day (optional)</label><input type="number" id="grPayDay" min="1" max="31" placeholder="7"></div>
+      </div>
+      <div class="row">
+        <div class="field grow"><label>Client or site</label><select id="grSite"></select></div>
+        <div class="field grow"><label>Role</label><select id="grRole"></select></div>
+        <div class="field"><label>Starts from month *</label><input type="month" id="grFrom"></div>
+        <div class="field"><label>Last month (optional)</label><input type="month" id="grTo"></div>
+      </div>
+      <div class="field"><label>Note (optional)</label><input id="grNote" maxlength="120"></div>
+      <div class="muted" id="grPreview"></div>
+      <div id="grErr" style="color:var(--bad);min-height:1.3em;margin-top:.3rem" role="alert"></div>
+      <div class="row"><button class="btn" id="grSave">Add group</button><button class="btn ghost" id="grCancel" style="display:none" type="button">Cancel editing</button></div>
+      <p class="muted" style="margin-top:.6rem">The site, role and first month of a group cannot be changed once it is made. To change them, end the group after its last month and make a new one. A group can be deleted only while it has no payroll. The pay day is the day of the next month by which the salary should be paid.</p>
+    </div>
+    <div class="banner" id="grLock" style="display:none"></div>
+  </div>
+</div>
+
 <div class="modal-bg" id="addPayModalBg">
   <div class="modal" style="max-width:700px">
     <button class="close-x" id="apClose">&times;</button>
@@ -1316,6 +1347,7 @@ tr:hover td{background:var(--line2)}
     setupIdCardsUI();
     setupMailUI();
     setupBackupUI();
+    setupGroupsUI();
     setupAddPayUI();
     setupPayUI();
     setupAttendanceUI();
@@ -1735,8 +1767,10 @@ tr:hover td{background:var(--line2)}
       if(leftV && id && typeof outstandingBalanceForEmp==='function'){ var ob=outstandingBalanceForEmp(id); if(ob>0) setTimeout(function(){ toast('Note: this employee still owes '+fmtMoney(ob)+' in advances. Deduct it in the final payroll.'); },1800); }
       closeEmpModal();
       var payMonthEl=document.getElementById('payMonth');
-      if(payMonthEl && payMonthEl.value) invalidateRun(payMonthEl.value);
-      if(cyc.month && (!payMonthEl || payMonthEl.value!==cyc.month)) invalidateRun(cyc.month);
+      var invEmp=(exPay||{}), invNew=Object.assign({}, invEmp, {site:data.site, role:data.role});
+      [payMonthEl && payMonthEl.value, cyc.month].filter(function(m,i,a){ return m && a.indexOf(m)===i; }).forEach(function(m){
+        invalidateRun(m, invEmp.id?invEmp:invNew); if(invEmp.id && empGroupId(invEmp,m)!==empGroupId(invNew,m)) invalidateRun(m, invNew);
+      });
     }catch(e){ toast('Save failed: '+(e.code||e.message||'error')); }
     btn.disabled=false; btn.textContent='Save employee';
   }
@@ -2286,9 +2320,9 @@ tr:hover td{background:var(--line2)}
     return {amount:Math.round(amt), note:notes.join('; ')};
   }
   // the latest month whose payroll is approved; pay cannot be cut for months up to then
-  async function payLockInfo(){
+  async function payLockInfo(e){
     var m=thisMonth(), last=null;
-    for(var i=1;i>=-24;i--){ var ym=xAddMonth(m,i), run=await getRun(ym); if(run && run.status==='approved'){ last=ym; break; } }
+    for(var i=1;i>=-24;i--){ var ym=xAddMonth(m,i), run=e?await getRunOfEmp(ym,e):await getRunAny(ym); if(run && run.status==='approved'){ last=ym; break; } }
     return {lastApproved:last, firstOpen:last?xAddMonth(last,1):null};
   }
   function minWageShortfall(e, T){
@@ -2326,24 +2360,24 @@ tr:hover td{background:var(--line2)}
   async function computeArrears(eNew, entryId, fromYm){
     var eOld=Object.assign({}, eNew, {payHistory:(eNew.payHistory||[]).filter(function(x){ return x.id!==entryId; })}), months=[], total=0, last=thisMonth(), n=0;
     for(var ym=fromYm; ym<=last && n<48; ym=xAddMonth(ym,1), n++){
-      var run=await getRun(ym); if(!run || run.status!=='approved') continue;
+      var run=await getRunOfEmp(ym,eNew); if(!run || run.status!=='approved') continue;
       if(!(run.rows||[]).some(function(r){ return r.empId===eNew.id; })) continue;
       var a=await computePayroll(eNew,ym), b=await computePayroll(eOld,ym), diff=Math.round(a.baseGross)-Math.round(b.baseGross);
       if(diff){ months.push({ym:ym, amt:diff}); total+=diff; }
     }
     return {amount:total, months:months};
   }
-  async function payRefreshMonths(fromYm, extraYm){
+  async function payRefreshMonths(fromYm, extraYm, emp){
     var list=[], last=xAddMonth(thisMonth(),1), n=0;
     for(var ym=fromYm; ym<=last && n<36; ym=xAddMonth(ym,1), n++) list.push(ym);
     if(extraYm && list.indexOf(extraYm)<0) list.push(extraYm);
-    for(var i=0;i<list.length;i++){ var run=await getRun(list[i]); if(run && run.status==='approved') continue; await invalidateRun(list[i]); }
+    for(var i=0;i<list.length;i++){ var run=emp?await getRunOfEmp(list[i],emp):await getRunAny(list[i]); if(run && run.status==='approved') continue; await invalidateRun(list[i], emp); }
   }
   // o: {from, reason, note, consent, payArrears, arrearsYm}. Returns the saved entry; throws an Error with a plain message when it is not allowed.
   async function savePayRevision(e, T, o){
     if(!db) throw new Error('Storage is not available, so nothing was saved.');
     if(!(me && me.isOwner)) throw new Error('Only the administrator can make a dated pay change.');
-    var lock=await payLockInfo(), msg=validatePayRevision(e,T,o,lock); if(msg) throw new Error(msg);
+    var lock=await payLockInfo(e), msg=validatePayRevision(e,T,o,lock); if(msg) throw new Error(msg);
     var f=payFieldsOf(T), oldG=payGrossOf(payTermsOn(e,o.from)), newG=payGrossOf(f), today=xToday();
     var entry={id:'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), from:o.from, terms:f, reason:o.reason, note:o.note||'', consent:!!o.consent,
       kind:newG>oldG?'increase':'decrease', oldGross:Math.round(oldG), newGross:Math.round(newG), by:(me&&(me.name||me.email))||'', byId:(me&&me.id)||'', at:Date.now(), arrears:null};
@@ -2351,12 +2385,12 @@ tr:hover td{background:var(--line2)}
     var payYm=o.arrearsYm||thisMonth();
     if(newG>oldG && o.payArrears){
       var a=await computeArrears(eNew, entry.id, o.from.slice(0,7));
-      if(a.amount>0){ var pr=await getRun(payYm); if(pr && pr.status==='approved') throw new Error('Payroll for '+xMonthLabel(payYm)+' is already approved. Choose a later month to pay the arrears.'); entry.arrears={amount:a.amount, months:a.months, payYm:payYm}; }
+      if(a.amount>0){ var pr=await getRunOfEmp(payYm,e); if(pr && pr.status==='approved') throw new Error('Payroll for '+xMonthLabel(payYm)+' is already approved. Choose a later month to pay the arrears.'); entry.arrears={amount:a.amount, months:a.months, payYm:payYm}; }
     }
     var fields={payBase:base, payHistory:eNew.payHistory};
     if(o.from<=today) Object.assign(fields, payFieldsOf(payTermsOn(eNew,today)));
     await db.doc('employees/'+e.id).update(fields);
-    await payRefreshMonths(o.from.slice(0,7), entry.arrears?entry.arrears.payYm:null);
+    await payRefreshMonths(o.from.slice(0,7), entry.arrears?entry.arrears.payYm:null, e);
     return entry;
   }
   // a change can be cancelled only while nothing has been paid with it
@@ -2366,7 +2400,7 @@ tr:hover td{background:var(--line2)}
     var en=(e.payHistory||[]).find(function(x){ return x.id===entryId; }); if(!en) throw new Error('That pay change was not found.');
     var last=xAddMonth(thisMonth(),1), n=0;
     for(var ym=en.from.slice(0,7); ym<=last && n<48; ym=xAddMonth(ym,1), n++){
-      var run=await getRun(ym);
+      var run=await getRunOfEmp(ym,e);
       if(run && run.status==='approved' && (!en.arrears || ym>=en.arrears.payYm) && (run.rows||[]).some(function(r){ return r.empId===e.id; }))
         throw new Error('Payroll for '+xMonthLabel(ym)+' is already approved with this change, so it cannot be cancelled.');
     }
@@ -2374,7 +2408,7 @@ tr:hover td{background:var(--line2)}
     if(rest.length) Object.assign(fields, payFieldsOf(payTermsOn(eNew,xToday())));
     else { Object.assign(fields, payFieldsOf(e.payBase||payFieldsOf(e))); fields.payBase=null; }
     await db.doc('employees/'+e.id).update(fields);
-    await payRefreshMonths(en.from.slice(0,7), en.arrears?en.arrears.payYm:null);
+    await payRefreshMonths(en.from.slice(0,7), en.arrears?en.arrears.payYm:null, e);
   }
   // keeps the pay shown on the employee record equal to the pay in force today (a change dated in the future takes effect by itself)
   var paySyncBusy={};
@@ -2410,7 +2444,7 @@ tr:hover td{background:var(--line2)}
   async function openPayModal(id){
     var e=state.employees.find(function(x){ return x.id===id; }); if(!e) return;
     if(!(me && me.isOwner)){ toast('Only the administrator uses dated pay changes. Accounts edits pay directly in the employee form.'); return; }
-    payEmp=e; payLock=await payLockInfo();
+    payEmp=e; payLock=await payLockInfo(payEmp);
     var T=payTermsOn(e,xToday()), struct=payStructOf(T), hist=payEntries(e);
     pfld('payTitle').textContent='Change pay: '+(e.name||'')+(e.empCode?' ('+e.empCode+')':'');
     pfld('payCurrent').textContent='Present pay: '+payDescribe(T)+'. '+(e.role||'')+(e.site?', '+e.site:'')+'.';
@@ -2470,7 +2504,7 @@ tr:hover td{background:var(--line2)}
     var id=payEmp.id, tries=0, e;
     while(tries++<12){ await new Promise(function(r){ setTimeout(r,250); }); e=state.employees.find(function(x){ return x.id===id; });
       if(e && (!entryId || (e.payHistory||[]).some(function(x){ return x.id===entryId; }))) break; }
-    if(e){ payEmp=e; payLock=await payLockInfo(); pfld('payCurrent').textContent='Present pay: '+payDescribe(payTermsOn(e,xToday()))+'. '+(e.role||'')+(e.site?', '+e.site:'')+'.'; renderPayHist(); payPreview(); }
+    if(e){ payEmp=e; payLock=await payLockInfo(payEmp); pfld('payCurrent').textContent='Present pay: '+payDescribe(payTermsOn(e,xToday()))+'. '+(e.role||'')+(e.site?', '+e.site:'')+'.'; renderPayHist(); payPreview(); }
   }
   async function paySaveClick(){
     var err=pfld('payErr'); err.textContent=''; var btn=pfld('btnPaySave'), old=btn.textContent; btn.disabled=true; btn.textContent='Saving...';
@@ -2817,7 +2851,7 @@ tr:hover td{background:var(--line2)}
     if(!cur.adds.length) delete cur.adds;
     extrasMap[key]=cur;
     if(db){ try{ await db.doc('monthExtras/'+id+'_'+ym.replace('-','')).set(cur); }catch(e){ toast('Could not save: '+(e&&e.code||'error')); return false; } }
-    await invalidateRun(ym); return true;
+    await invalidateRun(ym, state.employees.find(function(x){ return x.id===id; })); return true;
   }
   function renderAddPay(){
     var f=function(i){ return document.getElementById(i); }, e=state.employees.find(function(x){ return x.id===apEmp; })||{}, x=apCurrent(), lines=addLinesOf(x), can=canPay()&&!cycClosed(apYm);
@@ -2856,6 +2890,236 @@ tr:hover td{background:var(--line2)}
     f('apType').addEventListener('change', function(){ f('apStat').checked=addTypeStat(f('apType').value); });
     f('apAdd').addEventListener('click', apAdd);
     document.addEventListener('click', function(ev){ var b=ev.target.closest && ev.target.closest('[data-addpay]'); if(b) openAddPay(b.dataset.addpay); });
+  }
+
+  /* ---------- payroll groups: run payroll separately for each client or site and role ---------- */
+  // A group picks employees by site (the client) and/or role, from a month on. Each employee belongs to the most specific group that matches,
+  // and everyone else is in "Everyone else", which is the normal payroll as before. Each group has its own attendance confirmation, calculation,
+  // validation, approval and payslips, and its own pay day.
+  var payGroups=[], payScope='';
+  function scopeSuffix(sc){ return sc?'_'+sc:''; }
+  function runKeyOf(ym, sc){ return ym.replace('-','')+scopeSuffix(sc); }
+  function groupApplies(g, ym){ return !!g && g.from<=ym && (!g.to || ym<=g.to); }
+  function groupOf(id){ return payGroups.filter(function(g){ return g.id===id; })[0]||null; }
+  function groupName(id){ var g=groupOf(id); return g?g.name:'Everyone else'; }
+  function empGroupIdWith(groups, e, ym){
+    var best=null, site=String((e&&e.site)||'').trim(), role=String((e&&e.role)||'').trim();
+    groups.forEach(function(g){
+      if(!groupApplies(g,ym)) return;
+      if(g.site && site!==g.site) return;
+      if(g.role && role!==g.role) return;
+      var score=(g.site?2:0)+(g.role?1:0);
+      if(!best || score>best.score || (score===best.score && (g.createdAt||0)<(best.g.createdAt||0))) best={g:g, score:score};
+    });
+    return best?best.g.id:'';
+  }
+  function empGroupId(e, ym){ return empGroupIdWith(payGroups, e, ym); }
+  function scopesFor(ym){ return ['' ].concat(payGroups.filter(function(g){ return groupApplies(g,ym); }).map(function(g){ return g.id; })); }
+  function cycRunByKey(k){ var x=allRuns[k], y=runCache[k]; if(x && y) return ((y.calculatedAt||0)>=(x.calculatedAt||0)) ? y : x; return x||y||null; }
+  // every group's payroll for one month, from what is already loaded
+  function monthRuns(ym){ return scopesFor(ym).map(function(sc){ var k=runKeyOf(ym,sc); return {scope:sc, name:groupName(sc), key:k, run:cycRunByKey(k), cycle:cycles[k]||null}; }); }
+  // the PF, ESI and PT amounts are paid together for the whole month, from the groups whose payroll is approved
+  function monthGovRows(ym){
+    var rows=[], included=[], pending=[];
+    monthRuns(ym).forEach(function(m){
+      var has=m.run && m.run.rows && m.run.rows.length; if(!has) return;
+      if(m.run.status==='approved'){ included.push(m.name); m.run.rows.forEach(function(x){ rows.push(x); }); } else pending.push(m.name);
+    });
+    return {rows:rows, included:included, pending:pending};
+  }
+  function runStatusFor(c, r){
+    c=c||{}; var vok=!!(c.validated && r && r.calculatedAt && c.validatedStamp===r.calculatedAt);
+    if(c.closed) return ['Closed','ok'];
+    if(r && r.status==='approved') return ['Approved','ok'];
+    if(r && r.status==='submitted') return ['Awaiting approval','warn'];
+    if(r && r.status==='rejected') return ['Sent back','bad'];
+    if(vok) return ['Validated','info'];
+    if(r && r.rows && r.rows.length) return ['Calculated','info'];
+    return ['Draft','mute'];
+  }
+  async function getRunKey(key){
+    if(!db) return runCache[key]||null;
+    try{
+      var snap=await db.doc('payrollRuns/'+key).get(), data=(snap && snap.exists && snap.data())?snap.data():null;
+      if(data) data.scopeKey=key;
+      runCache[key]=data; return data;
+    }catch(e){ return runCache[key]||null; }
+  }
+  async function saveRunKey(key, data){
+    data.scopeKey=key; runCache[key]=data;
+    if(!db){ toast('Storage unavailable — cannot save.'); return; }
+    try{ await db.doc('payrollRuns/'+key).set(data); }
+    catch(e){ toast('Could not save approval status: '+(e.code||'')); }
+  }
+  function getRunScoped(ym, sc){ return getRunKey(runKeyOf(ym,sc)); }
+  // the run (in whichever group) that holds this employee for the month
+  function getRunOfEmp(ym, e){ return getRunScoped(ym, empGroupId(e,ym)); }
+  // an approved run of the month in any group (used where the whole month matters)
+  async function getRunAny(ym){
+    var scs=scopesFor(ym), last=null;
+    for(var i=0;i<scs.length;i++){ var r=await getRunScoped(ym,scs[i]); if(r && r.status==='approved') return r; if(r) last=r; }
+    return last;
+  }
+  function groupHasRuns(id){ var sfx='_'+id; return Object.keys(allRuns).some(function(k){ return k.slice(-sfx.length)===sfx && allRuns[k] && allRuns[k].rows && allRuns[k].rows.length; }) || Object.keys(cycles).some(function(k){ return k.slice(-sfx.length)===sfx; }); }
+  function latestRunMonth(){
+    var m=''; Object.keys(allRuns).forEach(function(k){ var x=allRuns[k]; if(x && x.rows && x.rows.length){ var ym=k.slice(0,4)+'-'+k.slice(4,6); if(ym>m) m=ym; } }); return m;
+  }
+  function setPayScope(sc){
+    if(sc && !groupOf(sc)) sc='';
+    payScope=sc||''; cycAttCache={};
+    if(typeof renderCycle==='function') renderCycle();
+    var pm=document.getElementById('payMonth'); if(pm && typeof renderPayroll==='function') renderPayroll();
+    cycRefresh(true);
+  }
+  // ---- making and changing groups ----
+  // returns an error message, or '' when the group is fine. isNew: a group being created. others: the other groups.
+  function validateGroup(g, isNew){
+    var name=String(g.name||'').trim();
+    if(!name) return 'Give the group a name, for example the client name.';
+    if(name.length>60) return 'Keep the name to 60 characters.';
+    if(payGroups.some(function(x){ return x.id!==g.id && String(x.name).trim().toLowerCase()===name.toLowerCase(); })) return 'There is already a group called "'+name+'".';
+    if(isNew && !g.site && !g.role) return 'Choose a site, a role, or both. A group with neither would take in every employee.';
+    if(!/^\d{4}-\d{2}$/.test(g.from||'')) return 'Choose the month the group starts from.';
+    if(g.to && (!/^\d{4}-\d{2}$/.test(g.to) || g.to<g.from)) return 'The last month must not be before the first month.';
+    if(g.payDay!=='' && g.payDay!=null && !(Number(g.payDay)>=1 && Number(g.payDay)<=31 && Math.floor(Number(g.payDay))===Number(g.payDay))) return 'The pay day must be a whole number from 1 to 31.';
+    if(String(g.note||'').length>120) return 'Keep the note to 120 characters.';
+    return '';
+  }
+  // employees who already have payroll calculated in a month from which this new group would take them over
+  function groupConflicts(g){
+    var after=payGroups.concat([g]), out=[], last=latestRunMonth();
+    Object.keys(allRuns).forEach(function(k){
+      var x=allRuns[k]; if(!x || !x.rows || !x.rows.length) return;
+      var ym=k.slice(0,4)+'-'+k.slice(4,6), sc=k.length>6?k.slice(7):''; if(ym<g.from || ym>last) return;
+      var moved=x.rows.filter(function(r){ return empGroupIdWith(after,{site:r.site,role:r.role},ym)!==sc; }).length;
+      if(moved) out.push({ym:ym, scope:sc, n:moved});
+    });
+    return out.sort(function(a,b){ return a.ym<b.ym?-1:1; });
+  }
+  async function saveGroup(g, isNew){
+    if(!canPay()) throw new Error('Only Accounts or an administrator can make or change payroll groups.');
+    if(!isNew){ var old0=groupOf(g.id); if(!old0) throw new Error('That group was not found.'); g.site=old0.site||''; g.role=old0.role||''; g.from=old0.from; g.createdAt=old0.createdAt; }   // the site, role and first month never change
+    var msg=validateGroup(g,isNew); if(msg) throw new Error(msg);
+    if(isNew){
+      var cf=groupConflicts(g);
+      if(cf.length) throw new Error('Payroll for '+xMonthLabel(cf[0].ym)+' has already been calculated for '+cf[0].n+' employee'+(cf[0].n===1?'':'s')+' who would move into this group. Choose a later month to start from.');
+    } else {
+      var old=groupOf(g.id)||{}, hasRuns=groupHasRuns(g.id);
+      if(g.to && g.to!==old.to){ var lm=''; Object.keys(allRuns).forEach(function(k){ var sfx='_'+g.id; if(k.slice(-sfx.length)===sfx && allRuns[k] && allRuns[k].rows && allRuns[k].rows.length){ var ym=k.slice(0,4)+'-'+k.slice(4,6); if(ym>lm) lm=ym; } }); if(lm && g.to<lm) throw new Error('This group already has payroll for '+xMonthLabel(lm)+', so it cannot end before that month.'); }
+    }
+    if(isNew){ g.id='g'+Date.now().toString(36)+Math.random().toString(36).slice(2,5); g.createdAt=Date.now(); }
+    var rec={id:g.id, name:String(g.name).trim(), site:g.site||'', role:g.role||'', from:g.from, to:g.to||'', payDay:(g.payDay===''||g.payDay==null)?'':Number(g.payDay), note:String(g.note||'').trim(), createdAt:g.createdAt, by:(me&&(me.name||me.email))||''};
+    if(db) await db.doc('payGroups/'+rec.id).set(rec);
+    var i=payGroups.findIndex(function(x){ return x.id===rec.id; }); if(i>=0) payGroups[i]=rec; else payGroups.push(rec);
+    cycRefresh(true); return rec;
+  }
+  async function deleteGroup(id){
+    if(!canPay()) throw new Error('Only Accounts or an administrator can delete payroll groups.');
+    if(groupHasRuns(id)) throw new Error('This group already has payroll, so it cannot be deleted. You can end it after its last month instead.');
+    if(db) await db.doc('payGroups/'+id).delete();
+    payGroups=payGroups.filter(function(x){ return x.id!==id; }); if(payScope===id) payScope='';
+    cycRefresh(true);
+  }
+
+  /* ---------- payroll groups: the screens ---------- */
+  var grEditId=null;
+  // when salary is due for a group, from its pay day (salary for a month is paid in the next month)
+  function payDayInfo(g, ym, statusName){
+    if(!g || !Number(g.payDay)) return {text:'', tag:'', due:''};
+    var pm=xAddMonth(ym,1), d=Math.min(Number(g.payDay), daysInMonth(pm)), due=pm+'-'+String(d).padStart(2,'0'), done=(statusName==='Approved'||statusName==='Closed'), tag='';
+    if(!done){
+      var diff=Math.round((new Date(due+'T00:00:00')-new Date(xToday()+'T00:00:00'))/86400000);
+      if(diff<0) tag='<span class="tag bad">Overdue by '+(-diff)+' day'+(diff===-1?'':'s')+'</span>';
+      else if(diff<=3) tag='<span class="tag warn">Due '+(diff===0?'today':'in '+diff+' day'+(diff===1?'':'s'))+'</span>';
+    }
+    return {text:'Pay by '+xFmt(due), tag:tag, due:due};
+  }
+  function groupWho(g){ return [g.site?g.site:'', g.role?g.role:''].filter(Boolean).join(' · ')||'Everyone'; }
+  // the choices in the group pickers (the Pay cycle header and the Payroll tab) for a month
+  function syncGroupSelects(ym){
+    var scs=scopesFor(ym); if(payScope && scs.indexOf(payScope)<0) payScope='';
+    var html=scs.map(function(sc){ return '<option value="'+escapeHtml(sc)+'">'+escapeHtml(sc===''?(payGroups.length?'Everyone else (not in a group)':'Everyone'):groupName(sc))+'</option>'; }).join('');
+    ['cycGroup','payGroupSel'].forEach(function(id){
+      var el=document.getElementById(id); if(!el) return;
+      if(el.dataset.sig!==html){ el.innerHTML=html; el.dataset.sig=html; }
+      el.value=payScope; if(el.parentNode && el.parentNode.style) el.parentNode.style.display=payGroups.length?'':'none';
+    });
+  }
+  // the table of groups on the Pay cycle overview
+  function groupsCardHtml(ym){
+    if(!payGroups.some(function(g){ return groupApplies(g,ym); })){
+      return '<div class="card"><h2>Payroll groups</h2><p class="muted">Do you pay different clients, sites or roles on different days or at different rates? Make a payroll group for each. Every group then has its own attendance, calculation, approval and payslips, and its own pay day.</p>'+(canPay()?'<button class="btn ghost" data-cyc="groups">Set up payroll groups</button>':'')+'</div>';
+    }
+    var runs=monthRuns(ym), rows='', totNet=0, totCost=0, n=0;
+    runs.forEach(function(m){
+      var emps=state.employees.filter(function(e){ return employedInMonth(e,ym) && empGroupId(e,ym)===m.scope; }).length, has=m.run && m.run.rows && m.run.rows.length;
+      if(m.scope==='' && !emps && !has) return;
+      var st=runStatusFor(m.cycle,m.run), t=has?cycTotals(m.run.rows):null, g=groupOf(m.scope), pd=payDayInfo(g,ym,st[0]);
+      if(t){ totNet+=t.net; totCost+=t.cost; } n+=emps;
+      rows+='<tr'+(m.scope===payScope?' style="background:var(--panel)"':'')+'><td><b>'+escapeHtml(m.name)+'</b><div class="muted" style="font-size:.78rem">'+escapeHtml(g?groupWho(g):'Employees not in any group')+'</div></td><td class="right">'+emps+'</td><td>'+xTag(st[0],st[1])+'</td><td class="right">'+(t?fmtMoney(t.net):'-')+'</td><td>'+escapeHtml(pd.text)+(pd.tag?' '+pd.tag:'')+'</td><td><button class="btn small'+(m.scope===payScope?'':' ghost')+'" data-cyc="scope" data-scope="'+escapeHtml(m.scope)+'">'+(m.scope===payScope?'Selected':'Open')+'</button></td></tr>';
+    });
+    return '<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">Payroll groups, '+escapeHtml(xMonthLabel(ym))+'</h2><button class="btn small ghost" data-cyc="groups">Manage groups</button></div><p class="muted">Each group is calculated, approved and paid on its own. PF, ESI and professional tax are still paid together for the month.</p><div class="scrollx"><table><thead><tr><th>Group</th><th class="right">Employees</th><th>Status</th><th class="right">Net pay</th><th>Pay day</th><th></th></tr></thead><tbody>'+rows+'</tbody><tfoot><tr><td>Total</td><td class="right">'+n+'</td><td></td><td class="right">'+fmtMoney(totNet)+'</td><td colspan="2"></td></tr></tfoot></table></div></div>';
+  }
+  function suggestGroupFrom(){ var c=cycMonth(), lm=latestRunMonth(); return (lm && c<=lm)?xAddMonth(lm,1):c; }
+  function renderGroupsList(){
+    var el=document.getElementById('grList'), ym=cycMonth(), can=canPay(), lock=document.getElementById('grLock');
+    document.getElementById('grForm').style.display=can?'':'none'; lock.style.display=can?'none':''; lock.textContent='Only Accounts or an administrator can make or change payroll groups. You can see them here.';
+    if(!payGroups.length){ el.innerHTML='<div class="muted">No payroll groups yet. Everyone is paid in one payroll.</div>'; return; }
+    el.innerHTML='<div class="scrollx"><table><thead><tr><th>Group</th><th>Who</th><th>From</th><th>Last month</th><th>Pay day</th><th class="right">Employees in '+escapeHtml(xMonthLabel(ym))+'</th><th>Payroll</th><th></th></tr></thead><tbody>'+payGroups.slice().sort(function(a,b){ return (a.createdAt||0)-(b.createdAt||0); }).map(function(g){
+      var n=state.employees.filter(function(e){ return employedInMonth(e,ym) && empGroupId(e,ym)===g.id; }).length, has=groupHasRuns(g.id);
+      return '<tr><td><b>'+escapeHtml(g.name)+'</b>'+(g.note?'<div class="muted" style="font-size:.78rem">'+escapeHtml(g.note)+'</div>':'')+'</td><td>'+escapeHtml(groupWho(g))+'</td><td>'+escapeHtml(xMonthLabel(g.from))+'</td><td>'+(g.to?escapeHtml(xMonthLabel(g.to)):'-')+'</td><td>'+(g.payDay?g.payDay:'-')+'</td><td class="right">'+n+'</td><td>'+(has?'Started':'Not started')+'</td><td style="white-space:nowrap">'+(can?'<button class="btn small ghost" data-gredit="'+escapeHtml(g.id)+'">Edit</button> <button class="btn small ghost" data-grdel="'+escapeHtml(g.id)+'">Delete</button>':'')+'</td></tr>'; }).join('')+'</tbody></table></div>';
+    el.querySelectorAll('[data-gredit]').forEach(function(b){ b.addEventListener('click', function(){ grStartEdit(b.dataset.gredit); }); });
+    el.querySelectorAll('[data-grdel]').forEach(function(b){ b.addEventListener('click', async function(){
+      if(!confirm('Delete this payroll group? This is only possible while it has no payroll.')) return;
+      try{ await deleteGroup(b.dataset.grdel); toast('Group deleted.'); renderGroupsList(); syncGroupSelects(cycMonth()); }catch(e){ toast(e.message||'Could not delete.'); } }); });
+  }
+  function grFormValues(){
+    var f=function(i){ return document.getElementById(i); };
+    return {id:grEditId||'', name:f('grName').value, site:f('grSite').value, role:f('grRole').value, from:f('grFrom').value, to:f('grTo').value, payDay:f('grPayDay').value, note:f('grNote').value};
+  }
+  // how many employees the group would hold, and whether it would take over anyone whose payroll is already calculated
+  function grPreview(){
+    var el=document.getElementById('grPreview'); if(!el) return; var g=grFormValues();
+    if(grEditId){ el.textContent=''; return; }
+    if(!g.site && !g.role){ el.textContent='Choose a client or site, a role, or both.'; return; }
+    if(!/^\d{4}-\d{2}$/.test(g.from||'')){ el.textContent='Choose the month the group starts from.'; return; }
+    var tmp={id:'__new',name:g.name,site:g.site,role:g.role,from:g.from,to:g.to,createdAt:Number.MAX_SAFE_INTEGER}, after=payGroups.concat([tmp]);
+    var n=state.employees.filter(function(e){ return employedInMonth(e,g.from) && empGroupIdWith(after,e,g.from)==='__new'; }).length, cf=groupConflicts(tmp);
+    el.innerHTML=n+' employee'+(n===1?'':'s')+' would be in this group in '+escapeHtml(xMonthLabel(g.from))+'.'+(cf.length?' <b style="color:var(--bad)">Payroll for '+escapeHtml(xMonthLabel(cf[0].ym))+' is already calculated for '+cf[0].n+' of them, so choose a later month.</b>':'');
+  }
+  function grResetForm(){
+    var f=function(i){ return document.getElementById(i); }, sites=allSites();
+    grEditId=null; f('grFormTitle').textContent='New group'; f('grSave').textContent='Add group'; f('grCancel').style.display='none';
+    f('grName').value=''; f('grPayDay').value=''; f('grNote').value=''; f('grTo').value=''; f('grErr').textContent='';
+    f('grSite').innerHTML='<option value="">Any site</option>'+sites.map(function(s){ return '<option>'+escapeHtml(s)+'</option>'; }).join('');
+    f('grRole').innerHTML='<option value="">Any role</option>'+Object.keys(state.employees.reduce(function(o,e){ if(e.role) o[String(e.role).trim()]=1; return o; },{})).sort().map(function(r){ return '<option>'+escapeHtml(r)+'</option>'; }).join('');
+    f('grSite').disabled=false; f('grRole').disabled=false; f('grFrom').disabled=false; f('grFrom').value=suggestGroupFrom(); grPreview();
+  }
+  function grStartEdit(id){
+    var g=groupOf(id), f=function(i){ return document.getElementById(i); }; if(!g) return;
+    grResetForm(); grEditId=id; f('grFormTitle').textContent='Edit group: '+g.name; f('grSave').textContent='Save changes'; f('grCancel').style.display='';
+    f('grName').value=g.name; f('grPayDay').value=g.payDay||''; f('grNote').value=g.note||''; f('grTo').value=g.to||'';
+    f('grSite').innerHTML='<option>'+escapeHtml(g.site||'Any site')+'</option>'; f('grRole').innerHTML='<option>'+escapeHtml(g.role||'Any role')+'</option>'; f('grFrom').value=g.from;
+    f('grSite').disabled=true; f('grRole').disabled=true; f('grFrom').disabled=true; grPreview();
+  }
+  async function grSaveClick(){
+    var f=function(i){ return document.getElementById(i); }, err=f('grErr'), btn=f('grSave'); err.textContent=''; btn.disabled=true;
+    try{
+      var isNew=!grEditId, rec=await saveGroup(grFormValues(), isNew);
+      toast(isNew?'Group "'+rec.name+'" added. Choose it in the Payroll group box to run its payroll.':'Group saved.');
+      renderGroupsList(); syncGroupSelects(cycMonth()); grResetForm();
+    }catch(e){ err.textContent=e.message||'Could not save the group.'; }
+    btn.disabled=false;
+  }
+  function openGroupsModal(){ grResetForm(); renderGroupsList(); document.getElementById('groupsModalBg').classList.add('show'); }
+  function setupGroupsUI(){
+    var f=function(i){ return document.getElementById(i); };
+    f('grClose').addEventListener('click', function(){ f('groupsModalBg').classList.remove('show'); });
+    f('groupsModalBg').addEventListener('click', function(ev){ if(ev.target===f('groupsModalBg')) f('groupsModalBg').classList.remove('show'); });
+    ['grName','grSite','grRole','grFrom','grTo'].forEach(function(id){ f(id).addEventListener('input', grPreview); f(id).addEventListener('change', grPreview); });
+    f('grSave').addEventListener('click', grSaveClick); f('grCancel').addEventListener('click', function(){ grResetForm(); });
+    f('btnPayGroups').addEventListener('click', openGroupsModal);
+    f('payGroupSel').addEventListener('change', function(){ setPayScope(f('payGroupSel').value); });
   }
 
   // ---------- ATTENDANCE ----------
@@ -2954,7 +3218,7 @@ tr:hover td{background:var(--line2)}
           var body = {empId:empId, ym:ym, days:days};
           state.attendance[key]=body;
           if(db){ try{ await db.doc('attendance/'+key).set(body); }catch(e){} }
-          await invalidateRun(ym);
+          await invalidateRun(ym, state.employees.find(function(x){ return x.id===empId; }));
         }
       }
 
@@ -3000,7 +3264,7 @@ tr:hover td{background:var(--line2)}
     if(db){
       try{ await db.doc('attendance/'+key).set(body); }catch(e){ toast('Could not save attendance.'); }
     }
-    invalidateRun(ym);
+    invalidateRun(ym, state.employees.find(function(x){ return x.id===empId; }));
   }
 
   async function renderAttendance(){
@@ -3424,7 +3688,7 @@ tr:hover td{background:var(--line2)}
   var runCache={};
   var identityCache={id:null,label:'Unknown'};
 
-  function runKey(ym){ return ym.replace('-',''); }
+  function runKey(ym){ return runKeyOf(ym,payScope); }
 
   async function myIdentity(){
     if(me && me.id){ return {id:me.id, label: me.name || me.email || 'You'}; }
@@ -3436,41 +3700,29 @@ tr:hover td{background:var(--line2)}
     return !!id && list.indexOf(id)>-1;
   }
 
-  async function getRun(ym){
-    var key=runKey(ym);
-    if(!db) return runCache[key]||null;
-    try{
-      var snap = await db.doc('payrollRuns/'+key).get();
-      var data = (snap && snap.exists && snap.data()) ? snap.data() : null;
-      runCache[key]=data;
-      return data;
-    }catch(e){ return runCache[key]||null; }
-  }
-
-  async function saveRun(ym, data){
-    var key=runKey(ym);
-    runCache[key]=data;
-    if(!db){ toast('Storage unavailable — cannot save.'); return; }
-    try{ await db.doc('payrollRuns/'+key).set(data); }
-    catch(e){ toast('Could not save approval status: '+(e.code||'')); }
-  }
-
-  async function invalidateRun(ym){
-    if(cycClosed(ym)) return;
-    cycleReset(ym);
-    var run = await getRun(ym);
-    if(run && (run.status==='submitted' || run.status==='approved')){
-      run.status='draft';
-      run.invalidatedNote='Attendance or employee data changed after this was '+(run.status)+' — recalculate and resubmit.';
-      await saveRun(ym, run);
-      if(document.getElementById('payMonth') && document.getElementById('payMonth').value===ym){ renderRunStatus(ym); }
+  async function getRun(ym){ return getRunKey(runKey(ym)); }
+  async function saveRun(ym, data){ return saveRunKey(data.scopeKey||runKey(ym), data); }
+  // a month's attendance or an employee changed: send the payroll of that employee's group back to draft (or every group when no employee is given)
+  async function invalidateRun(ym, emp){
+    var scopes=emp?[empGroupId(emp,ym)]:scopesFor(ym), shown=document.getElementById('payMonth') && document.getElementById('payMonth').value===ym;
+    for(var i=0;i<scopes.length;i++){
+      var key=runKeyOf(ym,scopes[i]); if(cycles[key] && cycles[key].closed) continue;
+      cycleResetKey(key);
+      var run=await getRunKey(key);
+      if(run && (run.status==='submitted' || run.status==='approved')){
+        var was=run.status; run.status='draft';
+        run.invalidatedNote='Attendance or employee data changed after this was '+was+' — recalculate and resubmit.';
+        await saveRunKey(key, run);
+        if(shown && scopes[i]===payScope){ renderRunStatus(ym); }
+      }
     }
   }
 
   async function renderPayroll(){
     var ym=document.getElementById('payMonth').value || thisMonth();
+    syncGroupSelects(ym);
     // everyone employed in the month, in employee ID order. The saved payroll run is built from this whole list, whatever is shown below.
-    var active = state.employees.filter(function(e){return employedInMonth(e,ym);}).sort(compareByEmpCode);
+    var active = state.employees.filter(function(e){return employedInMonth(e,ym) && empGroupId(e,ym)===payScope;}).sort(compareByEmpCode);
     // the site list comes from the employees of the month; the choice is kept while it still applies
     var siteSel=document.getElementById('payFilterSite'), prevSite=siteSel.value, sites=[];
     active.forEach(function(e){ var s=(e.site||'').trim(); if(s && sites.indexOf(s)<0) sites.push(s); });
@@ -3582,6 +3834,7 @@ tr:hover td{background:var(--line2)}
   }
 
   async function calculateRun(ym){
+    var scopeKey0=runKey(ym);
     if(cycClosed(ym)){ toast('This month is closed. Reopen it in the pay cycle to recalculate.'); return; }
     var existing = await getRun(ym);
     if(existing && existing.status==='approved'){
@@ -3604,10 +3857,10 @@ tr:hover td{background:var(--line2)}
         pfWages:Math.round(x.r.pfWages||0), epsEr:Math.round(x.r.epsEr||0), epfEr:Math.round(x.r.epfEr||0), edliWages:Math.round(x.r.edliWages||0), edliEr:Math.round(x.r.edliEr||0)};
     });
     var totalNet = rows.reduce(function(s,r){return s+r.net;},0);
-    var run = {ym:ym, status:'draft', rows:rows, totalNet:totalNet, calculatedAt:Date.now(), calculatedBy:identity.id,
+    var run = {ym:ym, scopeKey:scopeKey0, status:'draft', rows:rows, totalNet:totalNet, calculatedAt:Date.now(), calculatedBy:identity.id,
       submittedAt:null, submittedBy:null, submittedByLabel:null, approvedAt:null, approvedBy:null, approvedByLabel:null, remark:null, invalidatedNote:null};
-    await saveRun(ym, run);
-    toast('Payroll calculated for '+ym+'.');
+    await saveRunKey(scopeKey0, run);
+    toast('Payroll calculated for '+ym+(payScope?' ('+groupName(payScope)+')':'')+'.');
     renderRunStatus(ym);
     patchCycle(ym,{},'Payroll calculated: '+rows.length+' employees, net pay '+fmtMoney(totalNet));
   }
@@ -6847,7 +7100,7 @@ tr:hover td{background:var(--line2)}
   var cyc={month:'',step:'overview'}, cycles={}, cycPend={}, cycQ={}, extrasMap={}, allRuns={}, cycAttCache={}, cycSeq=0, cycDirty=false;
 
   function cycMonth(){ if(!cyc.month) cyc.month=xAddMonth(thisMonth(),-1); return cyc.month; }
-  function cycKey(ym){ return ym.replace('-',''); }
+  function cycKey(ym){ return runKeyOf(ym,payScope); }
   function cycDoc(ym){ return cycles[cycKey(ym)]||{log:[]}; }
   function cycRun(ym){
     var k=cycKey(ym), x=allRuns[k], y=runCache[k];
@@ -6855,7 +7108,7 @@ tr:hover td{background:var(--line2)}
     return x||y||null;
   }
   function cycClosed(ym){ return !!cycDoc(ym).closed; }
-  function cycEmps(ym){ return state.employees.filter(function(e){ return employedInMonth(e,ym); }).sort(compareByEmpCode); }
+  function cycEmps(ym){ return state.employees.filter(function(e){ return employedInMonth(e,ym) && empGroupId(e,ym)===payScope; }).sort(compareByEmpCode); }
   function cycValidatedOk(ym){ var c=cycDoc(ym), r=cycRun(ym); return !!(c.validated && r && r.calculatedAt && c.validatedStamp===r.calculatedAt); }
   function cycDone(id,ym){
     var c=cycDoc(ym), r=cycRun(ym);
@@ -6871,20 +7124,11 @@ tr:hover td{background:var(--line2)}
     return false;
   }
   function cycNext(ym){ for(var i=0;i<CYC_STEPS.length;i++){ if(!cycDone(CYC_STEPS[i].id,ym)) return CYC_STEPS[i].id; } return null; }
-  function cycStatus(ym){
-    var c=cycDoc(ym), r=cycRun(ym);
-    if(c.closed) return ['Closed','ok'];
-    if(r && r.status==='approved') return ['Approved','ok'];
-    if(r && r.status==='submitted') return ['Awaiting approval','warn'];
-    if(r && r.status==='rejected') return ['Sent back','bad'];
-    if(cycValidatedOk(ym)) return ['Validated','info'];
-    if(r && r.rows && r.rows.length) return ['Calculated','info'];
-    return ['Draft','mute'];
-  }
+  function cycStatus(ym){ return runStatusFor(cycDoc(ym), cycRun(ym)); }
 
   // ---------- saving the cycle record (step confirmations and the activity log) ----------
-  function patchCycle(ym, patch, msg){
-    var key=cycKey(ym), base=cycles[key]||{log:[]}, next=Object.assign({}, base, patch||{});
+  function patchCycleKey(key, patch, msg){
+    var base=cycles[key]||{log:[]}, next=Object.assign({}, base, patch||{});
     if(msg){ next.log=(base.log||[]).concat([{t:new Date().toISOString(), by:(me&&me.id)||null, who:(me&&(me.name||me.email))||'Someone', msg:msg}]).slice(-200); }
     cycles[key]=next;
     if(!db){ cycRefresh(true); return Promise.resolve(); }
@@ -6895,12 +7139,14 @@ tr:hover td{background:var(--line2)}
     cycRefresh(true);
     return cycQ[key];
   }
-  function cycleReset(ym){
+  function patchCycle(ym, patch, msg){ return patchCycleKey(cycKey(ym), patch, msg); }
+  function cycleResetKey(key){
     cycAttCache={};
-    var c=cycles[cycKey(ym)];
+    var c=cycles[key];
     if(!c || c.closed) return;
-    if(c.reviewed || c.validated) patchCycle(ym,{reviewed:false,validated:false,issues:null},'Attendance or employee data changed, so the review and validation must be done again');
+    if(c.reviewed || c.validated) patchCycleKey(key,{reviewed:false,validated:false,issues:null},'Attendance or employee data changed, so the review and validation must be done again');
   }
+  function cycleReset(ym){ cycleResetKey(cycKey(ym)); }
   function subscribeCycleData(){
     if(!db) return;
     try{
@@ -6916,6 +7162,11 @@ tr:hover td{background:var(--line2)}
       db.collection('payrollRuns').onSnapshot(function(snap){
         var o={}; snap.docs.forEach(function(d){ o[d.id]=d.data(); runCache[d.id]=d.data(); });
         allRuns=o; cycRefresh();
+      }, function(){});
+      db.collection('payGroups').onSnapshot(function(snap){
+        payGroups=snap.docs.map(function(d){ return d.data(); }).filter(function(x){ return x && x.id; });
+        if(payScope && !groupOf(payScope)) payScope='';
+        cycRefresh();
       }, function(){});
     }catch(e){}
   }
@@ -6995,9 +7246,10 @@ tr:hover td{background:var(--line2)}
     var ym=cycMonth(), r=cycRun(ym), st=cycStatus(ym), next=cycNext(ym), emps=cycEmps(ym), gaps=cycGaps();
     if(!state.employees.length) return '<div class="card"><h2>Welcome to the pay cycle</h2><p class="muted">Add your employees first. The same seven steps then repeat every month.</p><button class="btn" data-cyc="tab" data-tab="employees">Go to Employees</button></div>';
     var nl=next?CYC_STEPS.filter(function(s){return s.id===next;})[0].label:null, t=r&&r.rows?cycTotals(r.rows):null;
-    var h='<div class="card" style="border-left:4px solid var(--brand)"><div class="row" style="justify-content:space-between;align-items:center"><div><h2 style="margin:0">'+escapeHtml(xMonthLabel(ym))+' payroll</h2><p class="muted" style="margin:.3rem 0 0">'+(next?'Next up: '+escapeHtml(nl)+'.':'This month is closed. Payslips, the bank file and reports are available.')+'</p></div>'+
+    var h='<div class="card" style="border-left:4px solid var(--brand)"><div class="row" style="justify-content:space-between;align-items:center"><div><h2 style="margin:0">'+escapeHtml(xMonthLabel(ym))+' payroll'+(payGroups.length?' \u00b7 '+escapeHtml(groupName(payScope)):'')+'</h2><p class="muted" style="margin:.3rem 0 0">'+(next?'Next up: '+escapeHtml(nl)+'.':'This month is closed. Payslips, the bank file and reports are available.')+'</p></div>'+
       (next?'<button class="btn" data-cyc="go" data-step="'+next+'">Continue: '+escapeHtml(nl)+'</button>':'<button class="btn" data-cyc="go" data-step="reports">Open reports</button>')+'</div></div>';
     h+='<div class="card"><div class="stat-grid"><div class="stat"><b>'+emps.length+'</b><span>Employees this month</span></div><div class="stat"><b>'+(t?fmtMoney(t.net):'Not yet')+'</b><span>Net pay</span></div><div class="stat"><b>'+(t?fmtMoney(t.cost):'Not yet')+'</b><span>Cost to company</span></div><div class="stat"><b>'+xTag(st[0],st[1])+'</b><span>Status</span></div></div></div>';
+    h+=groupsCardHtml(ym);
     h+='<div class="card"><h2>Pay cycle</h2><p class="muted">Seven steps repeat every month. Each one opens when the one before it is done.</p><ol class="cyc-steps">';
     CYC_STEPS.forEach(function(s){ var d=cycDone(s.id,ym); h+='<li class="'+(d?'done':'')+' '+(next===s.id?'next':'')+'"><span class="dot">'+(d?'\u2713':s.n)+'</span><span style="flex:1">'+escapeHtml(s.label)+'</span><button class="btn small ghost" data-cyc="go" data-step="'+s.id+'">Open</button></li>'; });
     h+='</ol></div><div class="card"><h2>Employee records to fix</h2><p class="muted">Missing details will stop the validation step later.</p>';
@@ -7119,10 +7371,15 @@ tr:hover td{background:var(--line2)}
       var t=cycTotals(r.rows), by={};
       r.rows.forEach(function(x){ var k=x.site||'No site'; var b=by[k]||(by[k]={n:0,gross:0,net:0,cost:0}); var one=cycTotals([x]); b.n++; b.gross+=one.gross; b.net+=one.net; b.cost+=one.cost; });
       if(!cycDoc(ym).closed) h+='<div class="banner">'+escapeHtml(xMonthLabel(ym))+' is not closed yet. These figures come from the latest calculation.</div>';
-      h+='<div class="card"><h2>Cost by site, '+escapeHtml(xMonthLabel(ym))+'</h2><p class="muted">Cost to company includes the employer share of PF and ESI.</p><div class="scrollx"><table><thead><tr><th>Site</th><th class="right">Employees</th><th class="right">Gross pay</th><th class="right">Net pay</th><th class="right">Cost to company</th></tr></thead><tbody>';
+      h+='<div class="card"><h2>Cost by site, '+escapeHtml(xMonthLabel(ym))+(payGroups.length?' \u00b7 '+escapeHtml(groupName(payScope)):'')+'</h2><p class="muted">Cost to company includes the employer share of PF and ESI.</p><div class="scrollx"><table><thead><tr><th>Site</th><th class="right">Employees</th><th class="right">Gross pay</th><th class="right">Net pay</th><th class="right">Cost to company</th></tr></thead><tbody>';
       Object.keys(by).sort().forEach(function(k){ var b=by[k]; h+='<tr><td><b>'+escapeHtml(k)+'</b></td><td class="right">'+b.n+'</td><td class="right">'+fmtMoney(b.gross)+'</td><td class="right">'+fmtMoney(b.net)+'</td><td class="right">'+fmtMoney(b.cost)+'</td></tr>'; });
       h+='</tbody><tfoot><tr><td>Total</td><td class="right">'+t.n+'</td><td class="right">'+fmtMoney(t.gross)+'</td><td class="right">'+fmtMoney(t.net)+'</td><td class="right">'+fmtMoney(t.cost)+'</td></tr></tfoot></table></div></div>';
-      h+=govPayHtml(t,ym);
+      if(!payGroups.length) h+=govPayHtml(t,ym);
+      else {
+        var mg=monthGovRows(ym);
+        h+='<div class="card"><p class="muted" style="margin:0"><b>PF, ESI and professional tax are paid together for the whole month.</b> '+(mg.rows.length?'The amounts below cover the groups that are approved: '+escapeHtml(mg.included.join(', '))+'.':'No group is approved yet, so there is nothing to pay yet.')+(mg.pending.length&&mg.rows.length?' Not included yet, because they are not approved: '+escapeHtml(mg.pending.join(', '))+'.':'')+'</p></div>';
+        if(mg.rows.length) h+=govPayHtml(cycTotals(mg.rows),ym);
+      }
       if(r.status==='approved') h+='<div class="card"><div class="row"><button class="btn" data-cyc="register">Payroll register (PDF)</button><button class="btn ghost" data-cyc="bank">Bank transfer file (CSV)</button></div></div>';
     } else h+='<div class="card"><p class="muted" style="margin:0"><b>No payroll calculated for '+escapeHtml(xMonthLabel(ym))+'.</b> Reports appear here once payroll is calculated.</p></div>';
     var hist=Object.keys(allRuns).filter(function(k){return allRuns[k].rows&&allRuns[k].rows.length;}).sort().reverse();
@@ -7130,7 +7387,7 @@ tr:hover td{background:var(--line2)}
     if(!hist.length) h+='<p class="muted" style="margin:0">No history yet.</p>';
     else{
       h+='<div class="scrollx"><table><thead><tr><th>Month</th><th>Status</th><th class="right">Employees</th><th class="right">Net pay</th><th class="right">Cost to company</th><th></th></tr></thead><tbody>';
-      hist.forEach(function(k){ var x=allRuns[k], ymk=k.slice(0,4)+'-'+k.slice(4), s=cycStatus(ymk), tt=cycTotals(x.rows); h+='<tr><td><b>'+escapeHtml(xMonthLabel(ymk))+'</b></td><td>'+xTag(s[0],s[1])+'</td><td class="right">'+tt.n+'</td><td class="right">'+fmtMoney(tt.net)+'</td><td class="right">'+fmtMoney(tt.cost)+'</td><td><button class="btn small ghost" data-cyc="openRun" data-m="'+ymk+'">Open</button></td></tr>'; });
+      hist.forEach(function(k){ var x=allRuns[k], ymk=k.slice(0,4)+'-'+k.slice(4,6), sc=k.length>6?k.slice(7):'', s=runStatusFor(cycles[k],x), tt=cycTotals(x.rows); h+='<tr><td><b>'+escapeHtml(xMonthLabel(ymk))+'</b>'+(payGroups.length?'<div class="muted" style="font-size:.78rem">'+escapeHtml(groupName(sc))+'</div>':'')+'</td><td>'+xTag(s[0],s[1])+'</td><td class="right">'+tt.n+'</td><td class="right">'+fmtMoney(tt.net)+'</td><td class="right">'+fmtMoney(tt.cost)+'</td><td><button class="btn small ghost" data-cyc="openRun" data-m="'+ymk+'" data-scope="'+escapeHtml(sc)+'">Open</button></td></tr>'; });
       h+='</tbody></table></div>';
     }
     return h+'</div>';
@@ -7156,6 +7413,7 @@ tr:hover td{background:var(--line2)}
     var el=document.getElementById('cycleMain'); if(!el) return;
     var seq=++cycSeq, ym=cycMonth(), mi=document.getElementById('cycMonth');
     if(mi && mi.value!==ym) mi.value=ym;
+    syncGroupSelects(ym);
     renderCycStepper();
     var st=cycStatus(ym), pill=document.getElementById('cycStatusPill'); if(pill) pill.innerHTML='<span class="muted">Status: </span>'+xTag(st[0],st[1]);
     var html;
@@ -7168,7 +7426,7 @@ tr:hover td{background:var(--line2)}
     var ym=cycMonth(), next=cycNext(ym), n=CYC_STEPS.filter(function(s){return cycDone(s.id,ym);}).length, st=cycStatus(ym);
     if(!state.employees.length){ el.innerHTML='<h2>Pay cycle</h2><p class="muted">Add your employees, then start the monthly pay cycle.</p>'; return; }
     var nl=next?CYC_STEPS.filter(function(s){return s.id===next;})[0].label:null;
-    el.innerHTML='<div class="row" style="justify-content:space-between;align-items:center"><div><h2 style="margin:0">'+escapeHtml(xMonthLabel(ym))+' pay cycle</h2><p class="muted" style="margin:.3rem 0 0">'+n+' of '+CYC_STEPS.length+' steps done. '+(next?'Next up: '+escapeHtml(nl)+'.':'This month is closed.')+'</p></div><div class="row" style="flex:none;align-items:center">'+xTag(st[0],st[1])+'<button class="btn" data-cyc="go" data-step="'+(next||'overview')+'">'+(next?'Continue':'Open')+'</button></div></div>';
+    el.innerHTML='<div class="row" style="justify-content:space-between;align-items:center"><div><h2 style="margin:0">'+escapeHtml(xMonthLabel(ym))+' pay cycle'+(payScope?' \u00b7 '+escapeHtml(groupName(payScope)):'')+'</h2><p class="muted" style="margin:.3rem 0 0">'+n+' of '+CYC_STEPS.length+' steps done. '+(next?'Next up: '+escapeHtml(nl)+'.':'This month is closed.')+'</p></div><div class="row" style="flex:none;align-items:center">'+xTag(st[0],st[1])+'<button class="btn" data-cyc="go" data-step="'+(next||'overview')+'">'+(next?'Continue':'Open')+'</button></div></div>';
   }
   function cycGo(step, ym){
     if(ym) cyc.month=ym;
@@ -7195,7 +7453,7 @@ tr:hover td{background:var(--line2)}
       var xp='monthExtras/'+id+'_'+ym.replace('-','');
       if(canPay()) await db.doc(xp).set(cur); else { var cu=Object.assign({},cur); delete cu.adds; await db.doc(xp).update(cu); }
     }catch(e){ toast('Could not save: '+(e&&e.code||'error')); return; } }
-    if(field!=='note') await invalidateRun(ym);
+    if(field!=='note') await invalidateRun(ym, state.employees.find(function(x){ return x.id===id; }));
   }
   async function cycCalculate(){
     var ym=cycMonth();
@@ -7235,7 +7493,9 @@ tr:hover td{background:var(--line2)}
       case 'close': { var r=cycRun(ym); if(!(r&&r.status==='approved')){ toast('Approve the payroll before closing the month.'); break; } if(!confirm('Close '+xMonthLabel(ym)+'? Attendance and payroll will be locked.')) break; await patchCycle(ym,{closed:true,closedAt:Date.now()},'Month closed. Attendance and payroll are locked'); break; }
       case 'reopen': { if(!confirm('Reopen '+xMonthLabel(ym)+'? Attendance and payroll can be changed again.')) break; await patchCycle(ym,{closed:false},'Month reopened'); break; }
       case 'fixEmp': { var tb=document.getElementById('tabs-employees'); if(tb) tb.click(); openEmpModal(id); break; }
-      case 'openRun': cyc.month=el.dataset.m; cyc.step='overview'; renderCycle(); renderWorkflowRail(); renderCycleCard(); window.scrollTo(0,0); break;
+      case 'openRun': cyc.month=el.dataset.m; payScope=(el.dataset.scope && groupApplies(groupOf(el.dataset.scope), el.dataset.m))?el.dataset.scope:''; cycAttCache={}; cyc.step='overview'; renderCycle(); renderWorkflowRail(); renderCycleCard(); window.scrollTo(0,0); break;
+      case 'scope': setPayScope(el.dataset.scope||''); break;
+      case 'groups': openGroupsModal(); break;
     }
   }
   function setupCycleUI(){
@@ -7243,6 +7503,7 @@ tr:hover td{background:var(--line2)}
     root.addEventListener('click', function(ev){ var el=ev.target.closest('[data-cyc]'); if(el && !el.disabled) cycHandle(el.dataset.cyc, el); });
     root.addEventListener('change', function(ev){
       var el=ev.target;
+      if(el.id==='cycGroup'){ setPayScope(el.value); return; }
       if(el.id==='cycMonth'){ if(el.value){ cyc.month=el.value; cycAttCache={}; renderCycle(); renderWorkflowRail(); renderCycleCard(); } return; }
       if(el.dataset && el.dataset.filing){ saveFilingTick(el); return; }
       if(el.dataset && el.dataset.extra) cycSaveExtra(el.dataset.id, el.dataset.extra, el.value);
