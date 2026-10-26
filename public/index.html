@@ -297,6 +297,8 @@ tr:hover td{background:var(--line2)}
       <div class="row" style="justify-content:space-between">
         <h2>Payroll</h2>
         <div class="row" style="flex:none">
+          <div class="field"><label>Site</label><select id="payFilterSite"><option value="">All sites</option></select></div>
+          <div class="field"><label>Sort by</label><select id="payFilterSort"><option value="id">Employee ID</option><option value="name">Name</option></select></div>
           <div class="field"><label>Month</label><input type="month" id="payMonth"></div>
         </div>
       </div>
@@ -325,6 +327,7 @@ tr:hover td{background:var(--line2)}
         <div style="text-align:right">
           <div class="muted">Total net pay this month</div>
           <div style="font:800 1.8rem var(--display);color:var(--accent)" id="payTotal">₹0</div>
+          <div class="muted" id="payTotalNote" style="margin-top:.2rem"></div>
         </div>
       </div>
     </div>
@@ -966,6 +969,30 @@ tr:hover td{background:var(--line2)}
 </div>
 
 <!-- Billing pack modal -->
+<div class="modal-bg" id="addPayModalBg">
+  <div class="modal" style="max-width:700px">
+    <button class="close-x" id="apClose">&times;</button>
+    <h3 id="apTitle">Additional pay</h3>
+    <p class="muted" id="apSub"></p>
+    <div id="apList"></div>
+    <div class="muted" id="apTotal" style="font-weight:700;margin:.5rem 0"></div>
+    <div id="apForm" style="border-top:1px solid var(--line);padding-top:.8rem;margin-top:.6rem">
+      <div class="row">
+        <div class="field"><label>For</label><select id="apType"></select></div>
+        <div class="field"><label>Amount (₹)</label><input type="number" id="apAmt" min="0" step="0.01"></div>
+        <div class="field grow"><label>Note (optional)</label><input id="apNote" maxlength="80" placeholder="For example: Diwali bonus"></div>
+      </div>
+      <label class="chk" style="display:flex;align-items:center;gap:.5rem;margin-top:.3rem"><input type="checkbox" id="apStat" style="width:auto;min-height:0"> Count for ESI and professional tax</label>
+      <div class="muted" style="font-size:.78rem;margin-top:.3rem">PF is not worked out on these lines. Leave the box ticked for regular pay such as incentives and allowances, and unticked for a bonus or a reimbursement.</div>
+      <div id="apErr" style="color:var(--bad);min-height:1.3em;margin-top:.4rem" role="alert"></div>
+      <div class="row"><button class="btn" id="apAdd">Add to this month</button></div>
+    </div>
+    <div class="banner" id="apLock" style="display:none"></div>
+    <div class="row" style="margin-top:1rem"><button class="btn ghost" id="apDone">Done</button></div>
+    <p class="muted" style="margin-top:.6rem">Recalculate the payroll after adding pay. To take money off, use "Other deduction" instead.</p>
+  </div>
+</div>
+
 <div class="modal-bg" id="payModalBg">
   <div class="modal" style="max-width:800px">
     <button class="close-x" id="payModalClose">&times;</button>
@@ -1289,6 +1316,7 @@ tr:hover td{background:var(--line2)}
     setupIdCardsUI();
     setupMailUI();
     setupBackupUI();
+    setupAddPayUI();
     setupPayUI();
     setupAttendanceUI();
     setupAttImportUI();
@@ -2750,14 +2778,85 @@ tr:hover td{background:var(--line2)}
 
   // what the gross is made of, shown under the gross in the payroll table (the gross is the wage earned plus overtime, night shifts and arrears)
   function grossNote(r){
-    var parts=[], base=(r.baseGross!=null)?r.baseGross:r.gross, extras=(r.otPay||0)+(r.nightPay||0)+(r.arrears||0), absent=(r.present!=null && r.dim!=null && r.present<r.dim);
+    var parts=[], base=(r.baseGross!=null)?r.baseGross:r.gross, extras=(r.otPay||0)+(r.nightPay||0)+(r.arrears||0)+(r.addPay||0), absent=(r.present!=null && r.dim!=null && r.present<r.dim);
     if(absent) parts.push('Wage for '+r.present+' of '+r.dim+' days '+fmtMoney(base)); else if(extras) parts.push('Wage '+fmtMoney(base));
     if(r.otPay) parts.push('overtime '+(r.otHrs||0)+' h '+fmtMoney(r.otPay));
     if(r.nightPay) parts.push('night shifts '+(r.nights||0)+' '+fmtMoney(r.nightPay));
     if(r.arrears) parts.push('arrears '+fmtMoney(r.arrears));
+    var by={}; (r.addLines||[]).forEach(function(a){ var k=String(a.type||'Other').toLowerCase(); by[k]=(by[k]||0)+Number(a.amount); });
+    Object.keys(by).forEach(function(k){ parts.push(k+' '+fmtMoney(by[k])); });
     return parts.join(' + ');
   }
   function grossNoteHtml(r){ var n=grossNote(r); return n?'<div class="muted" style="font-size:.72rem;white-space:normal;max-width:230px;margin-left:auto">'+escapeHtml(n)+'</div>':''; }
+
+  /* ---------- additional pay: bonus, incentive, adjustment and other lines added to a month's pay ---------- */
+  // stat = counts towards ESI and professional tax. PF is never worked out on these lines (PF is on Basic + D.A.).
+  var ADD_TYPES=[{k:'Bonus',stat:false},{k:'Incentive',stat:true},{k:'Adjustment',stat:true},{k:'Allowance',stat:true},{k:'Reimbursement',stat:false},{k:'Other',stat:true}];
+  function addTypeStat(t){ var x=ADD_TYPES.filter(function(a){ return a.k===t; })[0]; return x?x.stat:true; }
+  function addLinesOf(x){ return ((x&&x.adds)||[]).filter(function(a){ return Number(a.amount)>0; }); }
+  function addPayTotal(x){ return addLinesOf(x).reduce(function(s,a){ return s+Number(a.amount); },0); }
+  function addPayLabel(a){ var l=String(a.type||'Other')+(a.note?' - '+String(a.note):''); return l.length>34?l.slice(0,33)+'...':l; }
+  // returns an error message, or '' when the line is fine
+  function validateAddLine(line, existing){
+    var amt=Number(line.amount);
+    if(ADD_TYPES.map(function(t){ return t.k; }).indexOf(line.type)<0) return 'Choose what the pay is for.';
+    if(!(amt>0)) return 'Enter an amount above zero. To take money off, use "Other deduction".';
+    if(amt>1000000) return 'That amount looks too large. Please check it.';
+    if(String(line.note||'').length>80) return 'Keep the note to 80 characters.';
+    if((existing||[]).length>=10) return 'A month can have at most 10 additional pay lines for one employee.';
+    return '';
+  }
+  var apEmp=null, apYm=null;
+  function apCurrent(){ return extrasMap[apEmp+'|'+apYm]||{}; }
+  // saves the lines for one employee and month (only Accounts or the administrator may)
+  async function cycSaveAdds(id, ym, lines){
+    if(!canPay()){ toast('Only Accounts or an administrator can add or change additional pay.'); return false; }
+    if(cycClosed(ym)){ toast('This month is closed. Reopen it to change pay.'); return false; }
+    var key=id+'|'+ym, cur=Object.assign({empId:id, ym:ym}, extrasMap[key]||{});
+    cur.adds=lines.map(function(a){ return {id:a.id, type:a.type, amount:Math.round(Number(a.amount)*100)/100, note:String(a.note||'').trim(), stat:!!a.stat}; });
+    if(!cur.adds.length) delete cur.adds;
+    extrasMap[key]=cur;
+    if(db){ try{ await db.doc('monthExtras/'+id+'_'+ym.replace('-','')).set(cur); }catch(e){ toast('Could not save: '+(e&&e.code||'error')); return false; } }
+    await invalidateRun(ym); return true;
+  }
+  function renderAddPay(){
+    var f=function(i){ return document.getElementById(i); }, e=state.employees.find(function(x){ return x.id===apEmp; })||{}, x=apCurrent(), lines=addLinesOf(x), can=canPay()&&!cycClosed(apYm);
+    f('apTitle').textContent='Additional pay: '+(e.name||'')+(e.empCode?' ('+e.empCode+')':'');
+    f('apSub').textContent=xMonthLabel(apYm)+'. These lines are added to the pay for this month and shown on the payslip.';
+    f('apList').innerHTML=lines.length?('<div class="scrollx"><table><thead><tr><th>For</th><th class="right">Amount</th><th>Note</th><th>ESI and PT</th><th></th></tr></thead><tbody>'+lines.map(function(a,i){
+      return '<tr><td>'+escapeHtml(a.type)+'</td><td class="right">'+fmtMoney(a.amount)+'</td><td>'+escapeHtml(a.note||'')+'</td><td>'+(a.stat?'Counted':'Not counted')+'</td><td>'+(can?'<button class="btn small ghost" data-apdel="'+i+'">Remove</button>':'')+'</td></tr>'; }).join('')+'</tbody></table></div>')
+      :'<div class="muted">No additional pay for this month yet.</div>';
+    f('apTotal').textContent=lines.length?'Total additional pay: '+fmtMoney(addPayTotal(x)):'';
+    f('apForm').style.display=can?'':'none';
+    f('apLock').style.display=can?'none':'';
+    f('apLock').textContent=cycClosed(apYm)?'This month is closed, so pay cannot be changed.':'Only Accounts or an administrator can add or change additional pay.';
+    f('apErr').textContent='';
+    f('apList').querySelectorAll('[data-apdel]').forEach(function(b){ b.addEventListener('click', async function(){
+      var cur=addLinesOf(apCurrent()).slice(); cur.splice(Number(b.dataset.apdel),1); if(await cycSaveAdds(apEmp,apYm,cur)){ renderAddPay(); if(typeof cycRefresh==='function') cycRefresh(true); } }); });
+  }
+  function openAddPay(id){
+    apEmp=id; apYm=cycMonth(); var f=function(i){ return document.getElementById(i); };
+    f('apType').innerHTML=ADD_TYPES.map(function(t){ return '<option>'+t.k+'</option>'; }).join(''); f('apType').value='Bonus'; f('apStat').checked=addTypeStat('Bonus'); f('apAmt').value=''; f('apNote').value='';
+    renderAddPay(); f('addPayModalBg').classList.add('show');
+  }
+  async function apAdd(){
+    var f=function(i){ return document.getElementById(i); }, existing=addLinesOf(apCurrent()), line={id:'a'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), type:f('apType').value, amount:f('apAmt').value, note:f('apNote').value, stat:f('apStat').checked};
+    var err=validateAddLine(line,existing); if(err){ f('apErr').textContent=err; return; }
+    if(await cycSaveAdds(apEmp,apYm,existing.concat([line]))){ f('apAmt').value=''; f('apNote').value=''; renderAddPay(); if(typeof cycRefresh==='function') cycRefresh(true); }
+  }
+  function addPayCell(e,x,closed){
+    var n=addLinesOf(x).length, t=addPayTotal(x);
+    return '<td class="right"><button class="btn small ghost" data-addpay="'+escapeHtml(e.id)+'">'+(n?fmtMoney(t)+' ('+n+')':(canPay()&&!closed?'Add':'View'))+'</button></td>';
+  }
+  function setupAddPayUI(){
+    var f=function(i){ return document.getElementById(i); };
+    f('apClose').addEventListener('click', function(){ f('addPayModalBg').classList.remove('show'); });
+    f('apDone').addEventListener('click', function(){ f('addPayModalBg').classList.remove('show'); });
+    f('addPayModalBg').addEventListener('click', function(ev){ if(ev.target===f('addPayModalBg')) f('addPayModalBg').classList.remove('show'); });
+    f('apType').addEventListener('change', function(){ f('apStat').checked=addTypeStat(f('apType').value); });
+    f('apAdd').addEventListener('click', apAdd);
+    document.addEventListener('click', function(ev){ var b=ev.target.closest && ev.target.closest('[data-addpay]'); if(b) openAddPay(b.dataset.addpay); });
+  }
 
   // ---------- ATTENDANCE ----------
   // ---------- ATTENDANCE CSV IMPORT (from the Attendance app) ----------
@@ -3015,23 +3114,27 @@ tr:hover td{background:var(--line2)}
     var otPay = Math.round(otHrs * (monthlyBasic/(dim*8)) * (st.otMult||2));
     var nightPay = Math.round(nights * (st.nightAllowance==null?150:st.nightAllowance));
     var baseGross = gross, ar = arrearsDue(e, ym), arrears = ar.amount;
-    gross = baseGross + otPay + nightPay + arrears;
+    var adds = addLinesOf(ex), addPay = 0, addStat = 0;
+    adds.forEach(function(a){ addPay += Number(a.amount); if(a.stat) addStat += Number(a.amount); });
+    gross = baseGross + otPay + nightPay + arrears + addPay;
+    var statGross = gross - (addPay - addStat);   // the pay that counts for ESI and professional tax
     if(arrears) basic += arrears*bshare;
     var pf=0, esi=0, pt=0, pfEr=0, esiEr=0, pfInfo=null;
     if(e.pfApplicable){
       pfInfo = pfBreakdown(basic, !!e.pfFull, null, ym); pf = pfInfo.ee; pfEr = pfInfo.er;
     }
     if(e.esiApplicable && baseGross <= (st.esiThreshold||21000)){
-      esi = gross * (st.esiRate||0.75)/100;
-      esiEr = gross * (st.esiErRate==null?3.25:st.esiErRate)/100;
+      esi = statGross * (st.esiRate||0.75)/100;
+      esiEr = statGross * (st.esiErRate==null?3.25:st.esiErRate)/100;
     }
-    pt = ptForState(e.state, gross);
+    pt = ptForState(e.state, statGross);
     var advance = (typeof suggestedAdvanceDeduction==='function') ? suggestedAdvanceDeduction(e.id) : 0;
     var net = gross - pf - esi - pt - advance - otherDed;
     return {present:present, dim:dim, gross:gross, baseGross:baseGross, basic:basic, pf:pf, esi:esi, pt:pt, advance:advance, net:net,
       otHrs:otHrs, nights:nights, otPay:otPay, nightPay:nightPay, otherDed:otherDed, pfEr:pfEr, esiEr:esiEr,
       struct:struct, basicPart:stdBasic, daPart:stdDa, extraPart:stdExtra, dutyHrs:stdDuty,
       arrears:arrears, arrearsNote:ar.note, revNote:revNote,
+      addPay:addPay, addLines:adds.map(function(a){ return {type:a.type, amount:Number(a.amount), note:a.note||'', stat:!!a.stat}; }),
       pfWages:pfInfo?pfInfo.wages:0, epsEr:pfInfo?pfInfo.eps:0, epfEr:pfInfo?pfInfo.epf:0, edliWages:pfInfo?pfInfo.edliWages:0, edliEr:pfInfo?pfInfo.edli:0};
   }
 
@@ -3313,6 +3416,8 @@ tr:hover td{background:var(--line2)}
 
   function setupPayrollUI(){
     document.getElementById('payMonth').addEventListener('change', renderPayroll);
+    document.getElementById('payFilterSite').addEventListener('change', renderPayroll);
+    document.getElementById('payFilterSort').addEventListener('change', renderPayroll);
   }
 
   var lastPayroll=[];
@@ -3364,18 +3469,35 @@ tr:hover td{background:var(--line2)}
 
   async function renderPayroll(){
     var ym=document.getElementById('payMonth').value || thisMonth();
-    var active = state.employees.filter(function(e){return employedInMonth(e,ym);})
-      .sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
+    // everyone employed in the month, in employee ID order. The saved payroll run is built from this whole list, whatever is shown below.
+    var active = state.employees.filter(function(e){return employedInMonth(e,ym);}).sort(compareByEmpCode);
+    // the site list comes from the employees of the month; the choice is kept while it still applies
+    var siteSel=document.getElementById('payFilterSite'), prevSite=siteSel.value, sites=[];
+    active.forEach(function(e){ var s=(e.site||'').trim(); if(s && sites.indexOf(s)<0) sites.push(s); });
+    sites.sort(function(a,b){ return a.localeCompare(b); });
+    var hasNoSite=active.some(function(e){ return !(e.site||'').trim(); });
+    siteSel.innerHTML='<option value="">All sites</option>'+sites.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join('')+(hasNoSite?'<option value="__none">No site</option>':'');
+    siteSel.value=(prevSite && (sites.indexOf(prevSite)>=0 || (prevSite==='__none' && hasNoSite))) ? prevSite : '';
     var tbody=document.querySelector('#payTable tbody');
     tbody.innerHTML='';
-    document.getElementById('payEmpty').style.display = active.length? 'none':'';
-    var total=0;
-    lastPayroll=[];
+    var list=[], allTotal=0;
     for(var i=0;i<active.length;i++){
       var e=active[i];
       var r = await computePayroll(e, ym);
+      allTotal += r.net;
+      list.push({emp:e, r:r});
+    }
+    lastPayroll=list;
+    // what is shown: the chosen site, in the chosen order
+    var site=siteSel.value, sortBy=document.getElementById('payFilterSort').value;
+    var view=list.filter(function(x){ var s=(x.emp.site||'').trim(); return !site || (site==='__none' ? !s : s===site); });
+    if(sortBy==='name') view=view.slice().sort(function(a,b){ return (a.emp.name||'').localeCompare(b.emp.name||'') || compareByEmpCode(a.emp,b.emp); });
+    document.getElementById('payEmpty').style.display = view.length? 'none':'';
+    document.getElementById('payEmpty').textContent = active.length ? 'No employees at this site for the month.' : 'No active employees to show payroll for.';
+    var total=0;
+    view.forEach(function(x){
+      var e=x.emp, r=x.r;
       total += r.net;
-      lastPayroll.push({emp:e, r:r});
       var tr=document.createElement('tr');
       tr.innerHTML = '<td style="font-weight:700;color:var(--accent)">'+escapeHtml(e.empCode||'—')+'</td><td>'+escapeHtml(e.name)+(r.revNote?'<div class="muted" style="font-size:.72rem">Pay changed this month</div>':'')+(r.arrears?'<div class="muted" style="font-size:.72rem">Includes arrears '+fmtMoney(r.arrears)+'</div>':'')+'</td><td>'+escapeHtml(e.site||'—')+'</td>'+
         '<td class="right">'+r.present+' / '+r.dim+'</td>'+
@@ -3387,8 +3509,9 @@ tr:hover td{background:var(--line2)}
         '<td class="right" style="font-weight:700">'+fmtMoney(r.net)+'</td>'+
         '<td><button class="btn small ghost" data-slip="'+e.id+'">Payslip</button></td>';
       tbody.appendChild(tr);
-    }
+    });
     document.getElementById('payTotal').textContent = fmtMoney(total);
+    document.getElementById('payTotalNote').textContent = site ? ('Showing '+view.length+' of '+active.length+' employees, at '+(site==='__none'?'no site':site)+'. All sites together: '+fmtMoney(allTotal)+'.') : '';
     tbody.querySelectorAll('[data-slip]').forEach(function(b){
       b.addEventListener('click', function(){ downloadPayslip(b.dataset.slip, ym); });
     });
@@ -3477,6 +3600,7 @@ tr:hover td{background:var(--line2)}
         basicPay:x.r.struct?Math.round(x.r.basicPart):0, daPay:x.r.struct?Math.round(x.r.daPart):0,
         extraPay:x.r.struct?Math.max(0,Math.round(x.r.baseGross)-Math.round(x.r.basicPart)-Math.round(x.r.daPart)):0,
         arrears:Math.round(x.r.arrears||0), arrearsNote:x.r.arrearsNote||'', revNote:x.r.revNote||'',
+        addPay:Math.round(x.r.addPay||0), addLines:(x.r.addLines||[]).map(function(a){ return {type:a.type, amount:Math.round(a.amount*100)/100, note:a.note||''}; }),
         pfWages:Math.round(x.r.pfWages||0), epsEr:Math.round(x.r.epsEr||0), epfEr:Math.round(x.r.epfEr||0), edliWages:Math.round(x.r.edliWages||0), edliEr:Math.round(x.r.edliEr||0)};
     });
     var totalNet = rows.reduce(function(s,r){return s+r.net;},0);
@@ -5852,13 +5976,13 @@ tr:hover td{background:var(--line2)}
     var half=(CW-20)/2, lx=ML, rx=ML+half+20;
     function head2(x,t){ pb.rect(x,y,half,20,{fill:C.ink}); pb.text(x+8,y+13.5,t,8.6,{bold:true,color:C.white}); pb.text(x+half-8,y+13.5,'Amount (Rs.)',8.6,{bold:true,color:C.white,align:'right'}); }
     head2(lx,'Earnings'); head2(rx,'Deductions');
-    var ot=r.otPay||0, nt=r.nightPay||0, ar=r.arrears||0, earn;
+    var ot=r.otPay||0, nt=r.nightPay||0, ar=r.arrears||0, ap=r.addPay||0, addE=(r.addLines||[]).map(function(a){ return [addPayLabel(a),a.amount]; }), earn;
     if(r.struct){
       earn=[['Basic',r.basicPay||0],['Dearness allowance (D.A.)',r.daPay||0]];
       if(r.extraPay) earn.push(['Extra '+Math.max(0,(r.dutyHrs||8)-8)+' hrs ('+(r.dutyHrs||8)+'-hour duty)',r.extraPay]);
-      if(ot) earn.push(['Overtime ('+(r.otHrs||0)+' hrs)',ot]); if(nt) earn.push(['Night shift allowance ('+(r.nights||0)+')',nt]); if(ar) earn.push(['Arrears (wage revision)',ar]);
+      if(ot) earn.push(['Overtime ('+(r.otHrs||0)+' hrs)',ot]); if(nt) earn.push(['Night shift allowance ('+(r.nights||0)+')',nt]); if(ar) earn.push(['Arrears (wage revision)',ar]); addE.forEach(function(a){ earn.push(a); });
     }
-    else if(ot||nt||ar){ earn=[['Pay for days worked',(r.gross||0)-ot-nt-ar]]; if(ot) earn.push(['Overtime ('+(r.otHrs||0)+' hrs)',ot]); if(nt) earn.push(['Night shift allowance ('+(r.nights||0)+')',nt]); if(ar) earn.push(['Arrears (wage revision)',ar]); }
+    else if(ot||nt||ar||ap){ earn=[['Pay for days worked',(r.gross||0)-ot-nt-ar-ap]]; if(ot) earn.push(['Overtime ('+(r.otHrs||0)+' hrs)',ot]); if(nt) earn.push(['Night shift allowance ('+(r.nights||0)+')',nt]); if(ar) earn.push(['Arrears (wage revision)',ar]); addE.forEach(function(a){ earn.push(a); }); }
     else earn=[['Gross pay',r.gross||0]];
     var ded=[['Provident fund (PF)',r.pf||0],['ESI',r.esi||0],['Professional tax',r.pt||0],['Salary advance',r.advance||0]];
     if(r.otherDed) ded.push(['Other deduction',r.otherDed]);
@@ -6800,7 +6924,7 @@ tr:hover td{background:var(--line2)}
   function cycTotals(rows){
     var t={n:rows.length,gross:0,pf:0,esi:0,pt:0,other:0,net:0,ot:0,pfEr:0,esiEr:0,pfWages:0,edliWages:0,eps:0,epf:0,edli:0};
     rows.forEach(function(r){
-      t.gross+=r.gross||0; t.pf+=r.pf||0; t.esi+=r.esi||0; t.pt+=r.pt||0; t.other+=(r.advance||0)+(r.otherDed||0); t.net+=r.net||0; t.ot+=(r.otPay||0)+(r.nightPay||0);
+      t.gross+=r.gross||0; t.pf+=r.pf||0; t.esi+=r.esi||0; t.pt+=r.pt||0; t.other+=(r.advance||0)+(r.otherDed||0); t.net+=r.net||0; t.ot+=(r.otPay||0)+(r.nightPay||0)+(r.addPay||0);
       t.pfEr+= (r.pfEr!=null? r.pfEr : (r.pf||0));
       if(r.pfWages!=null){ t.pfWages+=r.pfWages||0; t.edliWages+=r.edliWages||0; t.eps+=r.epsEr||0; t.epf+=r.epfEr||0; t.edli+=r.edliEr||0; }
       else if((r.pf||0)>0){ var pc=pfCfg(), pb0=pfBreakdown((r.pf||0)/(pc.ee/100),true); t.pfWages+=pb0.wages; t.edliWages+=pb0.edliWages; t.eps+=pb0.eps; t.epf+=pb0.epf; t.edli+=pb0.edli; }
@@ -6827,9 +6951,9 @@ tr:hover td{background:var(--line2)}
     return out;
   }
   function cycRowsTable(rows,t){
-    var h='<div class="scrollx"><table><thead><tr><th>ID</th><th>Employee</th><th>Site</th><th class="right">Paid days</th><th class="right">Gross</th><th class="right">OT and shifts</th><th class="right">PF</th><th class="right">ESI</th><th class="right">PT</th><th class="right">Advance and other</th><th class="right">Net pay</th></tr></thead><tbody>';
+    var h='<div class="scrollx"><table><thead><tr><th>ID</th><th>Employee</th><th>Site</th><th class="right">Paid days</th><th class="right">Gross</th><th class="right">OT, shifts and additions</th><th class="right">PF</th><th class="right">ESI</th><th class="right">PT</th><th class="right">Advance and other</th><th class="right">Net pay</th></tr></thead><tbody>';
     rows.forEach(function(r){
-      h+='<tr><td>'+escapeHtml(r.empCode||'')+'</td><td>'+escapeHtml(r.name)+'</td><td>'+escapeHtml(r.site||'')+'</td><td class="right">'+r.present+'/'+r.dim+'</td><td class="right">'+fmtMoney(r.gross)+'</td><td class="right">'+fmtMoney((r.otPay||0)+(r.nightPay||0))+'</td><td class="right">'+fmtMoney(r.pf)+'</td><td class="right">'+fmtMoney(r.esi)+'</td><td class="right">'+fmtMoney(r.pt)+'</td><td class="right">'+fmtMoney((r.advance||0)+(r.otherDed||0))+'</td><td class="right"><b>'+fmtMoney(r.net)+'</b></td></tr>';
+      h+='<tr><td>'+escapeHtml(r.empCode||'')+'</td><td>'+escapeHtml(r.name)+'</td><td>'+escapeHtml(r.site||'')+'</td><td class="right">'+r.present+'/'+r.dim+'</td><td class="right">'+fmtMoney(r.gross)+'</td><td class="right">'+fmtMoney((r.otPay||0)+(r.nightPay||0)+(r.addPay||0))+'</td><td class="right">'+fmtMoney(r.pf)+'</td><td class="right">'+fmtMoney(r.esi)+'</td><td class="right">'+fmtMoney(r.pt)+'</td><td class="right">'+fmtMoney((r.advance||0)+(r.otherDed||0))+'</td><td class="right"><b>'+fmtMoney(r.net)+'</b></td></tr>';
     });
     return h+'</tbody><tfoot><tr><td colspan="4">Total for '+t.n+' employees</td><td class="right">'+fmtMoney(t.gross)+'</td><td class="right">'+fmtMoney(t.ot)+'</td><td class="right">'+fmtMoney(t.pf)+'</td><td class="right">'+fmtMoney(t.esi)+'</td><td class="right">'+fmtMoney(t.pt)+'</td><td class="right">'+fmtMoney(t.other)+'</td><td class="right">'+fmtMoney(t.net)+'</td></tr></tfoot></table></div>';
   }
@@ -6856,7 +6980,7 @@ tr:hover td{background:var(--line2)}
       if((r.net||0)<0) add('error','Deductions are higher than earnings, so net pay is negative.');
       if(!(r.present>0)) add('warn','No payable days this month. Net pay is zero.');
       if(e.esiApplicable && !((r.esi||0)>0) && (r.present>0)) add('warn','Marked ESI applicable, but pay is above the ESI limit, so no ESI is deducted.');
-      var basicEarned=r.struct ? ((r.basicPay||0)+(r.daPay||0)) : ((r.gross||0)-(r.otPay||0)-(r.nightPay||0))*empBasicPct(e,st)/100;
+      var basicEarned=r.struct ? ((r.basicPay||0)+(r.daPay||0)) : ((r.gross||0)-(r.otPay||0)-(r.nightPay||0)-(r.addPay||0))*empBasicPct(e,st)/100;
       if(e.pfApplicable && st.pfCeilingEnabled && basicEarned>pfCeilNow()) add('warn','Basic pay is above the PF wage ceiling. PF is limited to '+fmtMoney(pfCeilNow()*(st.pfRate||12)/100)+'.');
       if((r.otHrs||0)>(st.otWarnHours||50)) add('warn','Overtime of '+r.otHrs+' hours is unusually high.');
       var acct=String(e.bankAcc||'').replace(/\s/g,''); if(acct) (seen[acct]=seen[acct]||[]).push(r.name);
@@ -6888,13 +7012,13 @@ tr:hover td{background:var(--line2)}
     if(closed) h+='<div class="banner">This month is closed, so attendance and shifts are locked.</div>';
     h+='<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><p class="muted" style="margin:0;max-width:64ch">'+escapeHtml(xMonthLabel(ym))+' has '+D+' days. Mark each day present, absent, half day or leave in the daily attendance. Then enter overtime hours, night shifts and any other deduction here.</p><button class="btn ghost" data-cyc="openAtt">Open daily attendance</button></div></div>';
     if(!emps.length) return h+'<div class="card"><p class="muted" style="margin:0">No employees were working in '+escapeHtml(xMonthLabel(ym))+'.</p></div>';
-    h+='<div class="card"><div class="scrollx"><table><thead><tr><th>Employee</th><th class="right">OT hours</th><th class="right">Night shifts</th><th class="right">Other deduction (\u20b9)</th><th>Note</th></tr></thead><tbody>';
+    h+='<div class="card"><div class="scrollx"><table><thead><tr><th>Employee</th><th class="right">OT hours</th><th class="right">Night shifts</th><th class="right">Other deduction (\u20b9)</th><th class="right">Additional pay</th><th>Note</th></tr></thead><tbody>';
     emps.forEach(function(e){
       var x=exOf(e.id,ym), dis=closed?' disabled':'';
       function inp(f,step){ return '<td class="right"><input type="number" min="0" step="'+step+'" style="width:96px" data-extra="'+f+'" data-id="'+e.id+'" value="'+(x[f]!=null&&x[f]!==0?x[f]:'')+'" aria-label="'+f+' for '+escapeHtml(e.name)+'"'+dis+'></td>'; }
-      h+='<tr><td><b>'+escapeHtml(e.name)+'</b><div class="muted">'+escapeHtml(e.empCode||'')+' \u00b7 '+escapeHtml(e.site||'No site')+'</div></td>'+inp('ot','0.5')+inp('night','1')+inp('otherDed','1')+'<td><input type="text" data-extra="note" data-id="'+e.id+'" value="'+escapeHtml(x.note||'')+'" placeholder="Optional note" style="min-width:160px"'+dis+'></td></tr>';
+      h+='<tr><td><b>'+escapeHtml(e.name)+'</b><div class="muted">'+escapeHtml(e.empCode||'')+' \u00b7 '+escapeHtml(e.site||'No site')+'</div></td>'+inp('ot','0.5')+inp('night','1')+inp('otherDed','1')+addPayCell(e,x,closed)+'<td><input type="text" data-extra="note" data-id="'+e.id+'" value="'+escapeHtml(x.note||'')+'" placeholder="Optional note" style="min-width:160px"'+dis+'></td></tr>';
     });
-    h+='</tbody></table></div><p class="muted">Changes save automatically. Overtime is paid at '+(state.settings.otMult||2)+' times the hourly basic rate. Each night shift adds '+fmtMoney(state.settings.nightAllowance==null?150:state.settings.nightAllowance)+'. Both rates are in Settings.</p></div>';
+    h+='</tbody></table></div><p class="muted">Changes save automatically. Overtime is paid at '+(state.settings.otMult||2)+' times the hourly basic rate. Each night shift adds '+fmtMoney(state.settings.nightAllowance==null?150:state.settings.nightAllowance)+'. Both rates are in Settings. <b>Additional pay</b> (bonus, incentive, adjustment and so on) is added with the button in that column. It is not part of PF, and counts for ESI and professional tax only if you tick it.</p></div>';
     if(!closed) h+='<div class="card"><div class="row" style="align-items:center"><button class="btn" data-cyc="confirmAtt"'+(c.attConfirmed?' disabled':'')+'>'+(c.attConfirmed?'Attendance confirmed':'Confirm attendance and shifts')+'</button><span class="muted">'+(c.attConfirmed?'You can continue to the review.':'Confirm once every day is marked and extras are entered.')+'</span></div></div>';
     return h;
   };
@@ -6903,7 +7027,7 @@ tr:hover td{background:var(--line2)}
     var ym=cycMonth(), c=cycDoc(ym), closed=cycClosed(ym);
     if(!c.attConfirmed) return cycGate([['attendance','Confirm attendance and shifts']]);
     var att=await cycLoadAtt(ym), emps=cycEmps(ym);
-    var rows=emps.filter(function(e){ var a=att[e.id]||{marks:[]}, x=exOf(e.id,ym), cnt=cycMarkCounts(a); return cnt.A||cnt.H||cnt.L||x.ot||x.night||x.otherDed||x.note||(typeof suggestedAdvanceDeduction==='function'&&suggestedAdvanceDeduction(e.id)>0); });
+    var rows=emps.filter(function(e){ var a=att[e.id]||{marks:[]}, x=exOf(e.id,ym), cnt=cycMarkCounts(a); return cnt.A||cnt.H||cnt.L||x.ot||x.night||x.otherDed||x.note||addLinesOf(x).length||(typeof suggestedAdvanceDeduction==='function'&&suggestedAdvanceDeduction(e.id)>0); });
     var h='';
     if(closed) h+='<div class="banner">This month is closed, so the review is locked.</div>';
     else if(c.reviewed) h+='<div class="banner">Review confirmed. You can continue to calculate payroll.</div>';
@@ -7067,7 +7191,10 @@ tr:hover td{background:var(--line2)}
     if(field==='note') cur.note=String(val||'').trim();
     else { var n=val===''?0:Number(val); cur[field]=(isFinite(n)&&n>0)?n:0; }
     extrasMap[key]=cur;
-    if(db){ try{ await db.doc('monthExtras/'+id+'_'+ym.replace('-','')).set(cur); }catch(e){ toast('Could not save: '+(e&&e.code||'error')); return; } }
+    if(db){ try{
+      var xp='monthExtras/'+id+'_'+ym.replace('-','');
+      if(canPay()) await db.doc(xp).set(cur); else { var cu=Object.assign({},cur); delete cu.adds; await db.doc(xp).update(cu); }
+    }catch(e){ toast('Could not save: '+(e&&e.code||'error')); return; } }
     if(field!=='note') await invalidateRun(ym);
   }
   async function cycCalculate(){

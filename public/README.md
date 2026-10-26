@@ -387,3 +387,28 @@ Example: a wage of 25,553 with 62 overtime hours gives a gross of 34,113 (62 hou
 The Payroll table now shows what the gross is made of in small grey text under it, for example "Wage 25,553 + overtime 62 h 8,560", or "Wage for 28 of 31 days 23,078" when there are absences. The column is headed "Gross (with overtime)". Overtime hours and night shifts are entered in the Pay cycle (the overtime and night shifts table). PF, ESI and professional tax follow the rules in Settings: PF and ESI are worked out on the Basic + D.A. part of the wage earned (not on overtime), and professional tax on the gross.
 
 The Advance column is filled from the loans in the Advances tab: for each active loan, the monthly deduction or the balance left, whichever is smaller. A small figure such as 2 usually means a loan with a small balance left, which can be closed in the Advances tab.
+
+
+## Payroll tab: filter by site and sort
+
+At the top of the Payroll tab, next to Month, there are two boxes:
+- **Site:** All sites, or one site (the list comes from the employees of that month, with "No site" for anyone who has none). The choice stays while you change months, as long as that site has employees in the month.
+- **Sort by:** **Employee ID** (the default, with numbers in order, so PFSS-0002 comes before PFSS-0010 and anyone without an ID comes last) or **Name**.
+
+**What changes and what does not.** The table and the total net pay show the chosen site only, and a note under the total says, for example, "Showing 2 of 5 employees, at Avio SEZ. All sites together: ₹…". The payroll that is calculated, approved and saved is always for **everyone**: the filter and the sort change only what you see, never what is saved. Payslips and downloads for the month are not affected by the filter either.
+
+
+## Additional pay: bonus, incentive, adjustment and other lines
+
+In the **Pay cycle**, step **Attendance and shifts**, the table has an **Additional pay** column. The button in it shows "Add", or the total and the number of lines such as "3,500 (2)". It opens a small window for that employee and month, where you add as many lines as you need:
+- **For:** Bonus, Incentive, Adjustment, Allowance, Reimbursement or Other.
+- **Amount** and an optional **note** (for example "Diwali bonus"). The amount must be above zero. To take money off, use "Other deduction". There can be up to 10 lines for one employee in a month.
+- **Count for ESI and professional tax:** a tick box. It starts unticked for a Bonus and a Reimbursement and ticked for the others, and you can change it for each line.
+
+**How the lines are treated.** They are added to that month's gross pay. PF is never worked out on them (PF is on Basic + D.A.). ESI and professional tax are worked out on the wage plus overtime, night shifts, arrears and only the additional pay lines that are ticked. Whether ESI applies at all still depends on the wage, not on these lines. Absences reduce the wage as before, and the lines are added on top.
+
+**Where it shows.** On the payslip each line is its own line under Earnings (for example "Bonus - Diwali bonus"). In the Payroll table the note under the gross reads, for example, "Wage 25,553 + bonus 2,000 + incentive 1,500". The review table has the column "OT, shifts and additions", and employees with additional pay appear in the review step. After adding or removing lines, recalculate the payroll.
+
+**Who can add them.** Only Accounts and the administrator. A manager can see the lines but not change them, and can still enter overtime and nights without touching them. A closed month is read-only for everyone. The database enforces this too: run `supabase/accounts_role.sql` again in the SQL Editor (safe to run again).
+
+Please confirm with your CA how a bonus or reimbursement should be treated for ESI and professional tax in your case, and change the tick for that line if needed.
