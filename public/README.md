@@ -356,3 +356,34 @@ The same share is used for overtime (paid on Basic + D.A.), the "PF not switched
 5. Sign in as a manager and check that an existing employee's pay boxes are greyed out. Sign in as Accounts and check that they can be edited.
 
 Anyone who is a manager today keeps working as before, apart from pay. Accounts can also be chosen as a payroll approver.
+
+
+## Entering a wage: Basic + D.A., and what will be deducted
+
+In the employee form, next to the wage there is a box **Basic + D.A. (₹ per month)** (₹ per day for a daily wage). **PF is worked out on this amount.**
+- If the whole wage is Basic + D.A., click "The whole wage is Basic + D.A." and the wage is copied into the box.
+- If you leave it empty, 50% of the wage is used, and the preview says so.
+- Whatever you enter, at least half of the wage counts as Basic + D.A., because the labour codes treat at least 50% of the pay as wages. The preview says when this applies.
+- PF is limited to the PF ceiling (25,000 from 17 September 2026). ESI applies when the gross is 21,000 or less. Professional tax follows the gross and the state.
+- Staff on the pay structure (Basic and D.A. from the minimum wage table) do not use this box.
+
+**The preview.** Under the wage fields, "What will be deducted, for a full month" updates as you type: gross, what PF is worked out on, PF from the employee and from the company, ESI from both, professional tax, and take-home before advances and absences. It uses the same rules as payroll.
+
+**Attendance is unchanged.** Payroll still takes the wage down day by day for absences and half days, and PF, ESI and professional tax follow the pay actually earned.
+
+**Workforce gaps (Compliance)** now lists anyone with PF whose Basic + D.A. has not been entered ("PF is worked out on 50% of the wage"), so you can find everyone who needs checking. An older percentage set earlier still works, and an amount overrides it.
+
+**Latest rates.** In Settings, Provident fund, the line at the top says whether your PF and ESI settings are the latest 2026 rates. The button **Use the latest 2026 rates** sets them: PF ceiling 25,000 from 17 September 2026 (15,000 before), 12% from the employee and the company, pension 8.33%, admin charge 0.5% with a 500 minimum, insurance 0.5%; ESI limit 21,000 at 0.75% and 3.25%. Your other settings are not touched.
+
+**Accounts and managers.** Basic + D.A. is part of pay: Accounts and the administrator can edit it, and managers see it greyed out on existing employees. Run `supabase/accounts_role.sql` again in the SQL Editor so the database also protects this box. It is safe to run again.
+
+
+## Why the payroll gross can be higher than the wage amount
+
+The **wage amount** in the employee form is the wage for a full month. The **Gross** in the Payroll table is what the employee earned that month: the wage, reduced for absences and half days, **plus overtime, night shift allowance and arrears**. So they differ whenever any of those apply.
+
+Example: a wage of 25,553 with 62 overtime hours gives a gross of 34,113 (62 hours x 138.07 = 8,560). Overtime is paid at twice the hourly Basic + D.A. (Basic + D.A. / days in the month / 8 hours x 2).
+
+The Payroll table now shows what the gross is made of in small grey text under it, for example "Wage 25,553 + overtime 62 h 8,560", or "Wage for 28 of 31 days 23,078" when there are absences. The column is headed "Gross (with overtime)". Overtime hours and night shifts are entered in the Pay cycle (the overtime and night shifts table). PF, ESI and professional tax follow the rules in Settings: PF and ESI are worked out on the Basic + D.A. part of the wage earned (not on overtime), and professional tax on the gross.
+
+The Advance column is filled from the loans in the Advances tab: for each active loan, the monthly deduction or the balance left, whichever is smaller. A small figure such as 2 usually means a loan with a small balance left, which can be closed in the Advances tab.
