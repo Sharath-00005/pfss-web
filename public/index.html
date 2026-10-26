@@ -2191,7 +2191,7 @@ tr:hover td{background:var(--line2)}
     el('mailMsg').value=mailMessageFor(mailInv,mailKind(),mailAttach()==='pack',el('mailFrom').value);
   }
   async function openMailModal(inv){
-    if(me && me.canEdit===false){ toast('Only administrators and managers can send email.'); return; }
+    if(me && me.canEdit===false){ toast('Only administrators, Accounts and managers can send email.'); return; }
     mailInv=inv; mailEdited=false;
     var el=function(x){ return document.getElementById(x); }, c=clients.find(function(x){ return x.id===inv.clientId; })||{}, k=contracts.find(function(x){ return x.id===inv.contractId; });
     el('mailTitle').textContent='Email invoice '+(inv.invoiceNo||'');
@@ -2212,7 +2212,7 @@ tr:hover td{background:var(--line2)}
       el('btnMailSend').disabled=false; mailRefreshText();
     }catch(e){
       el('mailFrom').innerHTML='<option value="">Not available</option>'; var h=el('mailHelp'); h.style.display='';
-      h.textContent = e&&e.status===403 ? 'Only administrators and managers can send email.' :
+      h.textContent = e&&e.status===403 ? 'Only administrators, Accounts and managers can send email.' :
         (e&&(e.status===404||e.status===0||/Failed to fetch|NetworkError|Load failed/i.test(String(e.message)))) ? 'Email is not set up here yet. It works on your own site once the email service is connected (see the README). You can still download the PDF.' :
         'Email is not available right now: '+((e&&e.message)||'unknown problem')+'. You can still download the PDF.';
     }

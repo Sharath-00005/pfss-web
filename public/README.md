@@ -412,3 +412,32 @@ In the **Pay cycle**, step **Attendance and shifts**, the table has an **Additio
 **Who can add them.** Only Accounts and the administrator. A manager can see the lines but not change them, and can still enter overtime and nights without touching them. A closed month is read-only for everyone. The database enforces this too: run `supabase/accounts_role.sql` again in the SQL Editor (safe to run again).
 
 Please confirm with your CA how a bonus or reimbursement should be treated for ESI and professional tax in your case, and change the tick for that line if needed.
+
+
+## Who can send email, and giving Accounts full admin access
+
+**Sending email** (invoices, payment reminders, rate cards and the company profile) is allowed for **admin, Accounts and manager**. Viewers cannot. The email service checks the person's role every time. After this change, update the service once:
+- **Cloudflare Worker:** open the Worker, Edit code, replace everything with the new `worker/send-ratecard.js`, and Deploy.
+- **Supabase function** (if you use that instead): replace the code of `send-ratecard` with the new `supabase/functions/send-ratecard/index.ts` and deploy it.
+
+Before this update, only admin and manager were accepted, so an Accounts login saw the email window and then got "Only administrators and managers can send email".
+
+**Admin or Accounts?** Both can edit employees and pay, add additional pay, run payroll, make invoices and send email. Only **admin** can also:
+- open **Settings** (PF and ESI rates, invoice letterhead, signature, approvers, rate card defaults)
+- make **backups** (the data backup holds Aadhaar numbers and bank details of everyone)
+- use the dated **Change pay** screens
+- change who has which role
+
+To give the Accounts login full admin access, run in the Supabase SQL Editor:
+
+```sql
+update public.profiles set role = 'admin' where email = 'accounts@publicforcesecurity.com';
+```
+
+To put it back to the Accounts role:
+
+```sql
+update public.profiles set role = 'accounts' where email = 'accounts@publicforcesecurity.com';
+```
+
+Keep at least one other admin (for example info@), and give admin only to people you trust: an admin can read and export all personal data, change the PF and ESI rates, and change roles. The person signs out and in again for the change to show.
