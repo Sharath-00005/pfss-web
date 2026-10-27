@@ -425,6 +425,16 @@ tr:hover td{background:var(--line2)}
       </div>
       <div class="empty-state" id="invEmpty" style="display:none">No invoices yet.</div>
     </div>
+
+    <div class="card" id="profitCard">
+      <div class="row" style="justify-content:space-between;align-items:flex-end">
+        <h2>Profit per client</h2>
+        <div class="field" style="max-width:200px"><label>Service month</label><input type="month" id="profMonth"></div>
+      </div>
+      <p class="muted">What each client paid you (invoices before GST) set against what their staff cost the company, and any other costs you enter. It uses the contracts to find which client a site belongs to.</p>
+      <div id="profOut"></div>
+      <div class="row" style="margin-top:.6rem"><button class="btn ghost" id="btnProfitCsv" type="button">Download as CSV</button></div>
+    </div>
   </section>
 
   <section id="tab-contracts" style="display:none">
@@ -643,6 +653,16 @@ tr:hover td{background:var(--line2)}
         <button class="btn ghost" id="btnBackupFiles">Download uploaded files (ZIP)</button>
       </div>
       <p class="muted" style="margin-top:.8rem">The data backup holds employees, attendance, payroll, invoices, clients, contracts, rate cards, licences, settings and the email log. The ZIP holds the photos and documents uploaded in the employee forms. Make both at least once a month. The dashboard reminds you when a month has passed.</p>
+      <div style="border-top:1px solid var(--line);margin-top:1rem;padding-top:1rem">
+        <div style="font-weight:700">Restore from a backup file</div>
+        <p class="muted">Use this if records were deleted or changed by mistake. Choose a data backup file (the .json), check it, and tick what to bring back. Nothing is deleted: a record in the file replaces the same record in the system, and records that are only in the system stay as they are. Your present data is downloaded first as a safety copy. Staff logins and uploaded files are not part of this: the files stay in storage and the logins stay in Supabase.</p>
+        <div class="row" style="align-items:flex-end"><div class="field grow"><label>Backup file</label><input type="file" id="rsFile" accept=".json,application/json"></div><button class="btn ghost" id="btnRestoreCheck" type="button">Check the file</button></div>
+        <div id="rsOut"></div>
+        <div id="rsConfirmBox" style="display:none;margin-top:.6rem">
+          <div class="row" style="align-items:flex-end"><div class="field"><label>Type RESTORE to confirm</label><input id="rsConfirm" autocomplete="off" placeholder="RESTORE"></div><button class="btn" id="btnRestoreRun" type="button" disabled>Restore the ticked records</button></div>
+        </div>
+        <div id="rsErr" style="color:var(--bad);min-height:1.3em;margin-top:.4rem" role="alert"></div>
+      </div>
     </div>
 
     <div class="card">
@@ -1348,6 +1368,8 @@ tr:hover td{background:var(--line2)}
     setupMailUI();
     setupBackupUI();
     setupGroupsUI();
+    setupRestoreUI();
+    setupProfitUI();
     setupAddPayUI();
     setupPayUI();
     setupAttendanceUI();
@@ -3122,6 +3144,268 @@ tr:hover td{background:var(--line2)}
     f('payGroupSel').addEventListener('change', function(){ setPayScope(f('payGroupSel').value); });
   }
 
+  /* ---------- upload files for the PF and ESIC portals ---------- */
+  function xmlEsc(v){ return String(v==null?'':v).replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f]/g,'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+  function xlsxColName(i){ var s='', n=i+1; while(n>0){ var m=(n-1)%26; s=String.fromCharCode(65+m)+s; n=Math.floor((n-1)/26); } return s; }
+  // a one-sheet Excel file from rows of text and numbers (text goes in as text, numbers as numbers)
+  function xlsxBlob(rows, sheetName){
+    var enc=new TextEncoder(), head='<?xml version="1.0" encoding="UTF-8" standalone="yes"?>';
+    var sheet=head+'<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>'+rows.map(function(r,ri){
+      return '<row r="'+(ri+1)+'">'+r.map(function(v,ci){
+        var ref=xlsxColName(ci)+(ri+1);
+        if(v===null||v===undefined||v==='') return '';
+        if(typeof v==='number' && isFinite(v)) return '<c r="'+ref+'"><v>'+v+'</v></c>';
+        return '<c r="'+ref+'" t="inlineStr"><is><t xml:space="preserve">'+xmlEsc(v)+'</t></is></c>';
+      }).join('')+'</row>';
+    }).join('')+'</sheetData></worksheet>';
+    var files=[
+      {name:'[Content_Types].xml', bytes:enc.encode(head+'<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/></Types>')},
+      {name:'_rels/.rels', bytes:enc.encode(head+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>')},
+      {name:'xl/workbook.xml', bytes:enc.encode(head+'<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="'+xmlEsc(sheetName||'Sheet1')+'" sheetId="1" r:id="rId1"/></sheets></workbook>')},
+      {name:'xl/_rels/workbook.xml.rels', bytes:enc.encode(head+'<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/></Relationships>')},
+      {name:'xl/worksheets/sheet1.xml', bytes:enc.encode(sheet)}];
+    var z=zipStore(files); return new Blob([z],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+  }
+  // the approved payroll of the month, from every group that is approved
+  function fileRows(ym){ var mg=monthGovRows(ym); return {rows:mg.rows, pending:mg.pending, included:mg.included}; }
+  function ecrName(n){ return String(n||'').toUpperCase().replace(/[^A-Z .]/g,' ').replace(/\s+/g,' ').trim(); }
+  function digitsOf(v){ return String(v==null?'':v).replace(/\D/g,''); }
+  // the PF return file (EPFO ECR): one line per member, fields joined by #~#
+  function buildEcr(rows){
+    var lines=[], skipped=[], tot={n:0,gross:0,epfW:0,ee:0,eps:0,diff:0,edliW:0};
+    rows.forEach(function(r){
+      var oldRow=(r.pfWages==null), est=oldRow?pfBreakdown((r.pf||0)/(pfCfg().ee/100),true):null;
+      var epfW=Math.round(oldRow?est.wages:(r.pfWages||0)), ee=Math.round(r.pf||0);
+      if(!(epfW>0) && !(ee>0)) return;
+      var uan=digitsOf(r.uan);
+      if(uan.length!==12){ skipped.push({name:r.name, empCode:r.empCode, why:uan?'UAN must have 12 digits (it has '+uan.length+')':'UAN is missing', pf:ee+Math.round(r.pfEr||0)}); return; }
+      var epsW=Math.round(oldRow?est.epsWages:(r.edliWages||0)), edliW=Math.round(oldRow?est.edliWages:(r.edliWages||0));
+      var eps=Math.round(oldRow?est.eps:(r.epsEr||0)), er=Math.round(r.pfEr!=null?r.pfEr:ee), diff=Math.max(0,er-eps), gross=Math.round(r.gross||0);
+      var ncp=Math.max(0,Math.round((Number(r.dim)||0)-(Number(r.present)||0)));
+      lines.push([uan, ecrName(r.name)||'MEMBER', gross, epfW, epsW, edliW, ee, eps, diff, ncp, 0].join('#~#'));
+      tot.n++; tot.gross+=gross; tot.epfW+=epfW; tot.ee+=ee; tot.eps+=eps; tot.diff+=diff; tot.edliW+=edliW;
+    });
+    return {text:lines.length?lines.join('\r\n')+'\r\n':'', count:lines.length, skipped:skipped, totals:tot};
+  }
+  var ESIC_HEADER=['IP Number','IP Name','No of Days for which wages paid/payable during the month','Total Monthly Wages','Reason Code for Zero workings days(numeric only; provide 0 for all other reasons- Click on the link for reasons)','Last Working Day( Format DD/MM/YYYY or DD-MM-YYYY)'];
+  // the ESIC monthly contribution sheet. The portal works out the contributions from the wages.
+  function buildEsic(rows, ym){
+    var out=[ESIC_HEADER.slice()], skipped=[], warn=[], tot={n:0,wages:0}, first=ym+'-01', last=ym+'-'+String(daysInMonth(ym)).padStart(2,'0');
+    rows.forEach(function(r){
+      var emp=state.employees.find(function(x){ return x.id===r.empId; })||{}, days=Math.round(Number(r.present)||0), covered=(r.esi||0)>0, zero=(days===0 && !!emp.esiApplicable);
+      if(!covered && !zero) return;
+      var ip=digitsOf(r.esicNo||emp.esic);
+      if(!ip){ skipped.push({name:r.name, empCode:r.empCode, why:'ESIC number is missing'}); return; }
+      if(ip.length!==10) warn.push({name:r.name, empCode:r.empCode, why:'ESIC number has '+ip.length+' digits, not 10. Please check it.'});
+      var wages=Math.round(r.esiWages!=null?r.esiWages:(r.gross||0)), code=0, lwd='';
+      if(zero){ wages=0; if(emp.dol && emp.dol<=last){ code=2; var p=String(emp.dol).split('-'); lwd=p[2]+'/'+p[1]+'/'+p[0]; } else code=1; }
+      var ipv=(ip.charAt(0)!=='0' && ip.length<=15)?Number(ip):ip;
+      out.push([ipv, String(r.name||'').trim(), days, wages, code, lwd]); tot.n++; tot.wages+=wages;
+    });
+    return {rows:out, count:out.length-1, skipped:skipped, warn:warn, totals:tot};
+  }
+  function fileNote(list){ return list.length?'<ul style="margin:.3rem 0 0 1.1rem">'+list.slice(0,8).map(function(x){ return '<li>'+escapeHtml(x.name||'')+' ('+escapeHtml(x.empCode||'')+'): '+escapeHtml(x.why)+'</li>'; }).join('')+(list.length>8?'<li>and '+(list.length-8)+' more</li>':'')+'</ul>':''; }
+  function filesCardHtml(ym){
+    var f=fileRows(ym), h='<div class="card"><h2>Files for the PF and ESIC portals, '+escapeHtml(xMonthLabel(ym))+'</h2>';
+    if(!f.rows.length) return h+'<p class="muted" style="margin:0">These files are made from approved payroll. Approve the payroll first'+(f.pending.length?' ('+escapeHtml(f.pending.join(', '))+' not approved yet)':'')+'.</p></div>';
+    var e=buildEcr(f.rows), s=buildEsic(f.rows,ym), t=e.totals;
+    if(f.pending.length) h+='<div class="banner" style="margin-bottom:.6rem">These files cover the approved groups only. Not approved yet: '+escapeHtml(f.pending.join(', '))+'. Download them again after those groups are approved, so each file covers everyone.</div>';
+    h+='<p class="muted">Made from the approved payroll of '+escapeHtml(f.included.join(', '))+'. Check each file on the portal (the PF portal has a Validate step) before you submit it, and keep your CA in the loop.</p>';
+    h+='<div style="margin:.6rem 0"><b>PF return file (ECR)</b><div class="muted">'+e.count+' employee'+(e.count===1?'':'s')+' in the file. EPF wages '+fmtMoney(t.epfW)+', from the employees '+fmtMoney(t.ee)+', pension '+fmtMoney(t.eps)+', employer provident fund '+fmtMoney(t.diff)+'.</div>'+(e.skipped.length?'<div style="color:var(--bad);margin-top:.3rem"><b>Left out of the file: '+e.skipped.length+'.</b> Their PF ('+fmtMoney(e.skipped.reduce(function(a,x){ return a+x.pf; },0))+') is in the amount to pay but not in the file.'+fileNote(e.skipped)+'</div>':'')+'<button class="btn small" style="margin-top:.4rem" data-cyc="ecr"'+(e.count?'':' disabled')+'>Download PF file (ECR, text)</button></div>';
+    h+='<div style="margin:.6rem 0"><b>ESIC monthly contribution file</b><div class="muted">'+s.count+' employee'+(s.count===1?'':'s')+', wages '+fmtMoney(s.totals.wages)+'. The ESIC portal works out the contributions from the wages.</div>'+((s.skipped.length||s.warn.length)?'<div style="color:var(--bad);margin-top:.3rem">'+(s.skipped.length?'<b>Left out of the file: '+s.skipped.length+'.</b>'+fileNote(s.skipped):'')+(s.warn.length?'<div><b>To check:</b>'+fileNote(s.warn)+'</div>':'')+'</div>':'')+'<button class="btn small" style="margin-top:.4rem" data-cyc="esicfile"'+(s.count?'':' disabled')+'>Download ESIC file (Excel)</button><div class="muted" style="font-size:.78rem;margin-top:.3rem">If the ESIC portal asks for the older .xls type, open the file in Excel and use Save As, Excel 97-2003 Workbook.</div></div>';
+    return h+'</div>';
+  }
+  async function downloadEcr(ym){
+    var f=fileRows(ym); if(!f.rows.length){ toast('Approve the payroll first.'); return; }
+    var e=buildEcr(f.rows); if(!e.count){ toast('No employee has a valid UAN, so there is nothing to put in the file.'); return; }
+    await pdfSave(new Blob([e.text],{type:'text/plain'}),'PFSS-ECR-'+ym+'.txt');
+    toast('PF file ready: '+e.count+' employee'+(e.count===1?'':'s')+(e.skipped.length?', '+e.skipped.length+' left out.':'.'));
+  }
+  async function downloadEsic(ym){
+    var f=fileRows(ym); if(!f.rows.length){ toast('Approve the payroll first.'); return; }
+    var s=buildEsic(f.rows,ym); if(!s.count){ toast('No employee has an ESIC number and wages, so there is nothing to put in the file.'); return; }
+    await pdfSave(xlsxBlob(s.rows,'Sheet1'),'PFSS-ESIC-'+ym+'.xlsx');
+    toast('ESIC file ready: '+s.count+' employee'+(s.count===1?'':'s')+(s.skipped.length?', '+s.skipped.length+' left out.':'.'));
+  }
+
+  /* ---------- restore from a backup file ---------- */
+  var restorePlan=null;
+  function stableJson(v){
+    if(v===null || typeof v!=='object') return JSON.stringify(v);
+    if(Array.isArray(v)) return '['+v.map(stableJson).join(',')+']';
+    return '{'+Object.keys(v).sort().map(function(k){ return JSON.stringify(k)+':'+stableJson(v[k]); }).join(',')+'}';
+  }
+  // reads the text of a backup file: {error} or {info, collections, skipped}
+  function parseBackup(text){
+    var o; try{ o=JSON.parse(text); }catch(e){ return {error:'This is not a backup file: it could not be read.'}; }
+    if(!o || typeof o!=='object' || !o.collections || typeof o.collections!=='object' || Array.isArray(o.collections)) return {error:'This file does not look like a backup made by this system.'};
+    if(o.format!==1) return {error:'This backup is a version this screen cannot read (format '+(o.format==null?'unknown':o.format)+').'};
+    var cols={}, skipped=0, total=0;
+    Object.keys(o.collections).forEach(function(c){
+      if(!/^[A-Za-z0-9_\-]{1,100}$/.test(c)){ skipped++; return; }
+      var recs=o.collections[c]; if(!recs || typeof recs!=='object' || Array.isArray(recs)){ skipped++; return; }
+      Object.keys(recs).forEach(function(id){
+        var d=recs[id]; if(!id || id.length>200 || d===null || typeof d!=='object' || Array.isArray(d)){ skipped++; return; }
+        (cols[c]=cols[c]||{})[id]=d; total++;
+      });
+    });
+    if(!total) return {error:'The backup has no records in it.'};
+    return {info:{exportedAt:o.exportedAt||'', exportedBy:o.exportedBy||'', records:total}, collections:cols, skipped:skipped};
+  }
+  // each collection in the backup, set against what is in the system now
+  function restoreCompare(backup, current){
+    return Object.keys(backup).sort().map(function(c){
+      var b=backup[c], cur=current[c]||{}, ids=Object.keys(b), same=0, changed=0, added=0;
+      ids.forEach(function(id){ if(!(id in cur)) added++; else if(stableJson(cur[id])===stableJson(b[id])) same++; else changed++; });
+      return {name:c, inBackup:ids.length, same:same, changed:changed, added:added, extra:Object.keys(cur).filter(function(id){ return !(id in b); }).length};
+    });
+  }
+  // only the records that would change anything, for the collections that are ticked
+  function restoreWrites(plan){
+    var out={}, n=0;
+    plan.rows.forEach(function(r){
+      if(!plan.selected[r.name]) return;
+      var b=plan.backup[r.name], cur=plan.current[r.name]||{};
+      Object.keys(b).forEach(function(id){ if(!(id in cur) || stableJson(cur[id])!==stableJson(b[id])){ (out[r.name]=out[r.name]||{})[id]=b[id]; n++; } });
+    });
+    return {collections:out, count:n};
+  }
+  function restoreWriteCount(){ return restorePlan?restoreWrites(restorePlan).count:0; }
+  function restoreRender(){
+    var out=document.getElementById('rsOut'), box=document.getElementById('rsConfirmBox'), btn=document.getElementById('btnRestoreRun'), p=restorePlan;
+    if(!p){ out.innerHTML=''; box.style.display='none'; return; }
+    var n=restoreWriteCount(), conf=String(document.getElementById('rsConfirm').value||'').trim()==='RESTORE';
+    out.innerHTML='<div class="muted" style="margin:.6rem 0">Backup made '+escapeHtml(p.info.exportedAt?new Date(p.info.exportedAt).toLocaleString('en-IN'):'on an unknown date')+(p.info.exportedBy?' by '+escapeHtml(p.info.exportedBy):'')+', with '+p.info.records.toLocaleString('en-IN')+' records'+(p.skipped?' ('+p.skipped+' unusable entries ignored)':'')+'.</div>'+
+      '<div class="scrollx"><table><thead><tr><th>Bring back</th><th>Records</th><th class="right">In the backup</th><th class="right">Same as now</th><th class="right">Different from now</th><th class="right">Missing now</th><th class="right">Only in the system</th></tr></thead><tbody>'+
+      p.rows.map(function(r){ return '<tr><td><input type="checkbox" data-rs="'+escapeHtml(r.name)+'" '+(p.selected[r.name]?'checked':'')+' style="width:auto;min-height:0"></td><td><b>'+escapeHtml(r.name)+'</b></td><td class="right">'+r.inBackup+'</td><td class="right">'+r.same+'</td><td class="right">'+r.changed+'</td><td class="right">'+r.added+'</td><td class="right">'+r.extra+'</td></tr>'; }).join('')+
+      '</tbody></table></div><p class="muted" style="margin-top:.5rem"><b>'+n.toLocaleString('en-IN')+' record'+(n===1?'':'s')+' would be written.</b> Records that are "different" are replaced by the version in the backup, and "missing" ones are put back. Records that are only in the system stay as they are. Nothing is deleted.</p>';
+    box.style.display=n>0?'':'none'; btn.disabled=!(n>0 && conf);
+    if(n===0) out.innerHTML+='<p class="muted"><b>Nothing to restore:</b> everything ticked is the same as it is now.</p>';
+  }
+  async function restoreCheck(){
+    var err=document.getElementById('rsErr'), f=document.getElementById('rsFile').files&&document.getElementById('rsFile').files[0], btn=document.getElementById('btnRestoreCheck'); err.textContent=''; restorePlan=null; restoreRender();
+    if(!(me && me.isOwner)){ err.textContent='Only an administrator can restore from a backup.'; return; }
+    if(!db || typeof db.exportAll!=='function' || typeof db.importAll!=='function'){ err.textContent='Restore works on your own site, with the updated pfss-backend.js.'; return; }
+    if(!f){ err.textContent='Choose a backup file first.'; return; }
+    if(f.size>100*1024*1024){ err.textContent='That file is too large to be a backup of this system.'; return; }
+    btn.disabled=true; var old=btn.textContent; btn.textContent='Checking...';
+    try{
+      var parsed=parseBackup(await f.text()); if(parsed.error){ err.textContent=parsed.error; }
+      else {
+        var cur=await db.exportAll(), rows=restoreCompare(parsed.collections,cur.collections), sel={};
+        rows.forEach(function(r){ sel[r.name]=(r.changed+r.added)>0; });
+        restorePlan={info:parsed.info, skipped:parsed.skipped, backup:parsed.collections, current:cur.collections, currentTotal:cur.total, profiles:cur.profiles, rows:rows, selected:sel};
+        document.getElementById('rsConfirm').value=''; restoreRender();
+      }
+    }catch(e){ err.textContent=(e&&e.code==='no-permission')?'Only an administrator can restore from a backup.':'Could not check the file: '+((e&&e.message)||'unknown problem'); }
+    btn.disabled=false; btn.textContent=old;
+  }
+  async function restoreRun(){
+    var err=document.getElementById('rsErr'), btn=document.getElementById('btnRestoreRun'), p=restorePlan; err.textContent='';
+    if(!p || !(me && me.isOwner)) return;
+    if(String(document.getElementById('rsConfirm').value||'').trim()!=='RESTORE'){ err.textContent='Type RESTORE to confirm.'; return; }
+    var w=restoreWrites(p); if(!w.count){ err.textContent='Nothing is ticked that would change.'; return; }
+    var old=btn.textContent; btn.disabled=true; btn.textContent='Saving a safety copy...';
+    try{
+      var snap={app:'Public Force HR, payroll and billing',format:1,exportedAt:new Date().toISOString(),exportedBy:(me&&me.name)||'',note:'Made automatically just before a restore',records:p.currentTotal,staffAccounts:p.profiles||[],collections:p.current};
+      await pdfSave(new Blob([JSON.stringify(snap)],{type:'application/json'}),'PFSS-before-restore-'+xToday()+'.json');
+    }catch(e){ err.textContent='The safety copy could not be saved, so nothing was restored.'; btn.disabled=false; btn.textContent=old; return; }
+    try{
+      btn.textContent='Restoring...';
+      var res=await db.importAll(w.collections,function(done,total){ btn.textContent='Restoring '+done.toLocaleString('en-IN')+' of '+total.toLocaleString('en-IN')+'...'; });
+      toast('Restored '+res.written.toLocaleString('en-IN')+' record'+(res.written===1?'':'s')+'. A safety copy of the data from before was downloaded.');
+      restorePlan=null; document.getElementById('rsFile').value=''; document.getElementById('rsConfirm').value=''; restoreRender();
+      document.getElementById('rsOut').innerHTML='<p><b>Done.</b> '+res.written.toLocaleString('en-IN')+' records were put back. Reload the page to be sure everything shows the restored data.</p>';
+    }catch(e){ err.textContent='The restore stopped'+((e&&e.written!=null)?' after '+e.written+' records':'')+': '+((e&&e.message)||'unknown problem')+'. Nothing was deleted. You can run it again.'; btn.textContent=old; btn.disabled=false; }
+  }
+  function setupRestoreUI(){
+    var f=function(i){ return document.getElementById(i); };
+    f('btnRestoreCheck').addEventListener('click', restoreCheck); f('btnRestoreRun').addEventListener('click', restoreRun); f('rsConfirm').addEventListener('input', restoreRender);
+    f('rsOut').addEventListener('change', function(ev){ var t=ev.target; if(t && t.dataset && t.dataset.rs && restorePlan){ restorePlan.selected[t.dataset.rs]=!!t.checked; restoreRender(); } });
+  }
+
+  /* ---------- profit per client: what a client paid, against what their staff cost ---------- */
+  var clientCosts={};   // 'clientId|YYYY-MM' -> {amount, note}: other costs for a client in a month
+  // the client a site belongs to, from the contracts (the one in force that month, else the latest)
+  function clientForSite(site, ym){
+    var s=String(site||'').trim(); if(!s) return '';
+    var first=ym+'-01', last=ym+'-'+String(daysInMonth(ym)).padStart(2,'0');
+    var list=(contracts||[]).filter(function(k){ return String(k.site||'').trim()===s && k.clientId; }); if(!list.length) return '';
+    var live=list.filter(function(k){ return (!k.start || k.start<=last) && (!k.end || k.end>=first); });
+    return (live.length?live:list).slice().sort(function(a,b){ return String(b.start||'')<String(a.start||'')?-1:1; })[0].clientId;
+  }
+  // what one employee cost the company for the month: pay, employer PF, employer ESI, insurance (EDLI) and the PF admin charge
+  function rowCompanyCost(r){ return (r.gross||0)+(r.pfEr!=null?r.pfEr:(r.pf||0))+(r.esiEr||0)+(r.edliEr||0)+Math.round((r.pfWages||0)*pfCfg().admin/100); }
+  function profitData(ym){
+    var byC={}, un={n:0,cost:0,sites:{}}, drafts=0, notApproved=[], any=false;
+    var nameOf=function(id){ var c=clients.find(function(x){ return x.id===id; }); return c?c.name:'Unknown client'; };
+    var get=function(id){ return byC[id]||(byC[id]={id:id,name:nameOf(id),sites:{},employees:0,invoices:0,invoiced:0,payroll:0,other:0}); };
+    invoices.forEach(function(inv){
+      if(inv.month!==ym) return; if(inv.status==='draft'){ drafts++; return; }
+      var c=get(inv.clientId); c.invoices++; c.invoiced+=invoiceModelFromSaved(inv).subtotal;
+    });
+    monthRuns(ym).forEach(function(m){
+      if(!(m.run && m.run.rows && m.run.rows.length)) return; any=true; if(m.run.status!=='approved') notApproved.push(m.name);
+      m.run.rows.forEach(function(r){
+        var cid=clientForSite(r.site,ym), cost=rowCompanyCost(r);
+        if(!cid){ un.n++; un.cost+=cost; var k=String(r.site||'').trim()||'No site'; un.sites[k]=(un.sites[k]||0)+1; return; }
+        var c=get(cid); c.employees++; c.payroll+=cost; if(String(r.site||'').trim()) c.sites[String(r.site).trim()]=1;
+      });
+    });
+    Object.keys(clientCosts).forEach(function(k){ var p=k.split('|'); if(p[1]!==ym) return; var a=Number(clientCosts[k].amount)||0; if(a) get(p[0]).other+=a; });
+    var rows=Object.keys(byC).map(function(id){ var c=byC[id]; c.profit=c.invoiced-c.payroll-c.other; c.margin=c.invoiced>0?c.profit/c.invoiced*100:null; c.siteList=Object.keys(c.sites).sort(); return c; }).sort(function(a,b){ return a.name.localeCompare(b.name); });
+    var tot=rows.reduce(function(t,c){ t.invoiced+=c.invoiced; t.payroll+=c.payroll; t.other+=c.other; t.employees+=c.employees; t.invoices+=c.invoices; return t; },{invoiced:0,payroll:0,other:0,employees:0,invoices:0});
+    tot.payroll+=un.cost; tot.employees+=un.n; tot.profit=tot.invoiced-tot.payroll-tot.other; tot.margin=tot.invoiced>0?tot.profit/tot.invoiced*100:null;
+    return {rows:rows, total:tot, unassigned:un, drafts:drafts, anyPayroll:any, notApproved:notApproved};
+  }
+  function profitPct(v){ return v===null?'-':(Math.round(v*10)/10)+'%'; }
+  function renderProfit(){
+    var el=document.getElementById('profOut'); if(!el) return;
+    var mi=document.getElementById('profMonth'); if(!mi.value) mi.value=cycMonth(); var ym=mi.value;
+    if(document.activeElement && el.contains(document.activeElement)) return;   // not while a cost is being typed
+    if(!canPay()){ el.innerHTML='<div class="banner">Only Accounts or an administrator can see profit per client.</div>'; return; }
+    var d=profitData(ym), h='', can=canPay();
+    if(!d.rows.length && !d.unassigned.n){ el.innerHTML='<p class="muted">No invoices or payroll for '+escapeHtml(xMonthLabel(ym))+' yet.</p>'; return; }
+    if(!d.anyPayroll) h+='<div class="banner" style="margin-bottom:.6rem">No payroll has been calculated for '+escapeHtml(xMonthLabel(ym))+', so the cost columns are empty and the profit is not real yet.</div>';
+    h+='<div class="scrollx"><table><thead><tr><th>Client</th><th class="right">Employees</th><th class="right">Invoiced (before GST)</th><th class="right">Staff cost</th><th class="right">Other costs</th><th class="right">Profit</th><th class="right">Margin</th></tr></thead><tbody>';
+    d.rows.forEach(function(c){
+      var bad=c.profit<0;
+      h+='<tr><td><b>'+escapeHtml(c.name)+'</b><div class="muted" style="font-size:.78rem">'+(c.siteList.length?escapeHtml(c.siteList.join(', ')):'No staff found for this client')+' · '+c.invoices+' invoice'+(c.invoices===1?'':'s')+'</div></td><td class="right">'+c.employees+'</td><td class="right">'+fmtMoney(c.invoiced)+'</td><td class="right">'+fmtMoney(c.payroll)+'</td><td class="right">'+(can?'<input type="number" min="0" step="1" data-profcost="'+escapeHtml(c.id)+'" value="'+(c.other||'')+'" placeholder="0" style="width:110px;text-align:right">':fmtMoney(c.other))+'</td><td class="right"><b style="color:'+(bad?'var(--bad,#B03A2E)':'inherit')+'">'+fmtMoney(c.profit)+'</b></td><td class="right">'+profitPct(c.margin)+'</td></tr>';
+    });
+    if(d.unassigned.n) h+='<tr><td><b>Staff not linked to a client</b><div class="muted" style="font-size:.78rem">'+escapeHtml(Object.keys(d.unassigned.sites).map(function(k){ return k+' ('+d.unassigned.sites[k]+')'; }).join(', '))+'</div></td><td class="right">'+d.unassigned.n+'</td><td class="right">-</td><td class="right">'+fmtMoney(d.unassigned.cost)+'</td><td class="right">-</td><td class="right"><b style="color:var(--bad,#B03A2E)">'+fmtMoney(-d.unassigned.cost)+'</b></td><td class="right">-</td></tr>';
+    var t=d.total;
+    h+='</tbody><tfoot><tr><td>Total</td><td class="right">'+t.employees+'</td><td class="right">'+fmtMoney(t.invoiced)+'</td><td class="right">'+fmtMoney(t.payroll)+'</td><td class="right">'+fmtMoney(t.other)+'</td><td class="right">'+fmtMoney(t.profit)+'</td><td class="right">'+profitPct(t.margin)+'</td></tr></tfoot></table></div>';
+    h+='<p class="muted" style="margin-top:.6rem">Invoiced is the invoices for the service month, before GST. Staff cost is the pay plus the employer share of PF and ESI, the insurance and the PF admin charge, for the employees at the client\'s sites (the site comes from the contract).'+(d.drafts?' '+d.drafts+' draft invoice'+(d.drafts===1?' is':'s are')+' not counted.':'')+(d.notApproved.length?' The payroll shown is the latest calculation. Not approved yet: '+escapeHtml(d.notApproved.join(', '))+'.':'')+(d.unassigned.n?' Staff whose site has no contract are listed separately: add a contract for that site to link them to a client.':'')+' Enter other costs for a client (uniforms, transport, supervision and so on) in the box, and press Tab.</p>';
+    el.innerHTML=h;
+  }
+  async function saveClientCost(id, ym, value){
+    if(!canPay()){ toast('Only Accounts or an administrator can change costs.'); return; }
+    var amt=Math.round((Number(value)||0)*100)/100, key=id+'|'+ym, path='clientCosts/'+id+'_'+ym.replace('-','');
+    if(amt<0){ toast('A cost cannot be negative.'); return; }
+    try{
+      if(amt>0){ clientCosts[key]={clientId:id, ym:ym, amount:amt, note:''}; if(db) await db.doc(path).set(clientCosts[key]); }
+      else { delete clientCosts[key]; if(db) await db.doc(path).delete(); }
+    }catch(e){ toast('Could not save: '+(e&&e.code||'error')); return; }
+    renderProfit();
+  }
+  function csvCell(v){ var s=String(v==null?'':v); return /[",\n\r]/.test(s)?'"'+s.replace(/"/g,'""')+'"':s; }
+  function profitCsv(ym){
+    var d=profitData(ym), rows=[['Client','Sites','Invoices','Employees','Invoiced before GST','Staff cost','Other costs','Profit','Margin %']];
+    d.rows.forEach(function(c){ rows.push([c.name,c.siteList.join('; '),c.invoices,c.employees,Math.round(c.invoiced),Math.round(c.payroll),Math.round(c.other),Math.round(c.profit),c.margin===null?'':Math.round(c.margin*10)/10]); });
+    if(d.unassigned.n) rows.push(['Staff not linked to a client',Object.keys(d.unassigned.sites).join('; '),'',d.unassigned.n,0,Math.round(d.unassigned.cost),0,-Math.round(d.unassigned.cost),'']);
+    var t=d.total; rows.push(['Total','',t.invoices,t.employees,Math.round(t.invoiced),Math.round(t.payroll),Math.round(t.other),Math.round(t.profit),t.margin===null?'':Math.round(t.margin*10)/10]);
+    return rows.map(function(r){ return r.map(csvCell).join(','); }).join('\r\n')+'\r\n';
+  }
+  function setupProfitUI(){
+    var f=function(i){ return document.getElementById(i); };
+    f('profMonth').addEventListener('change', renderProfit);
+    f('btnProfitCsv').addEventListener('click', async function(){
+      if(!canPay()){ toast('Only Accounts or an administrator can download this.'); return; }
+      var ym=f('profMonth').value||cycMonth(); await pdfSave(new Blob([profitCsv(ym)],{type:'text/csv'}),'PFSS-profit-'+ym+'.csv');
+    });
+    f('profOut').addEventListener('change', function(ev){ var t=ev.target; if(t && t.dataset && t.dataset.profcost) saveClientCost(t.dataset.profcost, f('profMonth').value||cycMonth(), t.value); });
+  }
+
   // ---------- ATTENDANCE ----------
   // ---------- ATTENDANCE CSV IMPORT (from the Attendance app) ----------
   function parseCsv(text){
@@ -3397,7 +3681,7 @@ tr:hover td{background:var(--line2)}
     return {present:present, dim:dim, gross:gross, baseGross:baseGross, basic:basic, pf:pf, esi:esi, pt:pt, advance:advance, net:net,
       otHrs:otHrs, nights:nights, otPay:otPay, nightPay:nightPay, otherDed:otherDed, pfEr:pfEr, esiEr:esiEr,
       struct:struct, basicPart:stdBasic, daPart:stdDa, extraPart:stdExtra, dutyHrs:stdDuty,
-      arrears:arrears, arrearsNote:ar.note, revNote:revNote,
+      arrears:arrears, arrearsNote:ar.note, revNote:revNote, esiWages:statGross,
       addPay:addPay, addLines:adds.map(function(a){ return {type:a.type, amount:Number(a.amount), note:a.note||'', stat:!!a.stat}; }),
       pfWages:pfInfo?pfInfo.wages:0, epsEr:pfInfo?pfInfo.eps:0, epfEr:pfInfo?pfInfo.epf:0, edliWages:pfInfo?pfInfo.edliWages:0, edliEr:pfInfo?pfInfo.edli:0};
   }
@@ -3854,7 +4138,7 @@ tr:hover td{background:var(--line2)}
         extraPay:x.r.struct?Math.max(0,Math.round(x.r.baseGross)-Math.round(x.r.basicPart)-Math.round(x.r.daPart)):0,
         arrears:Math.round(x.r.arrears||0), arrearsNote:x.r.arrearsNote||'', revNote:x.r.revNote||'',
         addPay:Math.round(x.r.addPay||0), addLines:(x.r.addLines||[]).map(function(a){ return {type:a.type, amount:Math.round(a.amount*100)/100, note:a.note||''}; }),
-        pfWages:Math.round(x.r.pfWages||0), epsEr:Math.round(x.r.epsEr||0), epfEr:Math.round(x.r.epfEr||0), edliWages:Math.round(x.r.edliWages||0), edliEr:Math.round(x.r.edliEr||0)};
+        esiWages:Math.round(x.r.esiWages||0), pfWages:Math.round(x.r.pfWages||0), epsEr:Math.round(x.r.epsEr||0), epfEr:Math.round(x.r.epfEr||0), edliWages:Math.round(x.r.edliWages||0), edliEr:Math.round(x.r.edliEr||0)};
     });
     var totalNet = rows.reduce(function(s,r){return s+r.net;},0);
     var run = {ym:ym, scopeKey:scopeKey0, status:'draft', rows:rows, totalNet:totalNet, calculatedAt:Date.now(), calculatedBy:identity.id,
@@ -4395,6 +4679,7 @@ tr:hover td{background:var(--line2)}
   }
 
   function renderInvoiceStats(){
+    renderProfit();
     var outEl=document.getElementById('invStatOutstanding');
     if(!outEl) return;
     var outstanding = invoices.filter(function(i){return i.status!=='paid';}).reduce(function(s,i){return s+(Number(i.total)||0);},0);
@@ -7163,6 +7448,10 @@ tr:hover td{background:var(--line2)}
         var o={}; snap.docs.forEach(function(d){ o[d.id]=d.data(); runCache[d.id]=d.data(); });
         allRuns=o; cycRefresh();
       }, function(){});
+      db.collection('clientCosts').onSnapshot(function(snap){
+        var o={}; snap.docs.forEach(function(d){ var x=d.data(); if(x && x.clientId && x.ym) o[x.clientId+'|'+x.ym]=x; });
+        clientCosts=o; renderProfit();
+      }, function(){});
       db.collection('payGroups').onSnapshot(function(snap){
         payGroups=snap.docs.map(function(d){ return d.data(); }).filter(function(x){ return x && x.id; });
         if(payScope && !groupOf(payScope)) payScope='';
@@ -7380,6 +7669,7 @@ tr:hover td{background:var(--line2)}
         h+='<div class="card"><p class="muted" style="margin:0"><b>PF, ESI and professional tax are paid together for the whole month.</b> '+(mg.rows.length?'The amounts below cover the groups that are approved: '+escapeHtml(mg.included.join(', '))+'.':'No group is approved yet, so there is nothing to pay yet.')+(mg.pending.length&&mg.rows.length?' Not included yet, because they are not approved: '+escapeHtml(mg.pending.join(', '))+'.':'')+'</p></div>';
         if(mg.rows.length) h+=govPayHtml(cycTotals(mg.rows),ym);
       }
+      h+=filesCardHtml(ym);
       if(r.status==='approved') h+='<div class="card"><div class="row"><button class="btn" data-cyc="register">Payroll register (PDF)</button><button class="btn ghost" data-cyc="bank">Bank transfer file (CSV)</button></div></div>';
     } else h+='<div class="card"><p class="muted" style="margin:0"><b>No payroll calculated for '+escapeHtml(xMonthLabel(ym))+'.</b> Reports appear here once payroll is calculated.</p></div>';
     var hist=Object.keys(allRuns).filter(function(k){return allRuns[k].rows&&allRuns[k].rows.length;}).sort().reverse();
@@ -7396,7 +7686,7 @@ tr:hover td{background:var(--line2)}
   // ---------- drawing the tab, the sidebar rail and the dashboard card ----------
   function cycTabOpen(){ var s=document.getElementById('tab-cycle'); return !!(s && s.style.display!=='none'); }
   function cycRefresh(force){
-    renderWorkflowRail(); renderCycleCard();
+    renderWorkflowRail(); renderCycleCard(); renderProfit();
     if(!cycTabOpen()) return;
     var a=document.activeElement;
     if(!force && a && document.getElementById('cycleMain') && document.getElementById('cycleMain').contains(a) && /^(INPUT|TEXTAREA|SELECT)$/.test(a.tagName)){ cycDirty=true; return; }
@@ -7488,6 +7778,8 @@ tr:hover td{background:var(--line2)}
       case 'reject': { var rm=document.getElementById('cycRemark'), txt=rm?rm.value.trim():''; if(!txt){ toast('Enter a reason for rejecting.'); break; } await rejectRun(ym,txt); cycRefresh(true); break; }
       case 'allSlips': await cycAllPayslips(); break;
       case 'bank': await exportCsv(ym); break;
+      case 'ecr': await downloadEcr(ym); break;
+      case 'esicfile': await downloadEsic(ym); break;
       case 'register': await downloadPayrollRegister(ym); break;
       case 'slip': await downloadPayslip(id,ym); break;
       case 'close': { var r=cycRun(ym); if(!(r&&r.status==='approved')){ toast('Approve the payroll before closing the month.'); break; } if(!confirm('Close '+xMonthLabel(ym)+'? Attendance and payroll will be locked.')) break; await patchCycle(ym,{closed:true,closedAt:Date.now()},'Month closed. Attendance and payroll are locked'); break; }

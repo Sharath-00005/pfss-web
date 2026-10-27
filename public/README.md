@@ -463,3 +463,33 @@ Use this when different clients, sites or roles are paid on different days, or n
 - Pay-change locks (for example, a pay cut cannot start in an approved month) look at the employee's own group.
 
 **Pay rates** stay on each employee. A group controls how and when payroll is processed, not the wage. Run `supabase/accounts_role.sql` again in the SQL Editor so the database also refuses changes to groups from anyone but Accounts and the administrator (safe to run again).
+
+
+## PF and ESIC upload files
+
+In the **Pay cycle**, step **Reports**, the card **Files for the PF and ESIC portals** makes the monthly files from the **approved** payroll. When payroll runs in groups, each file covers every group that is approved, so download after the last group is approved.
+
+**PF return file (ECR).** A text file, `PFSS-ECR-<month>.txt`, with one line per member and these fields joined by `#~#`: UAN, member name (capitals), gross wages, EPF wages, EPS wages, EDLI wages, EPF contribution (the employee's 12%), EPS contribution (8.33%), the difference to the employer's EPF (3.67%), days of non-contributory service (days not paid), and refund of advances (0). The EPF wages are the Basic + D.A. up to the PF ceiling, with September 2026 split by days at the 17 September change. The totals match the EPFO challan heads shown in "Pay to government".
+
+**ESIC monthly contribution file.** An Excel file, `PFSS-ESIC-<month>.xlsx`, with the six columns of the ESIC template: IP number, name, days paid, total monthly wages, reason code for zero days, last working day. The wages are the wages that count for ESI (additional pay lines you did not tick are left out). An employee with no days worked gets reason code 1 (on leave), or 2 (left service) with the last working day when they have left. The portal works out the contributions itself. If the portal asks for the older .xls type, open the file in Excel and use Save As, Excel 97-2003 Workbook.
+
+**Please check before you submit.** The card lists anyone left out because the UAN is missing or is not 12 digits, or the ESIC number is missing, and warns about an ESIC number that is not 10 digits. Employees left out are not in the file even though their PF is in the amount to pay, so fix their numbers first. Upload the PF file to the EPFO portal and use its Validate step, and look at the ESIC sheet once before uploading. The portals can change their formats, so if one rejects a file, send me the message.
+
+## Restore from a backup
+
+In **Settings**, **Backup**, the part **Restore from a backup file** brings records back from a data backup (.json). Only an administrator can use it. Steps: choose the file, click **Check the file** (it shows, for each kind of record, how many are the same as now, how many differ and how many are missing), tick what to bring back, type `RESTORE`, and click **Restore**.
+
+- **Nothing is deleted.** A record in the file replaces the same record in the system, and records that are only in the system stay as they are.
+- **A safety copy is downloaded first**, named `PFSS-before-restore-<date>.json`. It is a normal backup file, so you can restore it later to undo the restore. If it cannot be saved, nothing is restored.
+- Only records that differ or are missing are written, in batches. If it stops part-way it says after how many records, and you can run it again.
+- It restores **data**. Staff logins stay in Supabase, and uploaded photos and documents stay in storage (the ZIP is for your own safekeeping).
+- **Upload the new `pfss-backend.js`** with the new `index.html`, or the screen will say the restore needs the updated file.
+
+## Profit per client
+
+In the **Invoicing** tab, the card **Profit per client** (Accounts and administrator only) sets, for a service month, what each client was **invoiced before GST** against what their staff **cost the company**, plus **other costs** you type in for that client and month (uniforms, transport, supervision).
+
+- **Staff cost** is the pay plus the employer share of PF and ESI, the insurance (EDLI) and the PF admin charge, from the latest payroll of that month (all payroll groups). The note says which groups are not approved yet.
+- **Which client** an employee belongs to comes from the **contracts**: the contract for the employee's site that is in force that month. Staff at a site with no contract appear on their own line, "Staff not linked to a client", and still count in the total. Add a contract for that site to link them.
+- Draft invoices are not counted. Loss-making clients show in red, with the margin. **Download as CSV** saves the table.
+- The database also refuses changes to the entered costs from anyone but Accounts and the administrator: run `supabase/accounts_role.sql` again (safe to run again).

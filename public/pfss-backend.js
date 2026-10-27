@@ -257,6 +257,30 @@
         doc: function (id) { return docRef(name, id); }
       };
     },
+    // writes records from a backup file (existing records with the same collection and id are replaced, nothing is deleted). Administrators only.
+    importAll: async function (collections, onProgress) {
+      if (!profile || profile.role !== 'admin') { var pe = new Error('Only an administrator can restore from a backup'); pe.code = 'no-permission'; throw pe; }
+      var rows = [], skipped = 0;
+      Object.keys(collections || {}).forEach(function (c) {
+        if (!/^[A-Za-z0-9_\-]{1,100}$/.test(c)) { skipped++; return; }
+        var recs = collections[c] || {};
+        Object.keys(recs).forEach(function (id) {
+          var d = recs[id];
+          if (!id || id.length > 200 || d === null || typeof d !== 'object' || Array.isArray(d)) { skipped++; return; }
+          rows.push({ collection: c, id: id, data: clean(d) });
+        });
+      });
+      var done = 0, size = 200, touched = {};
+      for (var i = 0; i < rows.length; i += size) {
+        var chunk = rows.slice(i, i + size);
+        var r = await sb.from('documents').upsert(chunk, { onConflict: 'collection,id' });
+        if (r.error) { var er = dbError(r.error); er.written = done; throw er; }
+        chunk.forEach(function (x) { touched[x.collection] = 1; });
+        done += chunk.length; if (onProgress) onProgress(done, rows.length);
+      }
+      Object.keys(touched).forEach(function (c) { scheduleRefresh(c); });
+      return { written: done, skipped: skipped };
+    },
     // every record in every collection, for the backup file. Administrators only.
     exportAll: async function () {
       if (!profile || profile.role !== 'admin') { var pe = new Error('Only an administrator can make a backup'); pe.code = 'no-permission'; throw pe; }
