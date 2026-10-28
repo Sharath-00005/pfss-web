@@ -493,3 +493,21 @@ In the **Invoicing** tab, the card **Profit per client** (Accounts and administr
 - **Which client** an employee belongs to comes from the **contracts**: the contract for the employee's site that is in force that month. Staff at a site with no contract appear on their own line, "Staff not linked to a client", and still count in the total. Add a contract for that site to link them.
 - Draft invoices are not counted. Loss-making clients show in red, with the margin. **Download as CSV** saves the table.
 - The database also refuses changes to the entered costs from anyone but Accounts and the administrator: run `supabase/accounts_role.sql` again (safe to run again).
+
+
+## The look of the tool
+
+The tool has four looks, chosen with the **Look** box at the top right of every page. The choice is remembered on that device. It opens in **Aurora** the first time. Changing the look changes only colours, type and shapes. Every word on the screen, every calculation and every file made by the tool is the same in all four.
+
+- **Aurora.** Soft violet gradient sidebar with icons and a white pill on the active item, frosted sheets with large soft corners, gradient buttons and coloured icon chips on the figures. Light colours at all times.
+- **Horizon.** A sunrise band (violet, raspberry, orange) behind each page title with the white sheets overlapping it, a white sidebar with a differently coloured icon for each menu item, raspberry buttons and IDs. Light colours at all times.
+- **Executive.** The dark look: near-black blue, champagne-gold buttons and active item, serif titles, thin gold rules under table headings. Dark at all times.
+- **Register.** The look from the previous round: ledger-paper background, ruled sheets, signage blue, a yellow active item, stamp-style status tags. It follows the device's light or dark setting.
+
+Fonts load from Google Fonts (Bricolage Grotesque, Fraunces, IBM Plex Sans, Plus Jakarta Sans, Sora), and only the ones the chosen look uses are downloaded. Offline, a device falls back to its own fonts and the layout still works.
+
+**Fixing one look for everyone.** Once you have chosen, ask for the other three to be removed. The Look box then goes away and the chosen look is the only one, so nobody can change it by accident.
+
+**Going back to the very first look.** `previous-look/index.html` is the same tool, with every current feature, in the original teal-and-dark-sidebar look and without the Look box. It is ready to upload to the `public` folder in place of `index.html`, next to the same `config.js` and `pfss-backend.js`.
+
+The phone rate card app (`public/ratecard/index.html`) has its own stylesheet and keeps its current look. The PDFs (payslips, invoices, the company profile and ID cards) are also unchanged.
