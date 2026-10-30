@@ -511,3 +511,71 @@ Fonts load from Google Fonts (Bricolage Grotesque, Fraunces, IBM Plex Sans, Plus
 **Going back to the very first look.** `previous-look/index.html` is the same tool, with every current feature, in the original teal-and-dark-sidebar look and without the Look box. It is ready to upload to the `public` folder in place of `index.html`, next to the same `config.js` and `pfss-backend.js`.
 
 The phone rate card app (`public/ratecard/index.html`) has its own stylesheet and keeps its current look. The PDFs (payslips, invoices, the company profile and ID cards) are also unchanged.
+
+
+## Payslips on WhatsApp
+
+In the **Pay cycle**, step **Payslips and bank file**, the card **Send payslips on WhatsApp** appears once the payroll is approved. It covers the payroll group you have chosen. It works in two ways. **The first needs no set-up and no business account, and it works now.**
+
+### Without a business account (works now)
+You send from your own WhatsApp (the ordinary app, the free WhatsApp Business app on a phone, or WhatsApp Web), one employee at a time:
+1. Click **Open chat**. WhatsApp opens with the employee's number and the message already written, and the employee's own payslip PDF is downloaded.
+2. Attach the PDF and press send.
+3. Click **Mark sent**, so you can see who is done.
+
+What else the card gives you:
+- **Status for each employee:** Not sent, Chat opened, or Sent (by hand). The marks are saved, so Accounts and managers all see the same list, and a count at the top shows how many are done. **Undo** takes a mark off if you clicked by mistake.
+- **Download each payslip as its own PDF (ZIP).** One ZIP with a separate PDF for every employee, named by ID and name, so you can attach from a folder instead of downloading one at a time.
+- **Share PDF (phones).** On a phone it hands the PDF and message to the share sheet: choose WhatsApp, then the employee.
+- **Numbers are cleaned automatically** (spaces, dashes, +91, 91, a leading 0, two numbers in one field), and anyone with an unusable number is flagged so you can fix the phone number on the Employees tab.
+
+WhatsApp does not offer an official way for an ordinary number to send messages automatically. Tools that pretend to be WhatsApp Web can get the number blocked, so this tool does not use them.
+
+### With a business account (optional, later)
+If you ever want one click to send to everyone, you can add the WhatsApp Business Platform. Nothing changes until you do. The card then shows a green "ready" line and the buttons **Send to all not yet sent**, **Send to ticked**, **Send** for one person and **Send a sample**, in addition to Open chat.
+
+### How the automatic sending works
+The app builds the payslip PDF in the browser and sends it to a small service you run on Cloudflare (`worker/send-whatsapp.js`). The service holds the WhatsApp key, uploads the PDF to WhatsApp, and sends an approved message template with the PDF attached as its header. The employee sees a normal WhatsApp message from your business number with the PDF in it. WhatsApp only allows a business to start a conversation with a message template that Meta has approved, which is why a template is needed.
+
+### Set-up, once
+1. **Meta Business account.** At business.facebook.com, make or open your company's business account, and add the WhatsApp product in a Meta developer app (type Business). Business verification is not needed to start.
+2. **A number for the business.** Add a phone number to the WhatsApp Business Platform and verify it with the code WhatsApp sends. Use a new SIM or a number you do not chat on. A number used on the Business Platform generally cannot also be used in the ordinary WhatsApp apps at the same time, so check Meta's current rules before you move 99860 20293.
+3. **Two values.** In the WhatsApp section of the developer app, "API setup" shows the **Phone number ID** (a long number, not the phone number itself). Copy it.
+4. **A permanent token.** In Meta Business settings, Users, System users, add a system user, give it your app and WhatsApp account, and generate a token with the permissions `whatsapp_business_messaging` and `whatsapp_business_management`, set to never expire. Copy it and keep it secret.
+5. **The message template.** In WhatsApp Manager, Message templates, create one with:
+   - Name: `payslip`. Category: **Utility**. Language: English.
+   - Header: **Document** (upload any sample PDF when asked).
+   - Body, exactly: `Hello {{1}}, your payslip for {{2}} from Public Force Security Services is attached. This is a private document meant only for you. For any query, call 99860 20293.`
+   - Sample values when asked: {{1}} = Krishnappa M, {{2}} = October 2026. No footer and no buttons.
+   Submit it. Approval usually takes under a day. The tool needs the template to be **Approved**.
+6. **The Worker.** In Cloudflare, make a Worker called `pfss-whatsapp`, paste in `worker/send-whatsapp.js`, deploy it, and in its Settings, Variables and Secrets add:
+   - `WA_TOKEN` (secret): the permanent token.
+   - `WA_PHONE_ID`: the Phone number ID.
+   - `SUPABASE_URL` and `SUPABASE_ANON_KEY`: the same as in `config.js`.
+   - Optional: `WA_TEMPLATE` (default `payslip`), `WA_LANG` (default `en`), `WA_VERSION` (default `v23.0`; change it if Meta retires that version), `ALLOWED_ORIGIN`, `DAILY_LIMIT` (default 400).
+7. **config.js.** Add one line to your own `config.js`: `WHATSAPP_API_URL: "https://pfss-whatsapp.YOUR-ACCOUNT.workers.dev",` and upload it with the new `index.html`.
+8. **Try it.** In the card, type your own number in "send a sample payslip" and click **Send a sample**. It sends a payslip with every amount at zero. If it arrives, everything is working. If not, the message on the card says what to fix.
+
+### Costs and limits
+- Meta bills per delivered template message. In India a utility message such as a payslip costs roughly 11 to 16 paise, so 100 payslips a month is about 12 to 16 rupees, plus GST. Check Meta's current rate card, because prices change on the first day of a quarter.
+- A new account can message up to 250 different people in 24 hours. That is enough for a team of up to 250, and it grows when you verify the business. For more than 250 employees, send in two days or verify the business.
+- The Worker allows 400 payslips per person per day (change `DAILY_LIMIT`).
+
+### What the card shows
+- **Sent** means WhatsApp accepted the message. It does not show that the employee has read it. A message to a number that is not on WhatsApp shows as **Failed** with the reason. Anyone you marked by hand shows as **Sent (by hand)**, and an opened chat shows as **Chat opened**.
+- Every attempt is saved against the employee and month (who sent it, when, the last 4 digits of the number, and the message id), so you can see who has had theirs. The Worker keeps its own log with the last 4 digits only. Neither keeps the whole number, the PDF or the key.
+- **Send again** asks first, so nobody gets two by accident. **Stop** ends a batch after the one being sent. A problem that would fail every message (an expired token, a missing template, a payment problem on the Meta account) stops the batch at once, and the message says what to fix.
+
+### Phone numbers
+The number comes from the employee's phone field and is cleaned automatically: spaces, dashes, brackets, +91, 91 and a leading 0 are all accepted. If two numbers are saved, the first usable one is used. An Indian mobile must have 10 digits starting with 6, 7, 8 or 9. Anyone whose number cannot be used is marked "No valid number", and the card says how many. Fix the phone number on the Employees tab.
+
+### Privacy
+A payslip shows pay and deductions, and the bank details of the employee. Send it only to the employee's own number: check the numbers first, tell your staff that payslips will come on WhatsApp, and keep their agreement on record. Keep the WhatsApp token secret. If it is ever lost, remove the system user's token in Meta Business settings and make a new one. The payslip PDF is not password-protected.
+
+### If something goes wrong
+- **"Not set up yet" or "works on your own site".** The line in `config.js` is missing, or you are in the Claude preview. Open chat still works.
+- **Template not found or not approved.** Check the template name and language in the Worker settings, and that it shows Approved in WhatsApp Manager.
+- **Access expired.** Make a new token and replace `WA_TOKEN`.
+- **Only numbers on the allowed list.** The number is still in test mode in the Meta app. Finish adding your own number.
+- **Payment problem.** Add a payment method to the WhatsApp Business account in Meta Business settings.
+- **Could not deliver.** That number is probably not on WhatsApp. Use Open chat, or email the payslip.

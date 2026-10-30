@@ -3613,6 +3613,209 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     f('profOut').addEventListener('change', function(ev){ var t=ev.target; if(t && t.dataset && t.dataset.profcost) saveClientCost(t.dataset.profcost, f('profMonth').value||cycMonth(), t.value); });
   }
 
+  /* ---------- payslips on WhatsApp ---------- */
+  var slipLog={};   // 'empId|YYYY-MM' -> the last WhatsApp send record for that employee and month
+  var waState={checked:{}, busy:false, stop:false, progress:'', summary:'', testNo:''}, waInfoCache=null, waDelay=350;
+  // an employee's phone as digits with the country code, or '' when it cannot be a mobile number. Indian mobiles are 10 digits starting 6 to 9.
+  function waNumber(v){
+    var parts=String(v==null?'':v).split(/[\/,;\n]+| or /i);
+    for(var i=0;i<parts.length;i++){
+      var p=parts[i], d=p.replace(/\D/g,''); if(!d) continue;
+      if(d.length===11 && d.charAt(0)==='0') d=d.slice(1);
+      if(d.length===10 && /^[6-9]/.test(d)) return '91'+d;
+      if(d.length===12 && d.slice(0,2)==='91' && /^[6-9]/.test(d.charAt(2))) return d;
+      if(d.length===13 && d.slice(0,3)==='091' && /^[6-9]/.test(d.charAt(3))) return d.slice(1);
+      if(/^\s*\+/.test(p) && d.length>=11 && d.length<=15 && d.slice(0,2)!=='91') return d;
+    }
+    return '';
+  }
+  function waPretty(n){ return (n.length===12 && n.slice(0,2)==='91')?'+91 '+n.slice(2,7)+' '+n.slice(7):'+'+n; }
+  function waText(name, ym){ return 'Hello '+name+', your payslip for '+xMonthLabel(ym)+' from Public Force Security Services is attached. For any query, call 99860 20293.'; }
+  function waLink(n, text){ return 'https://wa.me/'+n+'?text='+encodeURIComponent(text); }
+  function waPause(ms){ return new Promise(function(r){ setTimeout(r,ms); }); }
+  // asks the WhatsApp service (a Cloudflare Worker) to do something, with the person's own login
+  async function waApi(method, body){
+    var A=window.pfssAuth;
+    if(!A){ var e0=new Error('WhatsApp sending works on your own site, not in this preview.'); e0.status=0; e0.fatal=true; e0.notSetUp=true; throw e0; }
+    var cfg=window.PFSS_CONFIG||{}, url=String(cfg.WHATSAPP_API_URL||'').replace(/\/+$/,'');
+    if(!url){ var e2=new Error('WhatsApp sending is not set up yet. Add WHATSAPP_API_URL to config.js (the README has the steps).'); e2.status=0; e2.fatal=true; e2.notSetUp=true; throw e2; }
+    var tok=await A.token(); if(!tok){ var e1=new Error('Please sign in again.'); e1.status=401; e1.fatal=true; throw e1; }
+    var res; try{ res=await fetch(url,{method:method,headers:{Authorization:'Bearer '+tok,'Content-Type':'application/json'},body:body?JSON.stringify(body):undefined}); }
+    catch(e){ var en=new Error('Could not reach the WhatsApp service. Check the internet connection.'); en.status=0; en.fatal=false; throw en; }
+    var out={}; try{ out=await res.json(); }catch(e){}
+    if(!res.ok){ var err=new Error(out.error||('Server error '+res.status)); err.status=res.status; err.fatal=(out.fatal!=null)?!!out.fatal:(res.status===401||res.status===403||res.status===503); err.code=out.code||null; throw err; }
+    return out;
+  }
+  // is sending ready? (asked once, and again after five minutes or when asked to)
+  async function waInfo(force){
+    if(waInfoCache && !force && (Date.now()-waInfoCache.at)<300000) return waInfoCache;
+    try{ var o=await waApi('GET'); waInfoCache={at:Date.now(), ready:!!o.configured, template:o.template, language:o.language, reason:o.configured?'':'The WhatsApp key or phone number ID is missing in the Worker settings.'}; }
+    catch(e){ waInfoCache={at:Date.now(), ready:false, reason:e.message||'WhatsApp sending is not available.', notSetUp:!!e.notSetUp}; }
+    return waInfoCache;
+  }
+  function waRows(ym){
+    var r=cycRun(ym); if(!(r && r.rows)) return [];
+    return r.rows.map(function(x){
+      var e=state.employees.find(function(z){ return z.id===x.empId; })||{}, rec=slipLog[x.empId+'|'+ym]||null;
+      return {row:x, emp:e, number:waNumber(e.phone), rec:rec, sent:!!(rec && rec.status==='sent')};
+    });
+  }
+  function waStatusHtml(w){
+    var when=function(at){ return escapeHtml(new Date(at).toLocaleString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})); };
+    if(!w.number) return '<span class="tag bad">No valid number</span>';
+    if(w.sent) return '<span class="tag ok">Sent</span> <span class="muted">'+when(w.rec.at)+(w.rec.via==='manual'?', by hand':'')+'</span>';
+    if(w.rec && w.rec.status==='opened') return '<span class="tag info">Chat opened</span> <span class="muted">'+when(w.rec.at)+'</span>';
+    if(w.rec && w.rec.status==='failed') return '<span class="tag bad">Failed</span><div class="muted" style="white-space:normal;max-width:300px">'+escapeHtml(w.rec.error||'')+'</div>';
+    return '<span class="tag mute">Not sent</span>';
+  }
+  // can this device share a file to another app (phones can)?
+  function waCanShare(){ try{ if(typeof navigator==='undefined' || !navigator.canShare || typeof File!=='function') return false; return !!navigator.canShare({files:[new File(['x'],'a.pdf',{type:'application/pdf'})]}); }catch(e){ return false; } }
+  function waCardHtml(ym, info){
+    var rows=waRows(ym), can=!!(me && me.canEdit), ready=!!(info && info.ready), busy=waState.busy, share=waCanShare();
+    var todo=rows.filter(function(w){ return w.number && !w.sent; }), ticked=rows.filter(function(w){ return w.number && waState.checked[w.row.empId]; }), nonum=rows.filter(function(w){ return !w.number; }), sent=rows.filter(function(w){ return w.sent; }), opened=rows.filter(function(w){ return !w.sent && w.rec && w.rec.status==='opened'; });
+    var dis=(can && ready && !busy)?'':' disabled', mdis=can?'':' disabled', who=escapeHtml(payGroups.length?groupName(payScope):'everyone in this payroll');
+    var h='<div class="card"><h2>Send payslips on WhatsApp</h2>';
+    if(ready){
+      h+='<p class="muted">Each employee gets a WhatsApp message with their payslip PDF attached, sent to the number saved on their employee record. This covers '+who+'. "Sent" means WhatsApp accepted the message; it does not show that it was read. Each message costs a few paise, billed by Meta.</p>';
+      h+='<div class="banner" style="background:var(--ok-soft);color:var(--ok);border-left-color:var(--ok)">WhatsApp sending is ready (message template: '+escapeHtml(info.template||'payslip')+', language '+escapeHtml(info.language||'en')+').</div>';
+    } else {
+      h+='<p class="muted">Send each employee their payslip on WhatsApp, one at a time, from your own WhatsApp (the ordinary app or WhatsApp Web both work). This covers '+who+'.</p>';
+      h+='<ol class="muted" style="margin:.2rem 0 .5rem 1.2rem;padding:0"><li>Click <b>Open chat</b>. WhatsApp opens with the employee\'s number and a message ready, and their payslip PDF is downloaded.</li><li>Attach the PDF and press send.</li><li>Click <b>Mark sent</b>, so you can see who is done.</li></ol>';
+      if(share) h+='<p class="muted">On this phone you can also use <b>Share PDF</b>: choose WhatsApp, then the employee.</p>';
+      if(info && info.notSetUp) h+='<p class="muted" style="margin:.2rem 0 .4rem">Sending to everyone with one click needs a WhatsApp Business account. It is not set up here and it does not have to be: the steps above work without it. The README explains how to add it later.</p>';
+      else h+='<div class="banner">'+escapeHtml((info&&info.reason)||'WhatsApp sending is not available.')+' <button class="btn small ghost" data-cyc="waRecheck">Check again</button></div>';
+    }
+    h+='<p style="margin:.7rem 0 0"><b>'+sent.length+'</b> of '+rows.length+' sent'+(todo.length?', <b>'+todo.length+'</b> not yet sent':'')+(opened.length?', <b>'+opened.length+'</b> chat'+(opened.length===1?'':'s')+' opened but not marked sent':'')+(nonum.length?', <b style="color:var(--bad)">'+nonum.length+' with no valid WhatsApp number</b> (fix the phone number on the Employees tab)':'')+'.</p>';
+    if(waState.progress) h+='<div class="banner" style="margin-top:.6rem">'+escapeHtml(waState.progress)+' <button class="btn small" data-cyc="waStop">Stop</button></div>';
+    else if(waState.summary) h+='<div class="muted" style="margin-top:.4rem"><b>Last send:</b> '+escapeHtml(waState.summary)+'</div>';
+    if(ready){
+      h+='<div class="row" style="margin-top:.7rem"><button class="btn" data-cyc="waSendAll"'+(todo.length?dis:' disabled')+'>Send to all not yet sent ('+todo.length+')</button><button class="btn ghost" data-cyc="waSendTicked"'+(ticked.length?dis:' disabled')+'>Send to ticked ('+ticked.length+')</button><button class="btn small ghost" data-cyc="waTickAll">Tick all not yet sent</button><button class="btn small ghost" data-cyc="waTickNone">Clear ticks</button></div>';
+      h+='<div class="row" style="margin-top:.7rem;align-items:flex-end"><div class="field" style="max-width:260px"><label>Try it first: send a sample payslip (all amounts zero) to</label><input id="waTestNo" placeholder="Your own number" value="'+escapeHtml(waState.testNo)+'"></div><button class="btn small ghost" data-cyc="waTest"'+dis+'>Send a sample</button></div>';
+    }
+    h+='<div class="row" style="margin-top:.7rem"><button class="btn small ghost" data-cyc="waZip">Download each payslip as its own PDF (ZIP)</button></div>';
+    h+='<div class="scrollx"><table><thead><tr>'+(ready?'<th></th>':'')+'<th>ID</th><th>Employee</th><th>WhatsApp number</th><th>Status</th><th></th></tr></thead><tbody>';
+    rows.forEach(function(w){
+      var id=escapeHtml(w.row.empId), act;
+      if(ready) act='<button class="btn small" data-cyc="waSend" data-id="'+id+'"'+(w.number?dis:' disabled')+'>'+(w.sent?'Send again':'Send')+'</button> <button class="btn small ghost" data-cyc="waManual" data-id="'+id+'"'+(w.number?'':' disabled')+'>Open chat</button>';
+      else act='<button class="btn small" data-cyc="waManual" data-id="'+id+'"'+(w.number?'':' disabled')+'>Open chat</button>'+(share?' <button class="btn small ghost" data-cyc="waShare" data-id="'+id+'"'+(w.number?'':' disabled')+'>Share PDF</button>':'')+
+        (w.sent?(w.rec.via==='manual'?' <button class="btn small ghost" data-cyc="waMark" data-id="'+id+'" data-on="0"'+mdis+'>Undo</button>':''):' <button class="btn small ghost" data-cyc="waMark" data-id="'+id+'" data-on="1"'+(w.number?mdis:' disabled')+'>Mark sent</button>');
+      h+='<tr>'+(ready?'<td><input type="checkbox" data-watick="'+id+'"'+(waState.checked[w.row.empId]?' checked':'')+(w.number?'':' disabled')+' style="width:auto;min-height:0"></td>':'')+'<td>'+escapeHtml(w.row.empCode||'')+'</td><td>'+escapeHtml(w.row.name)+'</td><td>'+(w.number?escapeHtml(waPretty(w.number)):'<span class="muted">'+escapeHtml(String(w.emp.phone||'none saved'))+'</span>')+'</td><td>'+waStatusHtml(w)+'</td><td style="white-space:nowrap">'+act+'</td></tr>';
+    });
+    return h+'</tbody></table></div></div>';
+  }
+  function waSampleRow(row){
+    var o=Object.assign({}, row);
+    Object.keys(o).forEach(function(k){ if(typeof o[k]==='number' && k!=='present' && k!=='dim') o[k]=0; });
+    o.present=o.dim=Number(row.dim)||30; o.name='Sample Employee'; o.empCode='SAMPLE'; o.uan=''; o.esicNo=''; o.bankAcc=''; o.ifsc=''; o.addLines=[]; o.arrearsNote=''; o.revNote='';
+    return o;
+  }
+  async function waSendOne(w, ym, opts){
+    opts=opts||{}; var num=opts.to||w.number, row=opts.row||w.row;
+    if(!num) return {ok:false, error:'No valid WhatsApp number'};
+    var blob; try{ blob=buildPayslipPdf(row, cycRun(ym), ym); }catch(e){ return {ok:false, error:'Could not build the payslip PDF.'}; }
+    var b64; try{ b64=await b64Of(blob); }catch(e){ return {ok:false, error:'Could not read the payslip PDF.'}; }
+    try{
+      var out=await waApi('POST',{to:num, name:String(opts.name||row.name||'').trim(), month:xMonthLabel(ym), filename:'Payslip-'+pdfName(row.name)+'-'+ym+'.pdf', pdfBase64:b64});
+      return {ok:true, messageId:out.messageId};
+    }catch(e){ return {ok:false, error:e.message||'Could not send.', fatal:!!e.fatal, code:e.code||null}; }
+  }
+  async function waRecordRaw(w, ym, patch){
+    var rec=Object.assign({empId:w.row.empId, ym:ym, channel:'whatsapp', at:new Date().toISOString(), by:(me&&(me.name||me.email))||'', toLast4:w.number.slice(-4), messageId:'', error:''}, patch);
+    slipLog[w.row.empId+'|'+ym]=rec;
+    if(db){ try{ await db.doc('payslipLog/'+w.row.empId+'_'+ym.replace('-','')+'_wa').set(rec); }catch(e){} }
+    return rec;
+  }
+  function waRecord(w, ym, res){ return waRecordRaw(w, ym, {status:res.ok?'sent':'failed', via:'auto', messageId:res.messageId||'', error:res.ok?'':String(res.error||'').slice(0,200)}); }
+  async function waSendMany(list, ym){
+    if(waState.busy) return;
+    if(!(me && me.canEdit)){ toast('You can only view payslips. Ask an administrator, Accounts or a manager to send them.'); return; }
+    var info=await waInfo(); if(!info.ready){ toast(info.reason||'WhatsApp sending is not set up yet.'); return; }
+    if(!list.length){ toast('There is nobody to send to.'); return; }
+    waState.busy=true; waState.stop=false; waState.summary='';
+    var okN=0, failN=0, why='';
+    for(var i=0;i<list.length;i++){
+      if(waState.stop){ why='You stopped it.'; break; }
+      waState.progress='Sending '+(i+1)+' of '+list.length+': '+list[i].row.name; cycRefresh(true);
+      var res=await waSendOne(list[i], ym); await waRecord(list[i], ym, res);
+      if(res.ok) okN++; else { failN++; if(res.fatal){ why=res.error; break; } }
+      if(i<list.length-1 && waDelay) await waPause(waDelay);
+    }
+    waState.busy=false; waState.progress='';
+    waState.summary=okN+' sent'+(failN?', '+failN+' failed':'')+'.'+(why?' '+why+(/[.!?]$/.test(why)?'':'.'):'')+(okN+failN<list.length?' '+(list.length-okN-failN)+' not attempted.':'');
+    toast(waState.summary); cycRefresh(true);
+  }
+  function waFind(ym, empId){ return waRows(ym).filter(function(w){ return w.row.empId===empId; })[0]||null; }
+  async function waSendClick(ym, empId){
+    var w=waFind(ym, empId); if(!w) return;
+    if(!w.number){ toast('This employee has no valid WhatsApp number.'); return; }
+    if(w.sent && !confirm('The payslip was already sent to '+w.row.name+'. Send it again?')) return;
+    await waSendMany([w], ym);
+  }
+  async function waSendAllClick(ym){
+    var list=waRows(ym).filter(function(w){ return w.number && !w.sent; });
+    if(list.length && !confirm('Send the payslip on WhatsApp to '+list.length+' employee'+(list.length===1?'':'s')+' now?')) return;
+    await waSendMany(list, ym);
+  }
+  async function waSendTickedClick(ym){
+    var list=waRows(ym).filter(function(w){ return w.number && waState.checked[w.row.empId]; });
+    if(list.length && !confirm('Send the payslip on WhatsApp to '+list.length+' ticked employee'+(list.length===1?'':'s')+' now?')) return;
+    await waSendMany(list, ym);
+  }
+  function waTick(ym, on){ waRows(ym).forEach(function(w){ waState.checked[w.row.empId]=!!(on && w.number && !w.sent); }); cycRefresh(true); }
+  async function waTestClick(ym){
+    var num=waNumber(waState.testNo), rows=waRows(ym);
+    if(!(me && me.canEdit)){ toast('Only administrators, Accounts and managers can send.'); return; }
+    if(!num){ toast('Type a valid WhatsApp number to send the sample to.'); return; }
+    if(!rows.length){ toast('There are no payslips yet.'); return; }
+    var info=await waInfo(); if(!info.ready){ toast(info.reason||'WhatsApp sending is not set up yet.'); return; }
+    if(!confirm('Send a sample payslip, with every amount at zero, to '+waPretty(num)+'?')) return;
+    var res=await waSendOne(rows[0], ym, {to:num, row:waSampleRow(rows[0].row), name:'Test'});
+    waState.summary=res.ok?'Sample sent to '+waPretty(num)+'. Check it on that phone.':'The sample was not sent: '+res.error;
+    toast(waState.summary); cycRefresh(true);
+  }
+  // no service needed: open the employee's chat, and either share the PDF (phones) or download it to attach
+  // no service needed: open the employee's chat with the message ready, and download the payslip to attach
+  function waManual(ym, empId){
+    var w=waFind(ym, empId); if(!w || !w.number){ toast('This employee has no valid WhatsApp number.'); return; }
+    var text=waText(w.row.name, ym), fname='Payslip-'+pdfName(w.row.name)+'-'+ym+'.pdf', blob;
+    try{ blob=buildPayslipPdf(w.row, cycRun(ym), ym); }catch(e){ toast('Could not build the payslip PDF.'); return; }
+    window.open(waLink(w.number, text),'_blank','noopener');   // first, while the click still counts, so the browser allows it
+    var noted=(me && me.canEdit && !w.sent)?waRecordRaw(w, ym, {status:'opened', via:'manual'}).then(function(){ cycRefresh(true); }):Promise.resolve();
+    return Promise.all([pdfSave(blob, fname), noted]).then(function(){ toast('The payslip was downloaded. Attach it in the WhatsApp chat that opened, press send, then click Mark sent.'); });
+  }
+  // phones: share the PDF and the message to WhatsApp, then choose the employee there
+  function waShare(ym, empId){
+    var w=waFind(ym, empId); if(!w || !w.number){ toast('This employee has no valid WhatsApp number.'); return; }
+    if(!waCanShare()){ toast('This device cannot share a file. Use Open chat.'); return; }
+    var blob; try{ blob=buildPayslipPdf(w.row, cycRun(ym), ym); }catch(e){ toast('Could not build the payslip PDF.'); return; }
+    var f=new File([blob],'Payslip-'+pdfName(w.row.name)+'-'+ym+'.pdf',{type:'application/pdf'});
+    return navigator.share({files:[f], text:waText(w.row.name, ym)}).then(function(){
+      if(me && me.canEdit && !w.sent) return waRecordRaw(w, ym, {status:'opened', via:'manual'}).then(function(){ cycRefresh(true); });
+    }).catch(function(){});
+  }
+  // mark an employee as done by hand (or take the mark off)
+  async function waMark(ym, empId, on){
+    if(!(me && me.canEdit)){ toast('Only administrators, Accounts and managers can change this.'); return; }
+    var w=waFind(ym, empId); if(!w || !w.number){ toast('This employee has no valid WhatsApp number.'); return; }
+    if(on) await waRecordRaw(w, ym, {status:'sent', via:'manual'});
+    else if(w.rec && w.rec.via==='manual'){ delete slipLog[empId+'|'+ym]; if(db){ try{ await db.doc('payslipLog/'+empId+'_'+ym.replace('-','')+'_wa').delete(); }catch(e){} } }
+    cycRefresh(true);
+  }
+  // one ZIP with a separate PDF for each employee, so they are easy to attach from a folder
+  async function waZip(ym){
+    var rows=waRows(ym); if(!rows.length){ toast('There are no payslips yet.'); return; }
+    var run=cycRun(ym), files=[], used={};
+    try{
+      for(var i=0;i<rows.length;i++){
+        var x=rows[i].row, bl=buildPayslipPdf(x, run, ym), buf=new Uint8Array(await bl.arrayBuffer());
+        var nm=pdfName(x.empCode||x.empId)+'-'+pdfName(x.name)+'-'+ym+'.pdf'; if(used[nm]) nm=nm.replace(/\.pdf$/,'-'+(i+1)+'.pdf'); used[nm]=1;
+        files.push({name:nm, bytes:buf});
+      }
+    }catch(e){ toast('Could not build the payslips.'); return; }
+    await pdfSave(new Blob([zipStore(files)],{type:'application/zip'}),'payslips-'+ym+'.zip');
+    toast(files.length+' payslips saved in one ZIP file, one PDF for each employee.');
+  }
+
   // ---------- ATTENDANCE ----------
   // ---------- ATTENDANCE CSV IMPORT (from the Attendance app) ----------
   function parseCsv(text){
@@ -7655,6 +7858,10 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         var o={}; snap.docs.forEach(function(d){ o[d.id]=d.data(); runCache[d.id]=d.data(); });
         allRuns=o; cycRefresh();
       }, function(){});
+      db.collection('payslipLog').onSnapshot(function(snap){
+        var o={}; snap.docs.forEach(function(d){ var x=d.data(); if(x && x.empId && x.ym && x.channel==='whatsapp') o[x.empId+'|'+x.ym]=x; });
+        slipLog=o; cycRefresh();
+      }, function(){});
       db.collection('clientCosts').onSnapshot(function(snap){
         var o={}; snap.docs.forEach(function(d){ var x=d.data(); if(x && x.clientId && x.ym) o[x.clientId+'|'+x.ym]=x; });
         clientCosts=o; renderProfit();
@@ -7856,6 +8063,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var h=closed?'<div class="banner">'+escapeHtml(xMonthLabel(ym))+' is closed. Attendance and payroll are locked.'+(canReopen?' <button class="btn small ghost" data-cyc="reopen">Reopen month</button>':'')+'</div>'
       :'<div class="card"><h2>Payslips and bank file</h2><p class="muted">Download what you need below. When everything has been paid and checked, close the month. Closing locks attendance and payroll for '+escapeHtml(xMonthLabel(ym))+'.</p><button class="btn" data-cyc="close">Close '+escapeHtml(xMonthLabel(ym))+'</button></div>';
     h+='<div class="card"><h2>Downloads</h2><div class="row"><button class="btn" data-cyc="allSlips">All payslips (one PDF)</button><button class="btn ghost" data-cyc="bank">Bank transfer file (CSV)</button><button class="btn ghost" data-cyc="register">Payroll register (PDF)</button></div></div>';
+    h+=waCardHtml(ym, await waInfo());
     h+='<div class="card"><div class="scrollx"><table><thead><tr><th>ID</th><th>Employee</th><th>Site</th><th class="right">Gross</th><th class="right">Deductions</th><th class="right">Net pay</th><th></th></tr></thead><tbody>';
     r.rows.forEach(function(x){ h+='<tr><td>'+escapeHtml(x.empCode||'')+'</td><td>'+escapeHtml(x.name)+'</td><td>'+escapeHtml(x.site||'')+'</td><td class="right">'+fmtMoney(x.gross)+'</td><td class="right">'+fmtMoney(x.gross-x.net)+'</td><td class="right"><b>'+fmtMoney(x.net)+'</b></td><td><button class="btn small ghost" data-cyc="slip" data-id="'+x.empId+'">Payslip</button></td></tr>'; });
     return h+'</tbody></table></div></div>';
@@ -7985,6 +8193,18 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       case 'reject': { var rm=document.getElementById('cycRemark'), txt=rm?rm.value.trim():''; if(!txt){ toast('Enter a reason for rejecting.'); break; } await rejectRun(ym,txt); cycRefresh(true); break; }
       case 'allSlips': await cycAllPayslips(); break;
       case 'bank': await exportCsv(ym); break;
+      case 'waSend': await waSendClick(ym, el.dataset.id); break;
+      case 'waSendAll': await waSendAllClick(ym); break;
+      case 'waSendTicked': await waSendTickedClick(ym); break;
+      case 'waTickAll': waTick(ym, true); break;
+      case 'waTickNone': waTick(ym, false); break;
+      case 'waStop': waState.stop=true; toast('Stopping after the one being sent.'); break;
+      case 'waTest': await waTestClick(ym); break;
+      case 'waManual': waManual(ym, el.dataset.id); break;
+      case 'waShare': await waShare(ym, el.dataset.id); break;
+      case 'waMark': await waMark(ym, el.dataset.id, el.dataset.on==='1'); break;
+      case 'waZip': await waZip(ym); break;
+      case 'waRecheck': await waInfo(true); cycRefresh(true); break;
       case 'ecr': await downloadEcr(ym); break;
       case 'esicfile': await downloadEsic(ym); break;
       case 'register': await downloadPayrollRegister(ym); break;
@@ -8003,6 +8223,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     root.addEventListener('change', function(ev){
       var el=ev.target;
       if(el.id==='cycGroup'){ setPayScope(el.value); return; }
+      if(el.dataset && el.dataset.watick){ waState.checked[el.dataset.watick]=el.checked; return; }
+      if(el.id==='waTestNo'){ waState.testNo=el.value; return; }
       if(el.id==='cycMonth'){ if(el.value){ cyc.month=el.value; cycAttCache={}; renderCycle(); renderWorkflowRail(); renderCycleCard(); } return; }
       if(el.dataset && el.dataset.filing){ saveFilingTick(el); return; }
       if(el.dataset && el.dataset.extra) cycSaveExtra(el.dataset.id, el.dataset.extra, el.value);
