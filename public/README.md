@@ -579,3 +579,32 @@ A payslip shows pay and deductions, and the bank details of the employee. Send i
 - **Only numbers on the allowed list.** The number is still in test mode in the Meta app. Finish adding your own number.
 - **Payment problem.** Add a payment method to the WhatsApp Business account in Meta Business settings.
 - **Could not deliver.** That number is probably not on WhatsApp. Use Open chat, or email the payslip.
+
+
+## Authorised signatory, and authenticated invoices
+
+### Who signs: Sharath R, Accounts Head
+Every invoice, payslip, payroll register and letter now names **Sharath R, Accounts Head** as the authorised signatory. Anything saved earlier with the old default (the registered name, "Satish Kumar K", with "Operations Head" or "Proprietor") is replaced automatically, so nothing needs saving for the new name to appear. To change it later, go to **Settings, Authorised signatory, signature and stamps**, type a name and designation, and click Save. A name saved there is kept as typed.
+
+The registered (legal) name **Satish Kumar K** is still shown in the supplier block of the invoice, because that is the name on the GST registration (GSTIN 29AQEPK6324M1ZG). The invoice must show the supplier as registered, so change that only if the registration itself changes.
+
+### The authentication stamp on an invoice
+Every issued invoice PDF carries, above the signature:
+- **"Electronically issued and authenticated"**, the billing system, the person who generated it (for example Sharath R (Accounts)) and the date and time in IST.
+- A **Document ID** such as `INV-101-7K3D9Q2M4X1B`, which is a fingerprint of the invoice: number, dates, client and its GSTIN, every line, the rates, GST and the notes. If any of those change, the ID changes.
+- A **QR code** holding the invoice number, date, total, the company GSTIN and the code.
+- The Document ID again in the footer of every page, and in the PDF's own properties (File, Properties in a PDF reader), where the creator is shown as the Public Force billing system.
+
+A **draft** invoice, or a copy made from the editing window with changes that are not saved yet, says "Draft, not yet issued" or "Preview, not saved" and carries no Document ID. Sending an invoice by email makes a draft final. The sample letterhead says it is a sample. A downloaded invoice is now named `Invoice-101.pdf`.
+
+If a **signature image** is saved in Settings, it is printed above the signatory's name on invoices and payslips.
+
+### Verify an invoice
+In **Invoicing**, the card **Verify an invoice** takes a Document ID, or the text a QR scanner reads from the code, and checks it against the invoices saved in the system:
+- **Genuine:** it matches the invoice as saved now, and nothing has changed since it was issued.
+- **Issued, but changed since:** the ID belongs to an earlier version. Saving an invoice keeps a short history of its Document IDs, with who saved it and when.
+- **Does not match** or **no invoice with that number:** the document was not produced by this system, or has been altered, or the ID was copied wrongly.
+Clients cannot check by themselves, because the tool needs a sign-in. A client can phone the office with the ID.
+
+### The GST signature rule (please ask your CA)
+Rule 46 of the CGST Rules asks for the **signature or digital signature** of the supplier or an authorised representative on a tax invoice. It does not ask for it on an official **e-invoice** (with an IRN from the government portal), which is compulsory above Rs 5 crore turnover. The authentication here proves the invoice came from your system and has not been changed. It is **not** a government e-invoice and **not** a digital signature, so the invoice still shows the authorised signatory's name, and the safest course is to sign it: on paper, or with a Digital Signature Certificate. Some commentary says that a remark such as "computer generated, no signature required" does not make an invoice valid for the buyer's input tax credit, and that a scanned signature is not a digital signature. For that reason the invoice does not say "no signature required". Ask your CA whether a signature image is enough for your clients, or whether to get a Digital Signature Certificate.

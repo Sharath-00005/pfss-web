@@ -642,6 +642,13 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       <div id="profOut"></div>
       <div class="row" style="margin-top:.6rem"><button class="btn ghost" id="btnProfitCsv" type="button">Download as CSV</button></div>
     </div>
+
+    <div class="card" id="verifyCard">
+      <h2>Verify an invoice</h2>
+      <p class="muted">Every issued invoice PDF carries a Document ID and a QR code. Type or paste the ID, or the text the QR code gives, to check that it matches the invoice saved in this system and has not been changed since it was issued.</p>
+      <div class="row" style="align-items:flex-end"><div class="field grow"><label>Document ID or QR text</label><input id="vfInput" placeholder="INV-101-7K3D9Q2M4X1B" autocomplete="off"></div><button class="btn" id="btnVerify" type="button">Verify</button></div>
+      <div id="vfOut" style="margin-top:.8rem"></div>
+    </div>
   </section>
 
   <section id="tab-contracts" style="display:none">
@@ -781,8 +788,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     </div>
 
     <div class="card">
-      <h2>Payslip signature and approval stamp</h2>
-      <p class="muted">Once a payroll is approved, every payslip downloaded from it carries the signature image below and an "Electronically approved" stamp showing who approved it, when, and a reference. Nothing needs signing by hand.</p>
+      <h2>Authorised signatory, signature and stamps</h2>
+      <p class="muted">The authorised signatory below is named on every invoice, payslip, payroll register and letter. Once a payroll is approved, every payslip downloaded from it carries the signature image and an "Electronically approved" stamp showing who approved it, when, and a reference. Every issued invoice carries the signature image and an "Electronically issued and authenticated" stamp with a Document ID and a QR code, which can be checked in Invoicing, Verify an invoice.</p>
       <div class="row">
         <div class="field grow"><label>Authorised signatory</label><input id="sigName"></div>
         <div class="field"><label>Designation</label><input id="sigDesig"></div>
@@ -1577,6 +1584,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     setupGroupsUI();
     setupRestoreUI();
     setupProfitUI();
+    setupVerifyUI();
     setupAddPayUI();
     setupPayUI();
     setupAttendanceUI();
@@ -2494,9 +2502,9 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         var client=clients.find(function(x){ return x.id===inv.clientId; })||{name:inv.clientName||''};
         var data=await gatherBilling(site,ym,rc,client);
         if(!data.rows.length || !data.rows.some(function(r){ return r.b; })) throw new Error('No employees on that site match the rate card, so the wage register would be empty. Choose another site or rate card, or send the invoice only.');
-        var pb=pdfNew(false); drawInvoice(pb,invoiceModelFromSaved(inv)); drawWageRegister(pb,data); drawAttendanceSheet(pb,data); pdfFoot(pb,'Computer-generated billing documents');
+        var pb=pdfNew(false); drawInvoice(pb,invoiceModelForIssue(inv)); drawWageRegister(pb,data); drawAttendanceSheet(pb,data); pdfFoot(pb,'Computer-generated billing documents');
         blob=pb.build(); name='Billing-pack-'+pdfName(inv.invoiceNo)+'.pdf';
-      } else { blob=buildInvoicePdf(invoiceModelFromSaved(inv)); name='Invoice-'+pdfName(inv.invoiceNo)+'.pdf'; }
+      } else { blob=buildInvoicePdf(invoiceModelForIssue(inv)); name='Invoice-'+pdfName(inv.invoiceNo)+'.pdf'; }
       btn.textContent='Sending...';
       await mailApi('POST',{from:el('mailFrom').value,to:to,cc:el('mailCc').value.trim(),subject:el('mailSubject').value,message:el('mailMsg').value,keepCopy:el('mailCopy').checked,filename:name,pdfBase64:await b64Of(blob)});
       var upd={emailedAt:Date.now(),emailedTo:to,emailKind:kind}; if(inv.status==='draft') upd.status='sent';
@@ -3814,6 +3822,109 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     }catch(e){ toast('Could not build the payslips.'); return; }
     await pdfSave(new Blob([zipStore(files)],{type:'application/zip'}),'payslips-'+ym+'.zip');
     toast(files.length+' payslips saved in one ZIP file, one PDF for each employee.');
+  }
+
+  /* ---------- invoice authentication: Document ID, QR code, issue stamp and verification ---------- */
+  var DEFAULT_SIGNATORY={name:'Sharath R', role:'Accounts Head'};
+  // SHA-256, written out so the Document ID can be worked out while the PDF is being drawn
+  var SHA_K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+  function sha256Hex(str){
+    var bytes=new TextEncoder().encode(String(str)), l=bytes.length, padLen=((l+9+63)>>6)<<6, buf=new Uint8Array(padLen); buf.set(bytes); buf[l]=0x80;
+    var dv=new DataView(buf.buffer); dv.setUint32(padLen-8, Math.floor(l*8/4294967296)); dv.setUint32(padLen-4, (l*8)>>>0);
+    var H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19], w=new Array(64), i, off;
+    for(off=0; off<padLen; off+=64){
+      for(i=0;i<16;i++) w[i]=dv.getUint32(off+i*4);
+      for(i=16;i<64;i++){
+        var x15=w[i-15], x2=w[i-2], s0=((x15>>>7)|(x15<<25))^((x15>>>18)|(x15<<14))^(x15>>>3), s1=((x2>>>17)|(x2<<15))^((x2>>>19)|(x2<<13))^(x2>>>10);
+        w[i]=(w[i-16]+s0+w[i-7]+s1)|0;
+      }
+      var a=H[0],b=H[1],c=H[2],d=H[3],e=H[4],f=H[5],g=H[6],h=H[7];
+      for(i=0;i<64;i++){
+        var S1=((e>>>6)|(e<<26))^((e>>>11)|(e<<21))^((e>>>25)|(e<<7)), ch=(e&f)^(~e&g), t1=(h+S1+ch+SHA_K[i]+w[i])|0,
+            S0=((a>>>2)|(a<<30))^((a>>>13)|(a<<19))^((a>>>22)|(a<<10)), mj=(a&b)^(a&c)^(b&c), t2=(S0+mj)|0;
+        h=g; g=f; f=e; e=(d+t1)|0; d=c; c=b; b=a; a=(t1+t2)|0;
+      }
+      H[0]=(H[0]+a)|0; H[1]=(H[1]+b)|0; H[2]=(H[2]+c)|0; H[3]=(H[3]+d)|0; H[4]=(H[4]+e)|0; H[5]=(H[5]+f)|0; H[6]=(H[6]+g)|0; H[7]=(H[7]+h)|0;
+    }
+    return H.map(function(x){ return ('00000000'+(x>>>0).toString(16)).slice(-8); }).join('');
+  }
+  function r2s(v){ return (Math.round((Number(v)||0)*100)/100).toFixed(2); }
+  function invTotalOf(m){ var sub=Number(m.subtotal)||0, tax=m.exempt?0:(Number(m.normalBase)||0)*(Number(m.gstPct)||0)/100; return Math.round(sub+tax); }
+  function invNoKey(v){ return String(v==null?'':v).replace(/[^A-Za-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
+  // everything that matters on the invoice, in a fixed order: if any of it changes, the Document ID changes
+  function invCanon(m){
+    var cl=m.client||{};
+    return ['PFSS-INV-1',COMPANY.gstin,String(m.no||''),String(m.date||''),String(m.due||''),String(m.month||''),String(cl.name||''),String(cl.gstin||''),String(m.pos||''),m.exempt?'E':'N',r2s(m.gstPct),r2s(m.subtotal),r2s(m.normalBase),r2s(m.rcmBase),String(invTotalOf(m)),String(m.notes||'')]
+      .concat((m.items||[]).map(function(i){ return [String(i.description||''),r2s(i.qty),r2s(i.rate),r2s(i.amount),String(i.cat||'normal')].join('~'); })).join('|');
+  }
+  function invFingerprint(m){ var hex=sha256Hex(invCanon(m)).slice(0,12).toUpperCase(); return {hex:hex, id:'INV-'+invNoKey(m.no)+'-'+hex}; }
+  function invQrText(m, fp){ return 'PFSS-INV|'+String(m.no||'')+'|'+String(m.date||'')+'|'+invTotalOf(m)+'|'+COMPANY.gstin+'|'+fp.hex; }
+  function invIssued(m){ return !(m.status==='draft' || m.unsaved || m.sample); }
+  // the ID as printed: a very long invoice number is shortened in the middle, and the code at the end always stays
+  function invIdShown(fp){ return fp.id.length>38 ? fp.id.slice(0,18)+'...'+fp.id.slice(-17) : fp.id; }
+  // who is generating this document, for the stamp
+  function issuerLabel(){
+    var n=(me&&(me.name||me.email))||'the billing system', r=(me&&me.isOwner)?'Administrator':((me&&me.canChangePay)?'Accounts':((me&&me.canEdit)?'Manager':''));
+    return n+(r?' ('+r+')':'');
+  }
+  // the stamp above the signature on an invoice: who generated it, when, its Document ID and a QR code. Returns its height.
+  function drawInvoiceAuth(pb, x, y, w, m, C){
+    if(!invIssued(m)){
+      var dl=pb.wrap(m.sample?'A sample to show the layout. It is not an invoice, so it has no Document ID.':(m.unsaved?'Save the invoice first. The PDF made from the saved invoice carries a Document ID and a QR code.':'This copy has no Document ID. Once the invoice is issued, the PDF carries a Document ID and a QR code.'),w-20,7.8,false).slice(0,3), dh=26+dl.length*10;
+      pb.rect(x,y,w,dh,{stroke:C.line,lw:0.9});
+      pb.text(x+10,y+14,m.sample?'SAMPLE, NOT AN INVOICE':(m.unsaved?'PREVIEW, NOT SAVED':'DRAFT, NOT YET ISSUED'),8,{bold:true,color:C.mute});
+      dl.forEach(function(l,k){ pb.text(x+10,y+26+k*10,l,7.8,{color:C.mute}); });
+      return dh;
+    }
+    var fp=invFingerprint(m), qr=invQrText(m,fp), box=54, H=66, drew=false;
+    pb.rect(x,y,w,H,{stroke:C.goldDk,lw:0.9});
+    try{ drew=qrDraw(pb,x+w-box-6,y+6,box,qr,C.ink); }catch(e){ drew=false; }
+    var tw=w-18-(drew?box+8:0);
+    pb.text(x+9,y+13,'ELECTRONICALLY ISSUED AND AUTHENTICATED',7.2,{bold:true,color:C.goldDk});
+    pb.text(x+9,y+24,pdfFit(pb,'Billing system, by '+issuerLabel(),tw,7.8,false),7.8);
+    pb.text(x+9,y+34,pdfFit(pb,'Date: '+pdfStampDate(Date.now()),tw,7.8,false),7.8);
+    var idText='Document ID: '+invIdShown(fp), idFs=8; while(idFs>5.6 && pb.tw(idText,idFs,true)>tw) idFs-=0.2;
+    pb.text(x+9,y+46,pdfFit(pb,idText,tw,idFs,true),idFs,{bold:true});
+    pb.text(x+9,y+58,pdfFit(pb,'Scan the QR code or call '+COMPANY.phone+' to verify.',tw,6.6,false),6.6,{color:C.mute});
+    return H;
+  }
+  // the invoice as it should be when it is being issued: sending or issuing it makes a draft final
+  function invoiceModelForIssue(inv){ var m=invoiceModelFromSaved(inv); if(!m.status||m.status==='draft') m.status='sent'; return m; }
+  // ---- checking a Document ID against the invoices saved in the system ----
+  function verifyInvoiceText(text){
+    var t=String(text==null?'':text).trim(); if(!t) return {kind:'empty'};
+    var no=null, hex=null, mm;
+    if(t.slice(0,9).toUpperCase()==='PFSS-INV|'){ var p=t.split('|'); if(p.length>=6){ no=p[1]; hex=String(p[5]).trim().toUpperCase(); } }
+    else if((mm=/^INV-(.+)-([0-9A-Fa-f]{12})$/i.exec(t))){ no=mm[1]; hex=mm[2].toUpperCase(); }
+    if(!no || !hex || !/^[0-9A-F]{12}$/.test(hex)) return {kind:'badformat'};
+    var matches=invoices.filter(function(i){ return String(i.invoiceNo)===no || invNoKey(i.invoiceNo)===invNoKey(no); });
+    if(!matches.length && no.indexOf('...')>-1){   // a long invoice number was shortened when printed: find the invoice from its code
+      matches=invoices.filter(function(i){ var h=invFingerprint(invoiceModelFromSaved(i)).hex; return h===hex || (i.fingerprints||[]).some(function(x){ return x.hex===hex; }); });
+    }
+    if(!matches.length) return {kind:'nonumber', no:no};
+    var cur=matches.map(function(inv){ return {inv:inv, fp:invFingerprint(invoiceModelFromSaved(inv))}; }), k;
+    for(k=0;k<cur.length;k++) if(cur[k].fp.hex===hex) return {kind:'genuine', inv:cur[k].inv, fp:cur[k].fp};
+    for(k=0;k<cur.length;k++){ var h=(cur[k].inv.fingerprints||[]).filter(function(x){ return x.hex===hex; })[0]; if(h) return {kind:'changed', inv:cur[k].inv, fp:cur[k].fp, entry:h}; }
+    return {kind:'nomatch', no:no, inv:matches[0]};
+  }
+  function verifyHtml(r){
+    var sum=function(inv,cap){ var m=invoiceModelFromSaved(inv); return (cap?'Invoice':'invoice')+' <b>'+escapeHtml(String(inv.invoiceNo))+'</b> dated '+escapeHtml(xFmt(inv.invoiceDate))+' to <b>'+escapeHtml(inv.clientName||(m.client&&m.client.name)||'')+'</b>, total <b>'+fmtMoney(invTotalOf(m))+'</b>'; };
+    var box=function(cls,title,body){ return '<div class="banner" style="margin:0;align-items:flex-start;'+(cls==='ok'?'background:var(--ok-soft);color:var(--ok);border-left-color:var(--ok)':(cls==='bad'?'background:var(--bad-soft);color:var(--bad);border-left-color:var(--bad)':''))+'"><div><b>'+title+'</b><div style="margin-top:.2rem">'+body+'</div></div></div>'; };
+    if(r.kind==='empty') return '';
+    if(r.kind==='badformat') return box('warn','That is not a Document ID.','A Document ID looks like <b>INV-101-7K3D9Q2M4X1B</b>, and the QR code gives text that starts with <b>PFSS-INV|</b>. Check it was copied completely.');
+    if(r.kind==='nonumber') return box('bad','No invoice with that number.','There is no invoice numbered <b>'+escapeHtml(r.no)+'</b> in this system, so this document was not issued from here.');
+    if(r.kind==='genuine'){
+      var d=r.inv.status==='draft';
+      return box(d?'warn':'ok',d?'Matches, but the invoice is now a draft.':'Genuine. This Document ID matches the invoice saved in the system.',sum(r.inv,true)+'. Nothing on the invoice has changed since this ID was made.'+(d?' It has since been moved back to Draft, so check why it was changed.':''));
+    }
+    if(r.kind==='changed') return box('bad','This ID was issued, but the invoice has been changed since.',sum(r.inv,true)+'. '+(Date.parse(r.entry.at)?'This Document ID was made on '+escapeHtml(pdfStampDate(Date.parse(r.entry.at)))+(r.entry.by?' by '+escapeHtml(r.entry.by):''):'This Document ID belongs to an earlier version of the invoice')+'. The invoice now has the Document ID <b>'+escapeHtml(r.fp.id)+'</b>, so a copy carrying the older ID is not the current invoice.');
+    return box('bad','Does not match.','This system never produced that Document ID for '+sum(r.inv)+'. The PDF may have been changed, or the ID was typed or copied wrongly. The current Document ID for that invoice is <b>'+escapeHtml(invFingerprint(invoiceModelFromSaved(r.inv)).id)+'</b>.');
+  }
+  function renderVerify(){ var el=document.getElementById('vfOut'); if(!el) return; el.innerHTML=verifyHtml(verifyInvoiceText(document.getElementById('vfInput').value)); }
+  function setupVerifyUI(){
+    var f=function(i){ return document.getElementById(i); };
+    f('btnVerify').addEventListener('click', function(){ if(!f('vfInput').value.trim()){ f('vfOut').innerHTML=''; toast('Type or paste a Document ID first.'); return; } renderVerify(); });
+    f('vfInput').addEventListener('keydown', function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); f('btnVerify').click(); } });
   }
 
   // ---------- ATTENDANCE ----------
@@ -5416,6 +5527,12 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       rcmBase: Math.round(preview.rcmBase), rcmTax: Math.round(preview.rcmTax),
       tdsPct: preview.tdsPct, tdsAmt: Math.round(preview.tdsAmt), netReceivable: Math.round(preview.receivable)
     };
+    try{
+      var oldInv=id?invoices.find(function(x){ return x.id===id; }):null, hist=((oldInv&&oldInv.fingerprints)||[]).slice(), fpNow=invFingerprint(invoiceModelFromSaved(data));
+      if(oldInv){ var fpOld=invFingerprint(invoiceModelFromSaved(oldInv)); if(!hist.some(function(x){ return x.hex===fpOld.hex; })) hist.push({hex:fpOld.hex, at:'', by:''}); }
+      if(!hist.some(function(x){ return x.hex===fpNow.hex; })) hist.push({hex:fpNow.hex, at:new Date().toISOString(), by:(me&&(me.name||me.email))||''});
+      data.fingerprints=hist.slice(-25);
+    }catch(e){}
     if(!db){ toast('Storage unavailable — cannot save.'); return; }
     try{
       if(id){ await db.doc('invoices/'+id).update(data); }
@@ -6403,6 +6520,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       if(line) out.push(line); return out.length?out:['']; };
     api.addImage=function(bytes,w,h){ extra.push({b:bytes,w:w,h:h}); return extra.length-1; };
     api.imageX=function(idx,x,y,w,h){ cur.push('q '+w.toFixed(2)+' 0 0 '+h.toFixed(2)+' '+x.toFixed(2)+' '+(H-y-h).toFixed(2)+' cm /Im'+(idx+2)+' Do Q'); };
+    api.meta={title:'Public Force Security Services document', author:'Public Force Security Services', creator:'Public Force HR, payroll and billing system', producer:'Public Force HR, payroll and billing system', subject:'', keywords:''};
     api.build=function(){
       var parts=[], offs=[], len=0, n=pages.length;
       function push(x){ var b=(typeof x==='string')?pdfStrBytes(x):x; parts.push(b); len+=b.length; }
@@ -6424,14 +6542,22 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         obj(base+2*p,'<</Length '+stream.length+'>>\nstream\n'+stream+'\nendstream');
         obj(base+1+2*p,'<</Type/Page/Parent 2 0 R/MediaBox [0 0 '+dims[p][0]+' '+dims[p][1]+']/Resources<</Font<</F1 3 0 R/F2 4 0 R/F3 5 0 R>>/XObject<<'+xo+'>>>>/Contents '+(base+2*p)+' 0 R>>');
       }
-      var total=base+2*n, xref=len; push('xref\n0 '+total+'\n0000000000 65535 f \n');
+      var infoNum=base+2*n; obj(infoNum,pdfInfoDict(api.meta));
+      var total=infoNum+1, xref=len; push('xref\n0 '+total+'\n0000000000 65535 f \n');
       for(var k=1;k<total;k++) push(('0000000000'+offs[k]).slice(-10)+' 00000 n \n');
-      push('trailer\n<</Size '+total+'/Root 1 0 R>>\nstartxref\n'+xref+'\n%%EOF');
+      push('trailer\n<</Size '+total+'/Root 1 0 R/Info '+infoNum+' 0 R>>\nstartxref\n'+xref+'\n%%EOF');
       return new Blob(parts,{type:'application/pdf'});
     };
     return api;
   }
 
+  // the properties shown in a PDF reader under File, Properties
+  function pdfInfoStr(v){ return '('+pdfAscii(String(v==null?'':v)).replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)')+')'; }
+  function pdfInfoDict(m){
+    var d=new Date(Date.now()+19800000), z=function(n){ return ('0'+n).slice(-2); };
+    var cd='D:'+d.getUTCFullYear()+z(d.getUTCMonth()+1)+z(d.getUTCDate())+z(d.getUTCHours())+z(d.getUTCMinutes())+z(d.getUTCSeconds())+"+05'30'";
+    return '<</Title '+pdfInfoStr(m.title)+'/Author '+pdfInfoStr(m.author)+'/Subject '+pdfInfoStr(m.subject)+'/Keywords '+pdfInfoStr(m.keywords)+'/Creator '+pdfInfoStr(m.creator)+'/Producer '+pdfInfoStr(m.producer)+'/CreationDate '+pdfInfoStr(cd)+'>>';
+  }
   function pdfWords(n){
     n=Math.round(n); if(n===0) return 'Zero';
     var ones=['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
@@ -6514,28 +6640,42 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var ly2=y; pb.text(ML,ly2+10,'Amount in words',8.2,{color:C.mute}); ly2+=22; wl.forEach(function(l){ pb.text(ML,ly2,l,8.8,{bold:true}); ly2+=11; });
     if(rcmLines.length){ ly2+=6; var hh=rcmLines.length*10.5+14; pb.rect(ML,ly2,nw,hh,{fill:C.paper}); rcmLines.forEach(function(l,i){ pb.text(ML+8,ly2+12+i*10.5,l,8.2,{color:C.ink}); }); ly2+=hh; }
     y=Math.max(ty+30,ly2)+16;
-    // payment, notes, terms
+    // payment, notes and terms on the left; the authentication stamp and then the signature on the right
     var bank=[]; [['Account name',inv.acctName],['Bank',inv.bankName],['Account no.',inv.acctNo],['IFSC',inv.ifsc],['Branch',inv.branch],['UPI',inv.upi]].forEach(function(r){ if(r[1]) bank.push(r); });
-    var terms=pb.wrap(inv.terms||'Payment is due by the date shown on this invoice. Subject to Bengaluru jurisdiction. This is a computer-generated invoice.',CW-250,8.2,false);
-    var noteLines=m.notes? pb.wrap(m.notes,CW-250,8.4,false):[];
-    var need=Math.max(14+bank.length*11+ (noteLines.length? 22+noteLines.length*10.5:0) + 22+terms.length*10.5, 78);
-    if(y+need>LIMIT){ y=head(); }
+    var leftW=CW-264;
+    var terms=pb.wrap(inv.terms||'Payment is due by the date shown on this invoice. Subject to Bengaluru jurisdiction. This is a computer-generated invoice.',leftW,8.2,false);
+    var noteLines=m.notes? pb.wrap(m.notes,leftW,8.4,false):[];
+    var sg=(state.settings&&state.settings.signature)||{};
+    if(pb._sigIdx===undefined){ pb._sigIdx=(sg.b64 && sg.w && sg.h)? pb.addImage(pdfB64Bytes(sg.b64), sg.w, sg.h) : -1; }
+    var hasSig=pb._sigIdx>=0, authH=invIssued(m)?66:62, sigBlock=hasSig?96:82, rightH=authH+6+sigBlock;
+    var leftNeed=14+bank.length*11+ (noteLines.length? 22+noteLines.length*10.5:0) + 22+terms.length*10.5;
+    var need=Math.max(leftNeed, rightH);
+    if(y+need+4>LIMIT){ y=head(); }
     var cy=y;
     if(bank.length){ pb.text(ML,cy+8,'Bank details',8.6,{bold:true,color:C.goldDk}); cy+=20; bank.forEach(function(r){ pb.text(ML,cy,r[0]+':',8.6,{color:C.mute}); pb.text(ML+76,cy,r[1],8.6,{bold:true}); cy+=11; }); cy+=8; }
     if(noteLines.length){ pb.text(ML,cy+8,'Notes',8.6,{bold:true,color:C.goldDk}); cy+=20; noteLines.forEach(function(l){ pb.text(ML,cy,l,8.4,{color:C.mute}); cy+=10.5; }); cy+=8; }
     pb.text(ML,cy+8,'Terms',8.6,{bold:true,color:C.goldDk}); cy+=20; terms.forEach(function(l){ pb.text(ML,cy,l,8.2,{color:C.mute}); cy+=10.5; });
-    pb.text(MR,y+10,'For '+COMPANY.tradeName,9,{bold:true,align:'right'});
-    pb.line(MR-170,y+62,MR,y+62,0.6,C.ink);
-    pb.text(MR,y+74,'Authorised signatory',8.6,{align:'right',color:C.mute});
-    pb.text(MR,y+85,pdfSignatory().name+', '+pdfSignatory().role,8.6,{align:'right',color:C.mute});
+    var ah=drawInvoiceAuth(pb,MR-250,y,250,m,C), sy=y+ah+6;
+    pb.text(MR,sy+10,'For '+COMPANY.tradeName,9,{bold:true,align:'right'});
+    var lineY=sy+(hasSig?68:56);
+    if(hasSig){ var hh=46, ww=Math.min(160, sg.w*hh/sg.h); pb.imageX(pb._sigIdx,MR-ww-14,sy+17,ww,hh); }
+    pb.line(MR-170,lineY,MR,lineY,0.6,C.ink);
+    pb.text(MR,lineY+12,'Authorised signatory',8.6,{align:'right',color:C.mute});
+    pb.text(MR,lineY+23,pdfSignatory().name+', '+pdfSignatory().role,8.6,{align:'right',color:C.mute});
   }
-  function buildInvoicePdf(m){ var pb=pdfNew(false); drawInvoice(pb,m); pdfFoot(pb,'Computer-generated invoice'); return pb.build(); }
+  function buildInvoicePdf(m){
+    var pb=pdfNew(false); drawInvoice(pb,m);
+    var fp=invIssued(m)?invFingerprint(m):null;
+    pb.meta.title='Tax Invoice '+m.no; pb.meta.subject=fp?'Document ID '+fp.id:(m.sample?'Sample, not an invoice':'Draft, not issued'); pb.meta.keywords='invoice, '+(m.client&&m.client.name||'');
+    pdfFoot(pb, fp?'Computer-generated invoice  |  Document ID '+invIdShown(fp):(m.sample?'Sample invoice, not issued':'Draft invoice, not issued')); return pb.build();
+  }
   function invoiceModelFromModal(){
     var client=clients.find(function(c){return c.id===document.getElementById('invClient').value;})||{name:''};
     var p=renderInvoicePreview();
     return {no:document.getElementById('invNo').value, date:document.getElementById('invDate').value, due:document.getElementById('invDue').value, month:document.getElementById('invMonth').value,
       notes:document.getElementById('invNotes').value.trim(), client:client, items:p.allItems.filter(function(i){return i.description||i.amount;}),
-      subtotal:p.subtotal, normalBase:p.normalBase, rcmBase:p.rcmBase, gstPct:p.gstPct, inter:p.inter, pos:p.pos, posCode:p.posCode, exempt:!!client.gstExempt};
+      subtotal:p.subtotal, normalBase:p.normalBase, rcmBase:p.rcmBase, gstPct:p.gstPct, inter:p.inter, pos:p.pos, posCode:p.posCode, exempt:!!client.gstExempt,
+      status:document.getElementById('invStatus').value, unsaved:true};
   }
   function invoiceModelFromSaved(inv){
     var client=clients.find(function(c){return c.id===inv.clientId;})||{name:inv.clientName||''};
@@ -6545,17 +6685,17 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var normalBase=items.filter(function(i){return i.cat!=='rcm';}).reduce(function(s,i){return s+i.amount;},0);
     var sp=supplyType(client);
     return {no:inv.invoiceNo, date:inv.invoiceDate, due:inv.dueDate, month:inv.month, notes:inv.notes||'', client:client, items:items,
-      subtotal:subtotal, normalBase:normalBase, rcmBase:subtotal-normalBase, gstPct:Number(inv.gstPct)||0, inter:sp.inter, pos:sp.pos, posCode:sp.code, exempt:!!client.gstExempt};
+      subtotal:subtotal, normalBase:normalBase, rcmBase:subtotal-normalBase, gstPct:Number(inv.gstPct)||0, inter:sp.inter, pos:sp.pos, posCode:sp.code, exempt:!!client.gstExempt, status:inv.status||''};
   }
   async function saveInvoicePdf(model){
     var blob;
     try{ blob=buildInvoicePdf(model); }catch(e){ toast('Could not build the PDF.'); return; }
-    var fname=String(model.no||'invoice').replace(/[^A-Za-z0-9_-]/g,'_')+'.pdf';
+    var fname='Invoice-'+String(model.no||'invoice').replace(/[^A-Za-z0-9_-]/g,'_')+'.pdf';
     if(downloadsCap){ try{ await downloadsCap.save({filename:fname, data:blob}); return; }catch(err){ if(err && err.code==='declined') return; } }
     var url=URL.createObjectURL(blob), a=document.createElement('a'); a.href=url; a.download=fname; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   }
   async function downloadInvoiceFile(){
-    var m=invoiceModelFromModal();
+    var m=invoiceModelFromModal(); (function(){ var sv=invoices.find(function(x){ return x.id===document.getElementById('invId').value; }); if(sv && invFingerprint(invoiceModelFromSaved(sv)).hex===invFingerprint(m).hex){ m.unsaved=false; m.status=sv.status||m.status; } })();
     if(!m.items.length){ toast('Add at least one line item first.'); return; }
     await saveInvoicePdf(m);
   }
@@ -6611,7 +6751,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       saveInvoicePdf({no:'SAMPLE', date:xToday(), due:xAddDays(xToday(),30), month:thisMonth(), notes:'Sample invoice to preview the letterhead.',
         client:{name:'Sample Client Pvt Ltd', address:'Client address line, Bengaluru - 560001, Karnataka', gstin:'29AAAAA0000A1Z5', contact:'Accounts team'},
         items:[{description:'Security Guard: 60 man-days of 30 (2 posts contracted)', qty:60, rate:700, amount:42000, cat:'rcm'},{description:'Housekeeping: 30 man-days of 30 (1 post contracted)', qty:30, rate:533.33, amount:15999.9, cat:'normal'}],
-        subtotal:57999.9, normalBase:15999.9, rcmBase:42000, gstPct:18, inter:false, pos:'Karnataka', posCode:'29', exempt:false});
+        subtotal:57999.9, normalBase:15999.9, rcmBase:42000, gstPct:18, inter:false, pos:'Karnataka', posCode:'29', exempt:false, sample:true});
     });
   }
 
@@ -6701,11 +6841,13 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     return pb.build();
   }
 
-  // who signs the documents: the name and designation saved in Settings, Payslip signature. A saved "Proprietor" (or nothing) shows as "Operations Head".
+  // who signs the documents: the name and designation saved in Settings. Until one is saved (or while the old default, the registered name, is still saved) it is Sharath R, Accounts Head.
   function pdfSignatory(){
-    var sg=(state.settings&&state.settings.signature)||{}, role=String(sg.designation||'').trim();
-    if(!role || /^proprietor$/i.test(role)) role='Operations Head';
-    return {name:String(sg.name||'').trim()||COMPANY.legalName, role:role};
+    var sg=(state.settings&&state.settings.signature)||{}, name=String(sg.name||'').trim(), role=String(sg.designation||'').trim();
+    if(!(Number(sg.v)>=2) && (!name || name===COMPANY.legalName)) return {name:DEFAULT_SIGNATORY.name, role:DEFAULT_SIGNATORY.role};
+    if(!name) name=DEFAULT_SIGNATORY.name;
+    if(!role || /^proprietor$/i.test(role)) role=(name===DEFAULT_SIGNATORY.name)?DEFAULT_SIGNATORY.role:'Authorised signatory';
+    return {name:name, role:role};
   }
   // "Prepared for" and the date, shown under the title of a rate card made for one client
   function pdfMetaBand(pb,ML,CW,MR,y,meta,C){
@@ -6964,7 +7106,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     }
     payslipSignature(pb,y,ML,MR,pb._sigIdx,sg);
   }
-  function buildPayslipPdf(r,run,ym){ var pb=pdfNew(false); drawPayslip(pb,r,run,ym); pdfFoot(pb,'Computer-generated payslip'); return pb.build(); }
+  function buildPayslipPdf(r,run,ym){ var pb=pdfNew(false); drawPayslip(pb,r,run,ym); pb.meta.title='Payslip '+(r.name||'')+' '+ym; pb.meta.subject='Ref PS-'+ym+'-'+(r.empCode||r.empId||'')+'-'+pdfRef(r,run,ym); pdfFoot(pb,'Computer-generated payslip'); return pb.build(); }
   function buildAllPayslipsPdf(run,ym){ var pb=pdfNew(false); (run.rows||[]).forEach(function(r){ drawPayslip(pb,r,run,ym); }); pdfFoot(pb,'Computer-generated payslip',true); return pb.build(); }
 
   /* ---------- payroll register (all employees for the month) ---------- */
@@ -7355,8 +7497,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   function renderSignatureSettings(){
     if(sigSetDirty || !document.getElementById('sigName')) return;
     var v=(state.settings&&state.settings.signature)||{};
-    document.getElementById('sigName').value=v.name||COMPANY.legalName;
-    document.getElementById('sigDesig').value=(v.designation && !/^proprietor$/i.test(v.designation))?v.designation:'Operations Head';
+    document.getElementById('sigName').value=pdfSignatory().name;
+    document.getElementById('sigDesig').value=pdfSignatory().role;
     document.getElementById('sigStamp').checked=v.stamp!==false;
     sigDraft=null; sigPreviewShow(v.b64||'');
   }
@@ -7380,7 +7522,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   }
   function currentSignatureSettings(){
     var cur=(state.settings&&state.settings.signature)||{}, base=sigDraft||cur;
-    return {name:document.getElementById('sigName').value.trim()||COMPANY.legalName, designation:document.getElementById('sigDesig').value.trim()||'Operations Head',
+    return {v:2, name:document.getElementById('sigName').value.trim()||DEFAULT_SIGNATORY.name, designation:document.getElementById('sigDesig').value.trim()||DEFAULT_SIGNATORY.role,
       stamp:document.getElementById('sigStamp').checked, b64:base.b64||'', w:base.w||0, h:base.h||0};
   }
   function setupSignatureUI(){
