@@ -119,6 +119,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 .daycell.A{background:var(--bad-soft);color:var(--bad);border-color:var(--bad)}
 .daycell.H{background:var(--warn-soft);color:var(--warn);border-color:var(--warn)}
 .daycell.L{background:var(--info-soft);color:var(--info);border-color:var(--info)}
+.daycell.D{background:var(--brand-soft);color:var(--brand);border-color:var(--brand);position:relative}
+.daycell.D::after{content:"x" attr(data-duty);position:absolute;right:2px;bottom:1px;font-size:.5rem;font-weight:800;line-height:1}
 .empty-state{text-align:center;color:var(--muted);padding:2.5rem 1rem}
 .banner{border-radius:4px;padding:12px 16px;margin-top:18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border:1px solid var(--line);font-size:.88rem}
 .banner.warn,.banner{background:var(--warn-soft);border-color:transparent;border-left:4px solid var(--signal);color:var(--warn)}
@@ -450,7 +452,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         <div class="field"><label>Month</label><input type="month" id="attMonth"></div>
         <div class="field"><label>Site</label><select id="attSiteFilter"><option value="">All sites</option></select></div>
       </div>
-      <p class="muted">Click a day cell to cycle: Present → Absent (unpaid) → Half-day → Paid Leave → Present. Unmarked days count as Present. Use Paid Leave for approved vacation/earned leave that should NOT cut their pay.</p>
+      <p class="muted">Click a day cell to cycle: Present → Absent (unpaid) → Half-day → Paid Leave → 1.5 duties → 2 duties → Present. Unmarked days count as Present. Use Paid Leave for approved vacation/earned leave that should NOT cut their pay. Use 1.5 or 2 duties when someone worked more than one duty that day: each extra duty is paid as an extra day at the normal daily rate, and shows as a blue cell with the number of duties.</p>
       <div class="scrollx" id="attContainer"></div>
     </div>
 
@@ -777,13 +779,14 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 
     <div class="card">
       <h2>Overtime, night shifts and employer ESIC</h2>
-      <p class="muted">Used by the pay cycle. Overtime hours and night shifts are entered for each employee every month. Recalculate payroll after changing these.</p>
+      <p class="muted">Used by the pay cycle. Overtime hours and night shifts are entered for each employee every month. Extra duties (1.5 or 2 duties on one day) are marked in the daily Attendance, and each extra duty is paid as an extra day at the normal daily rate. Recalculate payroll after changing these.</p>
       <div class="row">
         <div class="field"><label>Overtime multiplier</label><input type="number" step="0.1" id="setOtMult"></div>
         <div class="field"><label>Night shift allowance (\u20b9 per shift)</label><input type="number" id="setNightAllow"></div>
         <div class="field"><label>Employer ESIC %</label><input type="number" step="0.01" id="setEsiEr"></div>
         <div class="field"><label>Warn when overtime is over (hours)</label><input type="number" id="setOtWarn"></div>
       </div>
+      <div class="row" style="margin-top:.6rem"><label><input type="checkbox" id="setBillExtra" checked style="width:auto;margin-right:.4rem">Count extra duties (1.5 or 2 duties on one day) as days worked in client billing: the wage register, the attendance sheet and the man-days on invoices</label></div>
       <div class="row" style="margin-top:1rem"><button class="btn" id="btnSaveCycSettings">Save</button></div>
     </div>
 
@@ -1678,6 +1681,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         });
         document.body.classList.remove('menu');
         if(b.dataset.tab==='cycle'){ renderCycle(); }
+        if(b.dataset.tab==='payroll'){ renderPayroll(); }   // so changes made in Attendance show up when the tab is opened
       });
     });
   }
@@ -3049,8 +3053,9 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 
   // what the gross is made of, shown under the gross in the payroll table (the gross is the wage earned plus overtime, night shifts and arrears)
   function grossNote(r){
-    var parts=[], base=(r.baseGross!=null)?r.baseGross:r.gross, extras=(r.otPay||0)+(r.nightPay||0)+(r.arrears||0)+(r.addPay||0), absent=(r.present!=null && r.dim!=null && r.present<r.dim);
+    var parts=[], base=(r.baseGross!=null)?r.baseGross:r.gross, extras=(r.otPay||0)+(r.nightPay||0)+(r.arrears||0)+(r.addPay||0)+(r.dutyPay||0), absent=(r.present!=null && r.dim!=null && r.present<r.dim);
     if(absent) parts.push('Wage for '+r.present+' of '+r.dim+' days '+fmtMoney(base)); else if(extras) parts.push('Wage '+fmtMoney(base));
+    if(r.dutyPay) parts.push('extra duty '+dutyNum(r.extraDuty)+' '+fmtMoney(r.dutyPay));
     if(r.otPay) parts.push('overtime '+(r.otHrs||0)+' h '+fmtMoney(r.otPay));
     if(r.nightPay) parts.push('night shifts '+(r.nights||0)+' '+fmtMoney(r.nightPay));
     if(r.arrears) parts.push('arrears '+fmtMoney(r.arrears));
@@ -3927,6 +3932,21 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     f('vfInput').addEventListener('keydown', function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); f('btnVerify').click(); } });
   }
 
+  /* ---------- extra duty: more than one duty on the same day (1.5 or 2) ---------- */
+  var DUTY_STEPS=[1.5,2];   // the choices after Paid Leave when a day cell is clicked on the Attendance screen
+  var XD_WARN=10;           // the pay cycle warns when someone has more extra duties than this in a month
+  function dutyOk(v){ v=Number(v); return v>1 && v<=3 && Math.round(v*100)%25===0; }
+  // an extra duty only counts on a day that was worked (present, or not marked, which counts as present)
+  function dutyClean(duty, days){
+    var out={}; Object.keys(duty||{}).forEach(function(k){ var st=(days||{})[k]||'P'; if(st==='P' && dutyOk(duty[k])) out[k]=Number(duty[k]); });
+    return out;
+  }
+  function attBody(empId, ym, days, duty){ var b={empId:empId, ym:ym, days:days}, d=dutyClean(duty,days); if(Object.keys(d).length) b.duty=d; return b; }
+  function dutyNum(n){ return String(Math.round((Number(n)||0)*100)/100); }
+  function dutyLabel(v){ return Number(v)===2?'Double duty (2 duties)':dutyNum(v)+' duties'; }
+  // the payslip line for the pay of extra duties
+  function dutyPayLabel(n){ n=Number(n)||0; return 'Extra duty ('+dutyNum(n)+(n<=1?' duty)':' duties)'); }
+
   // ---------- ATTENDANCE ----------
   // ---------- ATTENDANCE CSV IMPORT (from the Attendance app) ----------
   function parseCsv(text){
@@ -4020,7 +4040,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
             }
           }
           var key = empId+'_'+ym.replace('-','');
-          var body = {empId:empId, ym:ym, days:days};
+          var body = attBody(empId, ym, days, existing.duty);
           state.attendance[key]=body;
           if(db){ try{ await db.doc('attendance/'+key).set(body); }catch(e){} }
           await invalidateRun(ym, state.employees.find(function(x){ return x.id===empId; }));
@@ -4059,12 +4079,14 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     }catch(e){ return {days:{}}; }
   }
 
-  async function setAttendanceDay(empId, ym, day, status){
+  async function setAttendanceDay(empId, ym, day, status, duty){
     var key = empId+'_'+ym.replace('-','');
     var cur = await getAttendanceDoc(empId, ym);
     var days = Object.assign({}, cur.days||{});
     days[String(day)] = status;
-    var body = {empId:empId, ym:ym, days:days};
+    var dm = Object.assign({}, cur.duty||{});
+    if(duty && status==='P') dm[String(day)]=duty; else delete dm[String(day)];
+    var body = attBody(empId, ym, days, dm);
     state.attendance[key]=body;
     if(db){
       try{ await db.doc('attendance/'+key).set(body); }catch(e){ toast('Could not save attendance.'); }
@@ -4086,29 +4108,37 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     for(var i=0;i<active.length;i++){
       var e=active[i];
       var doc = await getAttendanceDoc(e.id, ym);
-      var days=doc.days||{};
+      var days=doc.days||{}, duty=doc.duty||{};
       var cells='';
       for(var d=1; d<=dim; d++){
         var ds0 = ym+'-'+String(d).padStart(2,'0');
         if((e.doj && ds0<e.doj) || (e.dol && ds0>e.dol)){ cells += '<span class="daycell X" title="Not employed on this day">'+d+'</span>'; continue; }
-        var st = days[String(d)] || 'P';
-        cells += '<span class="daycell '+st+'" data-emp="'+e.id+'" data-day="'+d+'" title="Day '+d+': '+st+'">'+d+'</span>';
+        var st = days[String(d)] || 'P', dv=(st==='P' && dutyOk(duty[String(d)]))?Number(duty[String(d)]):1;
+        if(dv>1) cells += '<span class="daycell D" data-emp="'+e.id+'" data-day="'+d+'" data-duty="'+dv+'" title="Day '+d+': '+dutyLabel(dv)+'">'+d+'</span>';
+        else cells += '<span class="daycell '+st+'" data-emp="'+e.id+'" data-day="'+d+'" title="Day '+d+': '+st+'">'+d+'</span>';
       }
       html += '<tr><td>'+escapeHtml(e.name)+'</td><td>'+escapeHtml(e.site||'—')+'</td><td><div class="daygrid">'+cells+'</div></td></tr>';
     }
     html += '</tbody></table>';
     container.innerHTML = html;
 
+    // click order: Present, Absent, Half-day, Paid Leave, 1.5 duties, 2 duties, and back to Present
+    var order={P:'A', A:'H', H:'L', L:'D'+DUTY_STEPS[0]};
+    DUTY_STEPS.forEach(function(v,k){ order['D'+v]=(k<DUTY_STEPS.length-1)?'D'+DUTY_STEPS[k+1]:'P'; });
     container.querySelectorAll('.daycell').forEach(function(cell){
       cell.addEventListener('click', async function(){
         if(cell.classList.contains('X')) return;
         if(cycClosed(ym)){ toast('This month is closed. Reopen it in the pay cycle to change attendance.'); return; }
-        var cur = cell.classList.contains('P')?'P':cell.classList.contains('A')?'A':cell.classList.contains('H')?'H':cell.classList.contains('L')?'L':'P';
-        var order = {P:'A', A:'H', H:'L', L:'P'};
-        var next = order[cur] || 'P';
-        cell.classList.remove('P','A','H','L');
-        cell.classList.add(next);
-        await setAttendanceDay(cell.dataset.emp, ym, cell.dataset.day, next);
+        var cur = cell.dataset.duty ? 'D'+cell.dataset.duty : (cell.classList.contains('A')?'A':cell.classList.contains('H')?'H':cell.classList.contains('L')?'L':'P');
+        var next = order[cur] || 'P', dayN=cell.dataset.day;
+        cell.classList.remove('P','A','H','L','D'); cell.removeAttribute('data-duty');
+        if(next.charAt(0)==='D'){
+          var dv=Number(next.slice(1)); cell.classList.add('D'); cell.setAttribute('data-duty',String(dv)); cell.title='Day '+dayN+': '+dutyLabel(dv);
+          await setAttendanceDay(cell.dataset.emp, ym, dayN, 'P', dv);
+        } else {
+          cell.classList.add(next); cell.title='Day '+dayN+': '+next;
+          await setAttendanceDay(cell.dataset.emp, ym, dayN, next);
+        }
       });
     });
   }
@@ -4126,16 +4156,17 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var dim=daysInMonth(ym);
     var doc = await getAttendanceDoc(e.id, ym);
     var days=doc.days||{};
-    var lop=0, present=0, notEmployed=0, dayInfo=[], T0=null, TL=null, same=true;
+    var lop=0, present=0, notEmployed=0, dayInfo=[], T0=null, TL=null, same=true, dutyMap=doc.duty||{}, extraDuty=0, dutyPay=0, dutyBasic=0;
     for(var d=1; d<=dim; d++){
       var ds = ym+'-'+String(d).padStart(2,'0');
       if((e.doj && ds<e.doj) || (e.dol && ds>e.dol)){ notEmployed+=1; continue; }
       var dst = days[String(d)]||'P', f=1;
       if(dst==='A'){ lop+=1; f=0; }
       else if(dst==='H'){ lop+=0.5; f=0.5; }
+      var xd=(dst==='P' && dutyOk(dutyMap[String(d)]))?Number(dutyMap[String(d)])-1:0; extraDuty+=xd;   // extra duties are paid as extra days
       var Td=payTermsOn(e, ds);
       if(T0===null) T0=Td; else if(Td!==T0) same=false;
-      TL=Td; dayInfo.push({ds:ds, f:f, T:Td});
+      TL=Td; dayInfo.push({ds:ds, f:f, x:xd, T:Td});
     }
     present = dim - lop - notEmployed;
     var Tm = TL || payTermsOn(e, ym+'-'+String(dim).padStart(2,'0'));
@@ -4155,6 +4186,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         stdBasic=bA*ratio; stdDa=dA*ratio; stdExtra=extraM*ratio;
         basic=stdA*ratio; bshare=grossM>0?stdA/grossM:1;
       }
+      if(extraDuty>0){ dutyPay=extraDuty*((Tm.wageType==='daily')?(Number(Tm.wageAmount)||0):(Number(Tm.wageAmount)||0)/dim); dutyBasic=dutyPay*bshare; }
     } else {
       // the pay changed during the month: each day is paid at the pay in force on that day
       gross=0; basic=0;
@@ -4165,6 +4197,11 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
           var bB=Number(T.basicAmt)||0, dD=Number(T.daAmt)||0, A=Math.round(bB+dD), xh=Math.max(0,(Number(T.dutyHrs)||8)-8), exM=xh>0?Math.round(A*xh/8):0, gM=A+exM, rt=gM>0?c/gM:0;
           stdBasic+=bB*rt; stdDa+=dD*rt; stdExtra+=exM*rt; basic+=A*rt; struct=true; stdA=A; stdDuty=Number(T.dutyHrs)||8; bshare=gM>0?A/gM:1;
         } else basic+=c*empBasicPct(e,st,T)/100;
+        if(di.x>0){
+          var cx=((T.wageType==='daily')?amt:amt/dim)*di.x, shareX=empBasicPct(e,st,T)/100;
+          if(T.payStd && (Number(T.basicAmt)||0)>0){ var A2=Math.round((Number(T.basicAmt)||0)+(Number(T.daAmt)||0)), xh2=Math.max(0,(Number(T.dutyHrs)||8)-8), g2=A2+(xh2>0?Math.round(A2*xh2/8):0); shareX=g2>0?A2/g2:1; }
+          dutyPay+=cx; dutyBasic+=cx*shareX;
+        }
       });
       gross=Math.max(0,gross);
       var parts=[], prev=null;
@@ -4185,9 +4222,10 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var baseGross = gross, ar = arrearsDue(e, ym), arrears = ar.amount;
     var adds = addLinesOf(ex), addPay = 0, addStat = 0;
     adds.forEach(function(a){ addPay += Number(a.amount); if(a.stat) addStat += Number(a.amount); });
-    gross = baseGross + otPay + nightPay + arrears + addPay;
+    gross = baseGross + dutyPay + otPay + nightPay + arrears + addPay;
     var statGross = gross - (addPay - addStat);   // the pay that counts for ESI and professional tax
     if(arrears) basic += arrears*bshare;
+    basic += dutyBasic;   // PF is worked out on the Basic part of the extra duty pay too
     var pf=0, esi=0, pt=0, pfEr=0, esiEr=0, pfInfo=null;
     if(e.pfApplicable){
       pfInfo = pfBreakdown(basic, !!e.pfFull, null, ym); pf = pfInfo.ee; pfEr = pfInfo.er;
@@ -4199,7 +4237,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     pt = ptForState(e.state, statGross);
     var advance = (typeof suggestedAdvanceDeduction==='function') ? suggestedAdvanceDeduction(e.id) : 0;
     var net = gross - pf - esi - pt - advance - otherDed;
-    return {present:present, dim:dim, gross:gross, baseGross:baseGross, basic:basic, pf:pf, esi:esi, pt:pt, advance:advance, net:net,
+    return {present:present, extraDuty:extraDuty, dutyPay:dutyPay, billDays:present+((st.billExtraDuty===false)?0:extraDuty), dim:dim, gross:gross, baseGross:baseGross, basic:basic, pf:pf, esi:esi, pt:pt, advance:advance, net:net,
       otHrs:otHrs, nights:nights, otPay:otPay, nightPay:nightPay, otherDed:otherDed, pfEr:pfEr, esiEr:esiEr,
       struct:struct, basicPart:stdBasic, daPart:stdDa, extraPart:stdExtra, dutyHrs:stdDuty,
       arrears:arrears, arrearsNote:ar.note, revNote:revNote, esiWages:statGross,
@@ -4658,6 +4696,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         basicPay:x.r.struct?Math.round(x.r.basicPart):0, daPay:x.r.struct?Math.round(x.r.daPart):0,
         extraPay:x.r.struct?Math.max(0,Math.round(x.r.baseGross)-Math.round(x.r.basicPart)-Math.round(x.r.daPart)):0,
         arrears:Math.round(x.r.arrears||0), arrearsNote:x.r.arrearsNote||'', revNote:x.r.revNote||'',
+        extraDuty:x.r.extraDuty||0, dutyPay:Math.round(x.r.dutyPay||0),
         addPay:Math.round(x.r.addPay||0), addLines:(x.r.addLines||[]).map(function(a){ return {type:a.type, amount:Math.round(a.amount*100)/100, note:a.note||''}; }),
         esiWages:Math.round(x.r.esiWages||0), pfWages:Math.round(x.r.pfWages||0), epsEr:Math.round(x.r.epsEr||0), epfEr:Math.round(x.r.epfEr||0), edliWages:Math.round(x.r.edliWages||0), edliEr:Math.round(x.r.edliEr||0)};
     });
@@ -6431,11 +6470,11 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var unbilled=emps.filter(function(e){ return posRoles.indexOf(e.role||'')<0; }).length;
     if((k.billingBasis||'rate')==='rate'){
       (k.positions||[]).forEach(function(p){
-        var md=0; emps.forEach(function(e,i){ if((e.role||'')===p.role) md+=prs[i].present; });
+        var md=0; emps.forEach(function(e,i){ if((e.role||'')===p.role) md+=prs[i].billDays; });
         var monthly=Number(p.rate)||0;
         var exact=null, rr=null;
         if(!monthly && rc && rc.roles){ rr=findRcRole(rc,p.role,8);
-          if(rr){ monthly=computeRole(rc,rr).totalCost; exact=0; emps.forEach(function(e,i){ if((e.role||'')===p.role){ var rE=findRcRole(rc,e.role,e.dutyHrs)||rr; exact+=employeeBilling(rc,rE,prs[i].present,dim,e).scamt; } }); } }
+          if(rr){ monthly=computeRole(rc,rr).totalCost; exact=0; emps.forEach(function(e,i){ if((e.role||'')===p.role){ var rE=findRcRole(rc,e.role,e.dutyHrs)||rr; exact+=employeeBilling(rc,rE,prs[i].billDays,dim,e).scamt; } }); } }
         if(!monthly){ warns.push('No rate for '+p.role+'. Set a rate on the contract or add the role to its rate card.'); return; }
         if(!md){ warns.push('No attendance for '+p.role+'.'); return; }
         var c=catOf(p.role);
@@ -7066,13 +7105,14 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var half=(CW-20)/2, lx=ML, rx=ML+half+20;
     function head2(x,t){ pb.rect(x,y,half,20,{fill:C.ink}); pb.text(x+8,y+13.5,t,8.6,{bold:true,color:C.white}); pb.text(x+half-8,y+13.5,'Amount (Rs.)',8.6,{bold:true,color:C.white,align:'right'}); }
     head2(lx,'Earnings'); head2(rx,'Deductions');
-    var ot=r.otPay||0, nt=r.nightPay||0, ar=r.arrears||0, ap=r.addPay||0, addE=(r.addLines||[]).map(function(a){ return [addPayLabel(a),a.amount]; }), earn;
+    var ot=r.otPay||0, nt=r.nightPay||0, ar=r.arrears||0, ap=r.addPay||0, dp=r.dutyPay||0, dl=dutyPayLabel(r.extraDuty), addE=(r.addLines||[]).map(function(a){ return [addPayLabel(a),a.amount]; }), earn;
     if(r.struct){
       earn=[['Basic',r.basicPay||0],['Dearness allowance (D.A.)',r.daPay||0]];
       if(r.extraPay) earn.push(['Extra '+Math.max(0,(r.dutyHrs||8)-8)+' hrs ('+(r.dutyHrs||8)+'-hour duty)',r.extraPay]);
+      if(dp) earn.push([dl,dp]);
       if(ot) earn.push(['Overtime ('+(r.otHrs||0)+' hrs)',ot]); if(nt) earn.push(['Night shift allowance ('+(r.nights||0)+')',nt]); if(ar) earn.push(['Arrears (wage revision)',ar]); addE.forEach(function(a){ earn.push(a); });
     }
-    else if(ot||nt||ar||ap){ earn=[['Pay for days worked',(r.gross||0)-ot-nt-ar-ap]]; if(ot) earn.push(['Overtime ('+(r.otHrs||0)+' hrs)',ot]); if(nt) earn.push(['Night shift allowance ('+(r.nights||0)+')',nt]); if(ar) earn.push(['Arrears (wage revision)',ar]); addE.forEach(function(a){ earn.push(a); }); }
+    else if(ot||nt||ar||ap||dp){ earn=[['Pay for days worked',(r.gross||0)-ot-nt-ar-ap-dp]]; if(dp) earn.push([dl,dp]); if(ot) earn.push(['Overtime ('+(r.otHrs||0)+' hrs)',ot]); if(nt) earn.push(['Night shift allowance ('+(r.nights||0)+')',nt]); if(ar) earn.push(['Arrears (wage revision)',ar]); addE.forEach(function(a){ earn.push(a); }); }
     else earn=[['Gross pay',r.gross||0]];
     var ded=[['Provident fund (PF)',r.pf||0],['ESI',r.esi||0],['Professional tax',r.pt||0],['Salary advance',r.advance||0]];
     if(r.otherDed) ded.push(['Other deduction',r.otherDed]);
@@ -7580,15 +7620,17 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     return hits.find(function(r){ return (Number(r.dutyHrs)||8)===8; })||hits[0];
   }
   // Day-by-day marks for one employee: P present, A absent, H half day, L leave, - not employed that day.
-  function attendanceMarks(e, ym, days){
-    var dim=daysInMonth(ym), marks=[], lop=0, out=0;
+  // duty (optional) holds days with more than one duty, such as {'5':2}. extra is the number of duties above one a day, over the month.
+  function attendanceMarks(e, ym, days, duty){
+    var dim=daysInMonth(ym), marks=[], dutyArr=[], lop=0, out=0, extra=0; duty=duty||{};
     for(var d=1; d<=dim; d++){
       var ds=ym+'-'+String(d).padStart(2,'0');
-      if((e.doj && ds<e.doj) || (e.dol && ds>e.dol)){ marks.push('-'); out++; continue; }
+      if((e.doj && ds<e.doj) || (e.dol && ds>e.dol)){ marks.push('-'); dutyArr.push(1); out++; continue; }
       var st=days[String(d)]||'P'; marks.push(st);
+      var dv=(st==='P' && dutyOk(duty[String(d)]))?Number(duty[String(d)]):1; dutyArr.push(dv); extra+=dv-1;
       if(st==='A') lop+=1; else if(st==='H') lop+=0.5;
     }
-    return {dim:dim, marks:marks, pay:dim-lop-out, lop:lop, out:out};
+    return {dim:dim, marks:marks, duty:dutyArr, extra:extra, pay:dim-lop-out, payB:dim-lop-out+((state.settings&&state.settings.billExtraDuty===false)?0:extra), lop:lop, out:out};
   }
   // One employee's share of the rate card for the days worked (the columns of the wage register).
   function employeeBilling(card, rr, pay, dim, e){
@@ -7618,9 +7660,9 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var advBy={}; if(run && run.rows) run.rows.forEach(function(r){ advBy[r.empId]=Number(r.advance)||0; });
     var rows=[];
     for(var i=0;i<emps.length;i++){
-      var e=emps[i], doc=await getAttendanceDoc(e.id, ym), att=attendanceMarks(e,ym,(doc&&doc.days)||{});
+      var e=emps[i], doc=await getAttendanceDoc(e.id, ym), att=attendanceMarks(e,ym,(doc&&doc.days)||{},(doc&&doc.duty)||{});
       var rr=rc?findRcRole(rc,e.role,e.dutyHrs):null, b=null;
-      if(rr){ b=employeeBilling(rc,rr,att.pay,dim,e); b.adv=advBy[e.id]||0; b.canteen=0; b.unifd=0;
+      if(rr){ b=employeeBilling(rc,rr,att.payB,dim,e); b.adv=advBy[e.id]||0; b.canteen=0; b.unifd=0;
         b.totald=b.pf12+b.esic075+b.pt+b.canteen+b.adv+b.unifd; b.net=b.gross-b.totald; }
       else if(rc){ warns.push((e.name||'Employee')+' ('+(e.role||'no role')+') has no matching role on the rate card, so is left out of the wage register.'); }
       rows.push({e:e, att:att, b:b, short:roleShort(e.role), role:e.role||'', col:(rr&&rc&&rc.roles)?rc.roles.indexOf(rr):-1});
@@ -7674,7 +7716,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var rowH=14.5, groups=[], cur=null;
     data.rows.forEach(function(r){ if(!r.b) return; if(!cur||cur.col!==r.col){ cur={col:r.col,rows:[]}; groups.push(cur); } cur.rows.push(r); });
     var keys=['pdays','basic','da','subA','extra','subB','pf','esic','medical','bonus','leave','natHol','uniform','training','subC','relieve','subD','service','gst','billing','pf12','esic075','pt','canteen','adv','unifd','totald','net'];
-    function sums(list){ var t={}; keys.forEach(function(k){ t[k]=0; }); list.forEach(function(r){ keys.forEach(function(k){ t[k]+= (k==='pdays'? r.att.pay : (r.b[k]||0)); }); }); return t; }
+    function sums(list){ var t={}; keys.forEach(function(k){ t[k]=0; }); list.forEach(function(r){ keys.forEach(function(k){ t[k]+= (k==='pdays'? r.att.payB : (r.b[k]||0)); }); }); return t; }
     function totalRow(label,t,dark){
       if(y+rowH+4>LIMIT){ y=pdfHead(pb,true); colHead(); }
       pb.rect(ML,y,tableW,rowH+1.5,{fill:dark?C.ink:C.paper});
@@ -7688,7 +7730,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         if(y+rowH>LIMIT){ y=pdfHead(pb,true); colHead(); }
         n++; var b=r.b;
         put(0,String(n),y+10); put(1,r.e.empCode||'',y+10); put(2,(r.e.name||'').toUpperCase(),y+10); put(3,r.short,y+10);
-        put(4,String(data.dim),y+10); put(5,r.att.pay.toFixed(1),y+10);
+        put(4,String(data.dim),y+10); put(5,r.att.payB.toFixed(1),y+10);
         keys.slice(1).forEach(function(k){ put(ci(k),String(Math.round(b[k]||0)),y+10,(k==='net'||k==='billing')); });
         y+=rowH; pb.line(ML,y,ML+tableW,y,0.3,C.line);
       });
@@ -7746,7 +7788,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var rowH=14.5, groups=[], cur=null;
     data.rows.forEach(function(r){ if(!r.b) return; if(!cur||cur.role!==r.role){ cur={role:r.role,rows:[]}; groups.push(cur); } cur.rows.push(r); });
     var keys=['pdays','basic','da','special','extra','washing','gross','pf13','esic325','bonus','uniform','subb','ctc','sc','gst','billing','pf12','esic075','pt','canteen','adv','unifd','totald','net'];
-    function sums(list){ var t={}; keys.forEach(function(k){ t[k]=0; }); list.forEach(function(r){ keys.forEach(function(k){ t[k]+= (k==='pdays'? r.att.pay : (r.b[k]||0)); }); }); return t; }
+    function sums(list){ var t={}; keys.forEach(function(k){ t[k]=0; }); list.forEach(function(r){ keys.forEach(function(k){ t[k]+= (k==='pdays'? r.att.payB : (r.b[k]||0)); }); }); return t; }
     function totalRow(label,t,dark){
       if(y+rowH+4>LIMIT){ y=pdfHead(pb,true); colHead(); }
       pb.rect(ML,y,tableW,rowH+1.5,{fill:dark?C.ink:C.paper});
@@ -7760,7 +7802,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         if(y+rowH>LIMIT){ y=pdfHead(pb,true); colHead(); }
         n++; var b=r.b;
         put(0,String(n),y+10); put(1,r.e.empCode||'',y+10); put(2,(r.e.name||'').toUpperCase(),y+10); put(3,r.short,y+10);
-        put(4,String(data.dim),y+10); put(5,r.att.pay.toFixed(1),y+10);
+        put(4,String(data.dim),y+10); put(5,r.att.payB.toFixed(1),y+10);
         keys.slice(1).forEach(function(k){ put(ci(k),String(Math.round(b[k]||0)),y+10,(k==='net'||k==='billing')); });
         y+=rowH; pb.line(ML,y,ML+tableW,y,0.3,C.line);
       });
@@ -7799,10 +7841,11 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       pb.text(X.sl+9,y+11.5,String(n),7.6,{align:'center',color:C.mute}); pb.text(X.id+3,y+11.5,r.e.empCode||'',7.4);
       pb.text(X.desig+13,y+11.5,r.short,7.4,{align:'center'}); pb.text(X.name+3,y+11.5,pdfFit(pb,r.e.name||'',102,8,true),8,{bold:true});
       r.att.marks.forEach(function(m,i){
-        var col=m==='A'?'#B2372D':m==='H'?'#B07A10':m==='-'?'#9A9A92':m==='L'?'#2F6E3F':C.ink;
-        pb.text(X.d0+dw*i+dw/2,y+11.5,m,7.4,{align:'center',color:col,bold:m!=='P'&&m!=='-'});
+        var dv=(m==='P' && r.att.duty && r.att.duty[i]>1)?r.att.duty[i]:1, show=dv>1?dutyNum(dv):m;
+        var col=dv>1?'#1F4E9A':m==='A'?'#B2372D':m==='H'?'#B07A10':m==='-'?'#9A9A92':m==='L'?'#2F6E3F':C.ink;
+        pb.text(X.d0+dw*i+dw/2,y+11.5,show,dv>1?6.6:7.4,{align:'center',color:col,bold:(m!=='P'&&m!=='-')||dv>1});
       });
-      var shown=(Math.round(r.att.pay*10)/10); total+=r.att.pay;
+      var shown=(Math.round(r.att.payB*10)/10); total+=r.att.payB;
       pb.text(X.tot+18,y+11.5,(shown%1?shown.toFixed(1):String(shown)),8,{bold:true,align:'center'});
       y+=rh; pb.line(ML,y,ML+CWt,y,0.3,C.line);
     });
@@ -7810,7 +7853,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     pb.rect(ML,y,CWt,rh+1,{fill:C.paper}); pb.text(X.name+3,y+11.8,'Total',8.2,{bold:true});
     var tt=Math.round(total*10)/10; pb.text(X.tot+18,y+11.8,(tt%1?tt.toFixed(1):String(tt)),8.4,{bold:true,align:'center'});
     y+=rh+10;
-    pb.text(ML,y+6,'P = present   A = absent   H = half day   L = leave   - = not employed on that day',7,{color:C.mute});
+    pb.text(ML,y+6,'P = present   A = absent   H = half day   L = leave   - = not employed on that day   1.5 / 2 = number of duties worked that day',7,{color:C.mute});
     if(y+70>LIMIT){ y=pdfHead(pb,true); }
     y+=14; var sy=y+34;
     [['Prepared by',ML],['Checked by Area Officer',ML+CWt/3+8],['Client authorised signatory (with seal)',ML+2*CWt/3+16]].forEach(function(s){ pb.line(s[1],sy,s[1]+CWt/3-30,sy,0.5,C.ink); pb.text(s[1],sy+11,s[0],7.6,{color:C.mute}); });
@@ -8057,7 +8100,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     if(cycAttCache[ym]) return cycAttCache[ym];
     var emps=cycEmps(ym), out={};
     for(var i=0;i<emps.length;i+=10){
-      await Promise.all(emps.slice(i,i+10).map(async function(e){ var doc=await getAttendanceDoc(e.id,ym); out[e.id]=attendanceMarks(e,ym,(doc&&doc.days)||{}); }));
+      await Promise.all(emps.slice(i,i+10).map(async function(e){ var doc=await getAttendanceDoc(e.id,ym); out[e.id]=attendanceMarks(e,ym,(doc&&doc.days)||{},(doc&&doc.duty)||{}); }));
     }
     cycAttCache[ym]=out; return out;
   }
@@ -8079,6 +8122,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       var basicEarned=r.struct ? ((r.basicPay||0)+(r.daPay||0)) : ((r.gross||0)-(r.otPay||0)-(r.nightPay||0)-(r.addPay||0))*empBasicPct(e,st)/100;
       if(e.pfApplicable && st.pfCeilingEnabled && basicEarned>pfCeilNow()) add('warn','Basic pay is above the PF wage ceiling. PF is limited to '+fmtMoney(pfCeilNow()*(st.pfRate||12)/100)+'.');
       if((r.otHrs||0)>(st.otWarnHours||50)) add('warn','Overtime of '+r.otHrs+' hours is unusually high.');
+      if((r.extraDuty||0)>XD_WARN) add('warn','Extra duty of '+dutyNum(r.extraDuty)+' duties in the month is unusually high. Please check the days marked.');
       var acct=String(e.bankAcc||'').replace(/\s/g,''); if(acct) (seen[acct]=seen[acct]||[]).push(r.name);
     });
     Object.keys(seen).forEach(function(k){ if(seen[k].length>1) out.push({lv:'warn',id:null,name:seen[k].join(', '),msg:'These employees share one bank account number.'}); });
@@ -8107,7 +8151,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var ym=cycMonth(), D=daysInMonth(ym), emps=cycEmps(ym), closed=cycClosed(ym), c=cycDoc(ym);
     var h='';
     if(closed) h+='<div class="banner">This month is closed, so attendance and shifts are locked.</div>';
-    h+='<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><p class="muted" style="margin:0;max-width:64ch">'+escapeHtml(xMonthLabel(ym))+' has '+D+' days. Mark each day present, absent, half day or leave in the daily attendance. Then enter overtime hours, night shifts and any other deduction here.</p><button class="btn ghost" data-cyc="openAtt">Open daily attendance</button></div></div>';
+    h+='<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><p class="muted" style="margin:0;max-width:64ch">'+escapeHtml(xMonthLabel(ym))+' has '+D+' days. Mark each day present, absent, half day or leave in the daily attendance, and mark 1.5 or 2 duties for a day when someone worked extra. Then enter overtime hours, night shifts and any other deduction here.</p><button class="btn ghost" data-cyc="openAtt">Open daily attendance</button></div></div>';
     if(!emps.length) return h+'<div class="card"><p class="muted" style="margin:0">No employees were working in '+escapeHtml(xMonthLabel(ym))+'.</p></div>';
     h+='<div class="card"><div class="scrollx"><table><thead><tr><th>Employee</th><th class="right">OT hours</th><th class="right">Night shifts</th><th class="right">Other deduction (\u20b9)</th><th class="right">Additional pay</th><th>Note</th></tr></thead><tbody>';
     emps.forEach(function(e){
@@ -8124,17 +8168,17 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var ym=cycMonth(), c=cycDoc(ym), closed=cycClosed(ym);
     if(!c.attConfirmed) return cycGate([['attendance','Confirm attendance and shifts']]);
     var att=await cycLoadAtt(ym), emps=cycEmps(ym);
-    var rows=emps.filter(function(e){ var a=att[e.id]||{marks:[]}, x=exOf(e.id,ym), cnt=cycMarkCounts(a); return cnt.A||cnt.H||cnt.L||x.ot||x.night||x.otherDed||x.note||addLinesOf(x).length||(typeof suggestedAdvanceDeduction==='function'&&suggestedAdvanceDeduction(e.id)>0); });
+    var rows=emps.filter(function(e){ var a=att[e.id]||{marks:[]}, x=exOf(e.id,ym), cnt=cycMarkCounts(a); return cnt.A||cnt.H||cnt.L||cnt.X||x.ot||x.night||x.otherDed||x.note||addLinesOf(x).length||(typeof suggestedAdvanceDeduction==='function'&&suggestedAdvanceDeduction(e.id)>0); });
     var h='';
     if(closed) h+='<div class="banner">This month is closed, so the review is locked.</div>';
     else if(c.reviewed) h+='<div class="banner">Review confirmed. You can continue to calculate payroll.</div>';
     h+='<div class="card"><p class="muted" style="margin:0 0 .8rem;max-width:70ch">These employees have absences, half days, leave, overtime, night shifts, advances or deductions this month. Check them, add a note where something needs explaining, then confirm.</p>';
     if(!rows.length) h+='<p class="muted" style="margin:0"><b>No exceptions this month.</b> Everyone worked a regular month.</p>';
     else{
-      h+='<div class="scrollx"><table><thead><tr><th>Employee</th><th class="right">Absent</th><th class="right">Half days</th><th class="right">Leave</th><th class="right">OT hours</th><th class="right">Night shifts</th><th class="right">Advance</th><th class="right">Other deduction</th><th>Note</th></tr></thead><tbody>';
+      h+='<div class="scrollx"><table><thead><tr><th>Employee</th><th class="right">Absent</th><th class="right">Half days</th><th class="right">Leave</th><th class="right">Extra duty</th><th class="right">OT hours</th><th class="right">Night shifts</th><th class="right">Advance</th><th class="right">Other deduction</th><th>Note</th></tr></thead><tbody>';
       rows.forEach(function(e){
         var cnt=cycMarkCounts(att[e.id]||{marks:[]}), x=exOf(e.id,ym), adv=(typeof suggestedAdvanceDeduction==='function')?suggestedAdvanceDeduction(e.id):0;
-        h+='<tr><td><b>'+escapeHtml(e.name)+'</b><div class="muted">'+escapeHtml(e.site||'')+'</div></td><td class="right">'+cnt.A+'</td><td class="right">'+cnt.H+'</td><td class="right">'+cnt.L+'</td><td class="right">'+((x.ot||0)>(state.settings.otWarnHours||50)?xTag(String(x.ot),'warn'):(x.ot||0))+'</td><td class="right">'+(x.night||0)+'</td><td class="right">'+fmtMoney(adv||0)+'</td><td class="right">'+fmtMoney(x.otherDed||0)+'</td><td><input type="text" data-extra="note" data-id="'+e.id+'" value="'+escapeHtml(x.note||'')+'" placeholder="Add a note" style="min-width:160px"'+(closed?' disabled':'')+'></td></tr>';
+        h+='<tr><td><b>'+escapeHtml(e.name)+'</b><div class="muted">'+escapeHtml(e.site||'')+'</div></td><td class="right">'+cnt.A+'</td><td class="right">'+cnt.H+'</td><td class="right">'+cnt.L+'</td><td class="right">'+(cnt.X?dutyNum(cnt.X):0)+'</td><td class="right">'+((x.ot||0)>(state.settings.otWarnHours||50)?xTag(String(x.ot),'warn'):(x.ot||0))+'</td><td class="right">'+(x.night||0)+'</td><td class="right">'+fmtMoney(adv||0)+'</td><td class="right">'+fmtMoney(x.otherDed||0)+'</td><td><input type="text" data-extra="note" data-id="'+e.id+'" value="'+escapeHtml(x.note||'')+'" placeholder="Add a note" style="min-width:160px"'+(closed?' disabled':'')+'></td></tr>';
       });
       h+='</tbody></table></div>';
     }
@@ -8142,7 +8186,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     if(!closed) h+='<div class="card"><button class="btn" data-cyc="confirmReview"'+(c.reviewed?' disabled':'')+'>'+(c.reviewed?'Review confirmed':'Confirm review')+'</button></div>';
     return h;
   };
-  function cycMarkCounts(a){ var n={A:0,H:0,L:0}; (a.marks||[]).forEach(function(m){ if(n[m]!==undefined) n[m]++; }); return n; }
+  function cycMarkCounts(a){ var n={A:0,H:0,L:0,X:0}; (a.marks||[]).forEach(function(m){ if(n[m]!==undefined) n[m]++; }); n.X=Number(a.extra)||0; return n; }
 
   CYC_PAGES.calculate=async function(){
     var ym=cycMonth(), c=cycDoc(ym), r=cycRun(ym), miss=[], closed=cycClosed(ym);
@@ -8386,6 +8430,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     document.getElementById('setNightAllow').value=s.nightAllowance==null?150:s.nightAllowance;
     document.getElementById('setEsiEr').value=s.esiErRate==null?3.25:s.esiErRate;
     document.getElementById('setOtWarn').value=s.otWarnHours==null?50:s.otWarnHours;
+    document.getElementById('setBillExtra').checked=s.billExtraDuty!==false;
   }
   function setupCycleSettings(){
     var b=document.getElementById('btnSaveCycSettings'); if(!b) return;
@@ -8395,6 +8440,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       s.nightAllowance=Math.max(0,Number(document.getElementById('setNightAllow').value)||0);
       s.esiErRate=Number(document.getElementById('setEsiEr').value)||0;
       s.otWarnHours=Number(document.getElementById('setOtWarn').value)||50;
+      s.billExtraDuty=document.getElementById('setBillExtra').checked;
       if(!db){ toast('Storage unavailable.'); return; }
       try{ await db.doc('settings/config').set(s); toast('Saved. Recalculate payroll to apply.'); }catch(e){ toast('Could not save: '+(e&&e.code||'')); }
     });

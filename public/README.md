@@ -608,3 +608,23 @@ Clients cannot check by themselves, because the tool needs a sign-in. A client c
 
 ### The GST signature rule (please ask your CA)
 Rule 46 of the CGST Rules asks for the **signature or digital signature** of the supplier or an authorised representative on a tax invoice. It does not ask for it on an official **e-invoice** (with an IRN from the government portal), which is compulsory above Rs 5 crore turnover. The authentication here proves the invoice came from your system and has not been changed. It is **not** a government e-invoice and **not** a digital signature, so the invoice still shows the authorised signatory's name, and the safest course is to sign it: on paper, or with a Digital Signature Certificate. Some commentary says that a remark such as "computer generated, no signature required" does not make an invoice valid for the buyer's input tax credit, and that a scanned signature is not a digital signature. For that reason the invoice does not say "no signature required". Ask your CA whether a signature image is enough for your clients, or whether to get a Digital Signature Certificate.
+
+
+## Extra duty: 1.5 or 2 duties on the same day
+
+### Marking it
+On the **Attendance** screen, click a day cell to cycle through: Present, Absent (unpaid), Half-day, Paid Leave, **1.5 duties**, **2 duties**, and back to Present. A day with an extra duty shows as a violet cell with a small "x2" or "x1.5" in the corner, and the hover text says "Double duty (2 duties)" or "1.5 duties". An extra duty can only be on a day that was worked: changing the day to Absent, Half-day or Leave clears it, and a duty marked before the person joined or after they left is ignored. A closed month cannot be changed. Importing attendance from the Attendance app keeps the duties already marked.
+
+### How it is paid
+Each extra duty is paid as **one extra day at the normal daily rate**: 2 duties on a day is one extra day, 1.5 duties is half an extra day. The daily rate is the monthly wage divided by the days in the month (for a daily wage, the wage for one day; for the 12-hour pay structure, the whole monthly pay divided by the days). If the wage rose in the month, each extra duty is paid at the rate of its own day.
+- **Payslip:** a separate line, such as "Extra duty (1.5 duties)", under "Pay for days worked" (or after Basic, D.A. and the extra hours on the pay structure).
+- **Payroll table:** the note under the gross reads, for example, "Wage for 28.5 of 30 days 16,111 + extra duty 1.5 848". Days present stays as before (the regular days). The Payroll table now refreshes whenever you open the tab.
+- **PF:** the Basic and D.A. part of the extra duty pay counts for PF, up to the PF ceiling.
+- **ESI:** who is covered still depends on the wage (a wage of 20,500 stays covered even when extra duties take the month over 21,000), and the ESI is worked out on everything paid.
+- **Professional tax:** follows the total paid.
+- **Pay cycle:** the review step has an **Extra duty** column, and an employee whose only exception is an extra duty is listed there. The checks warn when someone has more than 10 extra duties in a month.
+
+Extra duty is paid at the normal day rate, as asked. Overtime by the hour (paid at 2 times the hourly rate) is still entered as OT hours in the pay cycle. Work beyond normal hours can count as overtime under labour rules, so please ask your CA or labour consultant whether a double duty should be paid as overtime instead of a normal extra day.
+
+### Client billing
+Extra duties count as **days worked** in what you bill the client: the wage register, the totals on the attendance sheet, and the man-days on invoices made from a contract. The attendance sheet for the client shows the "2" or "1.5" on those days and explains it in the key. This is on by default. If you do not bill clients for extra duties, switch it off in **Settings, Overtime, night shifts and employer ESIC** (the box "Count extra duties ... in client billing") and save.
