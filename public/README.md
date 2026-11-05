@@ -628,3 +628,30 @@ Extra duty is paid at the normal day rate, as asked. Overtime by the hour (paid 
 
 ### Client billing
 Extra duties count as **days worked** in what you bill the client: the wage register, the totals on the attendance sheet, and the man-days on invoices made from a contract. The attendance sheet for the client shows the "2" or "1.5" on those days and explains it in the key. This is on by default. If you do not bill clients for extra duties, switch it off in **Settings, Overtime, night shifts and employer ESIC** (the box "Count extra duties ... in client billing") and save.
+
+
+## Sundays and holidays: paid day off, and holiday work
+
+### Setting it up
+- **For each person:** open the employee record and choose the **Weekly off day** (None, or Sunday to Saturday), and tick **Company holidays are paid days off for this person** if that applies. People who work every day, such as guards, are left on "None", and nothing changes for them. Only Accounts and the administrator can change these two fields on an existing employee, because they decide how work on those days is paid.
+- **Company holidays:** on the **Attendance** screen, in the box above the grid, pick the date, type the name (for example Deepavali) and press **Add holiday**. Each month has its own list. A closed month cannot be changed. A holiday is a day off only for the people who have the company holidays tick.
+
+### In the register
+A day that is a person's weekly off, or a company holiday for them, shows with **stripes**. It is paid as part of the wage, as before: you do nothing if they did not work. If they worked, click the day:
+1. first click, **worked**: the holiday stays paid and **one extra duty** is added (violet cell, "x2");
+2. second click, **half a day worked**: holiday pay and half an extra duty ("x1.5");
+3. third click, **absent**: the holiday is not paid;
+4. fourth click, back to a **paid day off**.
+
+The hover text on each day says what it means, for example "Sunday (weekly off), worked. Holiday pay and 1 extra duty". Ordinary days keep the cycle described in the extra duty section above.
+
+### How it is paid
+The holiday itself is already in the monthly wage (or in the daily wage count, as unmarked days are paid), so holiday pay plus an extra day makes **two days' pay for that day**. The payslip shows the extra day on its own line, such as "Holiday work (1 day)", apart from "Extra duty" on ordinary days. In **Settings, Overtime, night shifts and employer ESIC**, the box **A duty worked on a weekly off or holiday is paid at (times the daily rate)** is 1 by default (a normal day). Put 2 if holiday work is to be paid at double: the payslip then reads "Holiday work (1 day at 2 times)". The rate applies only to holiday work. PF, ESI eligibility, professional tax and the day-by-day rule when the wage rises in a month work exactly as for extra duty. The pay cycle review has a **Holiday work** column next to **Extra duty**, and the Payroll table note reads, for example, "Wage 15,500 + extra duty 1 500 + holiday work 1 500". In client billing, holiday work counts as days worked with extra duties, under the same Settings box.
+
+Whether holiday work must be paid at a higher rate depends on the law that applies to the establishment and on the contract, so please confirm the rate with your CA or labour consultant and set it in Settings.
+
+### After you change a holiday
+Adding or removing a holiday, or changing someone's weekly off, can change the pay of anyone who worked on that day. Recalculate payroll for the month afterwards. Adding or removing a company holiday sends that month's payroll back to draft, so it needs approval again.
+
+### Database
+Run `supabase/accounts_role.sql` again once (it is safe to run more than once). It now also stops anyone other than Accounts and the administrator from changing the weekly off day or company holidays on an existing employee. Holidays are saved in their own collection, which needs no new table.
