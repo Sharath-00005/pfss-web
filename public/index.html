@@ -7712,15 +7712,15 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   // Day-by-day marks for one employee: P present, A absent, H half day, L leave, - not employed that day.
   // duty (optional) holds days with more than one duty, such as {'5':2}. extra is the number of duties above one a day, over the month.
   function attendanceMarks(e, ym, days, duty){
-    var dim=daysInMonth(ym), marks=[], dutyArr=[], lop=0, out=0, extra=0, hx=0; duty=duty||{};
+    var dim=daysInMonth(ym), marks=[], dutyArr=[], offArr=[], lop=0, out=0, extra=0, hx=0, wo=0; duty=duty||{};
     for(var d=1; d<=dim; d++){
       var ds=ym+'-'+String(d).padStart(2,'0');
-      if((e.doj && ds<e.doj) || (e.dol && ds>e.dol)){ marks.push('-'); dutyArr.push(1); out++; continue; }
+      if((e.doj && ds<e.doj) || (e.dol && ds>e.dol)){ marks.push('-'); dutyArr.push(1); offArr.push(false); out++; continue; }
       var st=days[String(d)]||'P'; marks.push(st);
-      var dv=(st==='P' && dutyOk(duty[String(d)]))?Number(duty[String(d)]):1; dutyArr.push(dv); extra+=dv-1; if(dv>1 && offKind(e,ym,d)) hx+=dv-1;
+      var dv=(st==='P' && dutyOk(duty[String(d)]))?Number(duty[String(d)]):1; dutyArr.push(dv); extra+=dv-1; var offH=!!offKind(e,ym,d); offArr.push(offH); if(offH && st==='P') wo++; if(dv>1 && offH) hx+=dv-1;
       if(st==='A') lop+=1; else if(st==='H') lop+=0.5;
     }
-    return {dim:dim, marks:marks, duty:dutyArr, extra:extra, hx:hx, pay:dim-lop-out, payB:dim-lop-out+((state.settings&&state.settings.billExtraDuty===false)?0:extra), lop:lop, out:out};
+    return {dim:dim, marks:marks, duty:dutyArr, off:offArr, wo:wo, extra:extra, hx:hx, pay:dim-lop-out, payB:dim-lop-out+((state.settings&&state.settings.billExtraDuty===false)?0:extra), lop:lop, out:out};
   }
   // One employee's share of the rate card for the days worked (the columns of the wage register).
   function employeeBilling(card, rr, pay, dim, e){
@@ -7907,43 +7907,73 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     pb.text(pb.W-24,y+44,'Authorised signatory (with seal)',7.6,{color:C.mute,align:'right'}); pb.line(pb.W-24-190,y+38,pb.W-24,y+38,0.5,C.ink);
   }
 
+  // the number written in the Present, W/O, O/T and Total columns: a whole number, or with .5 for a half (the PDF font has no half sign)
+  function sheetNum(n){ n=Math.round((Number(n)||0)*100)/100; return String(n); }
   function drawAttendanceSheet(pb, data){
-    var C=PDFC, ML=36, y=pdfHead(pb,true), CWt=pb.W-72, LIMIT=pb.H-78, dim=data.dim;
+    var C=PDFC, ML=36, y=pdfHead(pb,true), CWt=pb.W-72, LIMIT=pb.H-78, dim=data.dim, showX=!(state.settings && state.settings.billExtraDuty===false);
+    var RED='#B2372D', BLUE='#1F4E9A';
     pb.text(ML,y+8,'ATTENDANCE SHEET',14,{bold:true}); pb.text(pb.W-36,y+8,xMonthLabel(data.ym),11,{bold:true,align:'right',color:C.goldDk});
     y+=20; pb.text(ML,y+8,'Unit name: ',8.8,{color:C.mute}); pb.text(ML+50,y+8,data.site,9.4,{bold:true});
     if(data.client&&data.client.name) pb.text(ML+300,y+8,'Client: '+data.client.name,8.8,{color:C.mute});
     y+=18;
-    var fixed=18+44+26+108+36, dw=Math.floor((CWt-fixed)/dim*10)/10, x0=ML, hh=20, rh=17;
-    var X={sl:x0, id:x0+18, desig:x0+62, name:x0+88, d0:x0+196, tot:x0+196+dw*dim};
+    var SW=[30,24,24,30], fixed=18+44+26+108+SW[0]+SW[1]+SW[2]+SW[3], dw=Math.floor((CWt-fixed)/dim*10)/10, x0=ML, hh=20, rh=17;
+    var X={sl:x0, id:x0+18, desig:x0+62, name:x0+88, d0:x0+196, pres:x0+196+dw*dim}; X.wo=X.pres+SW[0]; X.ot=X.wo+SW[1]; X.tot=X.ot+SW[2];
+    var offAny=[]; for(var q=0;q<dim;q++) offAny.push(data.rows.some(function(r){ return r.att.off && r.att.off[q]; }));
     function thead(){
       pb.rect(ML,y,CWt,hh,{fill:C.ink});
       pb.text(X.sl+9,y+13,'Sr',7,{bold:true,color:C.white,align:'center'}); pb.text(X.id+3,y+13,'ID No',7,{bold:true,color:C.white});
       pb.text(X.desig+13,y+13,'Desig',7,{bold:true,color:C.white,align:'center'}); pb.text(X.name+3,y+13,'Name',7,{bold:true,color:C.white});
-      for(var d=1; d<=dim; d++) pb.text(X.d0+dw*(d-1)+dw/2,y+13,String(d),6.8,{bold:true,color:C.white,align:'center'});
-      pb.text(X.tot+18,y+13,'Total',7,{bold:true,color:C.white,align:'center'});
+      for(var d=1; d<=dim; d++){
+        if(offAny[d-1]) pb.rect(X.d0+dw*(d-1),y,dw,hh,{fill:RED});
+        pb.text(X.d0+dw*(d-1)+dw/2,y+13,String(d),6.8,{bold:true,color:C.white,align:'center'});
+      }
+      [['Present',X.pres,SW[0]],['W/O',X.wo,SW[1]],['O/T',X.ot,SW[2]],['Total',X.tot,SW[3]]].forEach(function(c){ pb.text(c[1]+c[2]/2,y+13,c[0],6.6,{bold:true,color:C.white,align:'center'}); });
       y+=hh;
     }
     thead();
-    var total=0, n=0;
+    var T={pres:0,wo:0,ot:0,all:0}, n=0;
     data.rows.forEach(function(r){
       if(y+rh>LIMIT){ y=pdfHead(pb,true); thead(); }
       n++;
       pb.text(X.sl+9,y+11.5,String(n),7.6,{align:'center',color:C.mute}); pb.text(X.id+3,y+11.5,r.e.empCode||'',7.4);
       pb.text(X.desig+13,y+11.5,r.short,7.4,{align:'center'}); pb.text(X.name+3,y+11.5,pdfFit(pb,r.e.name||'',102,8,true),8,{bold:true});
-      r.att.marks.forEach(function(m,i){
-        var dv=(m==='P' && r.att.duty && r.att.duty[i]>1)?r.att.duty[i]:1, show=dv>1?dutyNum(dv):m;
-        var col=dv>1?'#1F4E9A':m==='A'?'#B2372D':m==='H'?'#B07A10':m==='-'?'#9A9A92':m==='L'?'#2F6E3F':C.ink;
-        pb.text(X.d0+dw*i+dw/2,y+11.5,show,dv>1?6.6:7.4,{align:'center',color:col,bold:(m!=='P'&&m!=='-')||dv>1});
+      var att=r.att;
+      att.marks.forEach(function(m,i){
+        var cl=X.d0+dw*i, cx=cl+dw/2, dv=(showX && m==='P' && att.duty && att.duty[i]>1)?att.duty[i]:1, offH=!!(att.off && att.off[i]);
+        if(m==='-'){ pb.text(cx,y+11.5,'-',7.4,{align:'center',color:'#9A9A92'}); return; }
+        if(offH) pb.rect(cl,y,dw,rh,{fill:'#F5D3CE'});
+        if(m==='P'){
+          if(offH){   // a day off: blank when not worked, P when worked, 4 when half a day was worked
+            if(dv>=2) pb.text(cx,y+11.5,'P',7.6,{align:'center',color:RED,bold:true});
+            else if(dv>1) pb.text(cx,y+11.5,'4',7.6,{align:'center',color:RED,bold:true});
+            return;
+          }
+          if(dv===1){ pb.text(cx,y+11.5,'P',7.4,{align:'center',color:C.ink}); return; }
+          if(dv===2){ pb.text(cx,y+7.4,'P',6,{align:'center',color:BLUE,bold:true}); pb.text(cx,y+14.8,'P',6.4,{align:'center',color:BLUE,bold:true}); }
+          else if(dv===1.5){ pb.text(cx,y+7.4,'4',6,{align:'center',color:BLUE,bold:true}); pb.text(cx,y+14.8,'P',6.4,{align:'center',color:BLUE,bold:true}); }
+          else pb.text(cx,y+11.5,dutyNum(dv),6.6,{align:'center',color:BLUE,bold:true});
+          return;
+        }
+        var col=m==='A'?RED:m==='H'?'#B07A10':m==='L'?'#2F6E3F':C.ink;
+        pb.text(cx,y+11.5,m,7.4,{align:'center',color:col,bold:true});
       });
-      var shown=(Math.round(r.att.payB*10)/10); total+=r.att.payB;
-      pb.text(X.tot+18,y+11.5,(shown%1?shown.toFixed(1):String(shown)),8,{bold:true,align:'center'});
+      var wo=att.wo||0, ot=showX?(att.extra||0):0, pres=att.pay-wo, all=pres+wo+ot;
+      T.pres+=pres; T.wo+=wo; T.ot+=ot; T.all+=all;
+      pb.text(X.pres+SW[0]/2,y+11.5,sheetNum(pres),7.8,{align:'center'}); pb.text(X.wo+SW[1]/2,y+11.5,sheetNum(wo),7.8,{align:'center'});
+      pb.text(X.ot+SW[2]/2,y+11.5,ot?sheetNum(ot):'-',7.8,{align:'center',color:ot?BLUE:C.mute,bold:!!ot}); pb.text(X.tot+SW[3]/2,y+11.5,sheetNum(all),8.2,{bold:true,align:'center'});
       y+=rh; pb.line(ML,y,ML+CWt,y,0.3,C.line);
     });
     if(y+rh>LIMIT){ y=pdfHead(pb,true); thead(); }
     pb.rect(ML,y,CWt,rh+1,{fill:C.paper}); pb.text(X.name+3,y+11.8,'Total',8.2,{bold:true});
-    var tt=Math.round(total*10)/10; pb.text(X.tot+18,y+11.8,(tt%1?tt.toFixed(1):String(tt)),8.4,{bold:true,align:'center'});
+    pb.text(X.pres+SW[0]/2,y+11.8,sheetNum(T.pres),8,{bold:true,align:'center'}); pb.text(X.wo+SW[1]/2,y+11.8,sheetNum(T.wo),8,{bold:true,align:'center'});
+    pb.text(X.ot+SW[2]/2,y+11.8,T.ot?sheetNum(T.ot):'-',8,{bold:true,align:'center'}); pb.text(X.tot+SW[3]/2,y+11.8,sheetNum(T.all),8.4,{bold:true,align:'center'});
     y+=rh+10;
-    pb.text(ML,y+6,'P = present   A = absent   H = half day   L = leave   - = not employed on that day   1.5 / 2 = number of duties worked that day',7,{color:C.mute});
+    var hol=holMap(data.ym), hk=Object.keys(hol).map(Number).sort(function(a,b){ return a-b; });
+    var keyLines=['P = present   PP = two duties   4 over P = one and a half duties (the 4 is an extra half day)   A = absent   H = half day   L = paid leave   - = not employed on that day',
+      'Red days are weekly offs and holidays: blank = not worked (paid), P = worked (an extra duty), 4 = worked half a day.   Present + W/O + O/T = Total.   W/O = paid weekly offs and holidays   O/T = extra duties'+(showX?'':' (not billed, so not shown)')];
+    if(hk.length) keyLines.push('Holidays: '+hk.map(function(k){ return k+' '+xMonthShort(data.ym)+' '+hol[String(k)]; }).join(', '));
+    keyLines.forEach(function(t,i){ pb.text(ML,y+6+i*9.5,t,6.9,{color:C.mute}); });
+    y+=keyLines.length*9.5-9.5;
     if(y+70>LIMIT){ y=pdfHead(pb,true); }
     y+=14; var sy=y+34;
     [['Prepared by',ML],['Checked by Area Officer',ML+CWt/3+8],['Client authorised signatory (with seal)',ML+2*CWt/3+16]].forEach(function(s){ pb.line(s[1],sy,s[1]+CWt/3-30,sy,0.5,C.ink); pb.text(s[1],sy+11,s[0],7.6,{color:C.mute}); });

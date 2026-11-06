@@ -655,3 +655,16 @@ Adding or removing a holiday, or changing someone's weekly off, can change the p
 
 ### Database
 Run `supabase/accounts_role.sql` again once (it is safe to run more than once). It now also stops anyone other than Accounts and the administrator from changing the weekly off day or company holidays on an existing employee. Holidays are saved in their own collection, which needs no new table.
+
+
+## The attendance sheet PDF, in the format of your paper register
+
+The attendance sheet for a client (from the Billing pack) now follows the paper register:
+- **P** is one duty on an ordinary day. **Two P's stacked** (one over the other) are two duties. A **4 over a P** is one and a half duties: the 4 is the extra half day.
+- **Red days** are weekly offs and holidays (the day number is red, and the day is shaded for the people it is a day off for). It is **blank** if the person did not work (the day is paid), **P** if they worked (an extra duty), and **4** if they worked half a day.
+- Columns on the right: **Present** (days paid that are not weekly offs or holidays), **W/O** (paid weekly offs and holidays), **O/T** (extra duties, including work on a day off) and **Total**, which is Present + W/O + O/T. The last row adds up each column. Halves are written as 10.5 (the PDF font has no half sign).
+- A key under the table explains the marks, and lists the company holidays of the month.
+- Someone who joined in the month has "-" before joining and only the days off after joining count in W/O. **A = absent** is unpaid. The red "L" on a paper sheet that is not counted in the total should be marked **Absent** in the register. In this system **L = paid leave**, which is paid, and is counted in Present.
+- If **Count extra duties ... in client billing** is switched off in Settings, the sheet shows ordinary days only, O/T shows "-", and the key says extra duties are not shown.
+
+For October 2026, the rows of the sample (examples folder) come to the same Present, W/O, O/T and Total as the paper register: 25, 6, 12, 43 for a person with 12 extra duties, 25, 6, 10.5, 41.5 with a half day, 23, 6, -, 29 with two absent days, and 16, 4, -, 20 for someone who joined on the 9th.
