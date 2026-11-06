@@ -381,7 +381,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <button class="navbtn" id="tabs-settings" data-tab="settings">Settings</button>
     <div class="grp" id="railTitle">Pay cycle</div>
     <ul class="rail" id="workflowRail"></ul>
-    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 5 Nov 2026, build 6</div>
+    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 5 Nov 2026, build 7</div>
   </nav>
 
   <div class="main-col">
@@ -1367,6 +1367,12 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <div id="mailPackBox" style="display:none">
       <div class="row"><div class="field grow"><label>Site</label><select id="mailSite"></select></div><div class="field"><label>Month</label><input type="month" id="mailMonth"></div></div>
       <div class="field"><label>Rate card (for the wage register)</label><select id="mailRate"></select></div>
+    </div>
+    <div class="field" id="mailFilesBox"><label for="mailFiles">Additional documents (optional)</label>
+      <input type="file" id="mailFiles" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.csv,.txt">
+      <div id="mailFileList" style="margin-top:.4rem"></div>
+      <div id="mailFileMsg" style="color:var(--bad);min-height:1.1em;font-size:.84rem" role="alert"></div>
+      <div class="muted" style="font-size:.78rem">For example a copy of the work order, a signed attendance sheet or a payment advice. Up to 4 files, about 3 MB each and 7 MB in all. Photos are made smaller automatically. PDF, JPG, PNG, Word, Excel, CSV and text files can be attached.</div>
     </div>
     <div class="field"><label>Send from</label><select id="mailFrom"></select></div>
     <div class="row">
@@ -2476,6 +2482,52 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     return out;
   }
   function invOverdue(inv){ var today=new Date().toISOString().slice(0,10); return !!(inv.status!=='paid' && inv.dueDate && inv.dueDate<today); }
+  // extra documents that go with the invoice or the billing pack
+  var MAIL_EXTRA_MAX=4, MAIL_FILE_BYTES=3000000, MAIL_TOTAL_BYTES=7000000, MAIL_TOTAL_B64=9600000, MAIL_EXTS=['pdf','jpg','jpeg','png','doc','docx','xls','xlsx','csv','txt'];
+  var mailExtra=[];   // {name, size, b64}
+  function mailFileExt(n){ var m=String(n||'').toLowerCase().match(/\.([a-z0-9]+)$/); return m?m[1]:''; }
+  function mailSizeText(b){ return b>=1000000?(Math.round(b/100000)/10)+' MB':Math.max(1,Math.round(b/1000))+' KB'; }
+  function mailExtraBytes(){ return mailExtra.reduce(function(t,x){ return t+x.size; },0); }
+  // a big photo is made smaller (longest side 1800 px, as JPEG), so a few MB from a phone go as a few hundred KB
+  function mailShrinkImage(file){
+    return new Promise(function(resolve){
+      try{
+        var url=URL.createObjectURL(file), img=new Image();
+        img.onload=function(){
+          try{
+            var w=img.naturalWidth, h=img.naturalHeight, k=Math.min(1,1800/Math.max(w,h)), cv=document.createElement('canvas');
+            cv.width=Math.max(1,Math.round(w*k)); cv.height=Math.max(1,Math.round(h*k));
+            var cx=cv.getContext('2d'); cx.fillStyle='#fff'; cx.fillRect(0,0,cv.width,cv.height); cx.drawImage(img,0,0,cv.width,cv.height);
+            URL.revokeObjectURL(url); cv.toBlob(function(b){ resolve(b||null); },'image/jpeg',0.82);
+          }catch(e){ URL.revokeObjectURL(url); resolve(null); }
+        };
+        img.onerror=function(){ URL.revokeObjectURL(url); resolve(null); };
+        img.src=url;
+      }catch(e){ resolve(null); }
+    });
+  }
+  function renderMailFiles(){
+    var box=document.getElementById('mailFileList'); if(!box) return;
+    if(!mailExtra.length){ box.innerHTML=''; return; }
+    box.innerHTML=mailExtra.map(function(x,i){ return '<div style="display:flex;align-items:center;gap:.6rem;padding:.2rem 0;border-bottom:1px solid var(--line)"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(x.name)+'</span><span class="muted">'+mailSizeText(x.size)+'</span><button class="btn small ghost" type="button" data-mfdel="'+i+'">Remove</button></div>'; }).join('')+'<div class="muted" style="font-size:.8rem;margin-top:.2rem">'+mailExtra.length+' extra file'+(mailExtra.length>1?'s':'')+', '+mailSizeText(mailExtraBytes())+' in all</div>';
+  }
+  // checks each chosen file and adds it to the list; returns the messages for the ones that could not be added
+  async function mailAddFiles(files){
+    var msgs=[]; files=Array.prototype.slice.call(files||[]);
+    for(var i=0;i<files.length;i++){
+      var f=files[i], ext=mailFileExt(f.name);
+      if(MAIL_EXTS.indexOf(ext)<0){ msgs.push(f.name+': this kind of file cannot be attached. Use PDF, JPG, PNG, Word, Excel, CSV or text.'); continue; }
+      if(mailExtra.length>=MAIL_EXTRA_MAX){ msgs.push('Only '+MAIL_EXTRA_MAX+' extra files can be attached, so '+(files.length-i>1?'the rest were':f.name+' was')+' not added.'); break; }
+      if(!f.size){ msgs.push(f.name+' is empty.'); continue; }
+      var blob=f, name=f.name;
+      if((ext==='jpg'||ext==='jpeg'||ext==='png') && f.size>600000){ var sm=await mailShrinkImage(f); if(sm && sm.size<f.size){ blob=sm; name=name.replace(/\.[^.]+$/,'')+'.jpg'; } }
+      if(blob.size>MAIL_FILE_BYTES){ msgs.push(f.name+' is too large ('+mailSizeText(f.size)+'). The limit is about 3 MB for each file.'); continue; }
+      if(mailExtraBytes()+blob.size>MAIL_TOTAL_BYTES){ msgs.push(f.name+' was not added: the extra files would be over 7 MB in all.'); continue; }
+      var b64; try{ b64=await b64Of(blob); }catch(e){ msgs.push(f.name+' could not be read.'); continue; }
+      mailExtra.push({name:name, size:blob.size, b64:b64});
+    }
+    renderMailFiles(); return msgs;
+  }
   function mailKind(){ var r=document.querySelector('input[name="mailKind"]:checked'); return r?r.value:'invoice'; }
   function mailAttach(){ var r=document.querySelector('input[name="mailAttach"]:checked'); return r?r.value:'inv'; }
   function mailSenderLabel(email){ var lp=String(email||'').split('@')[0].toLowerCase(); return lp==='accounts'?'Accounts Team':(lp==='hr'?'HR Team':'Public Force Security Services'); }
@@ -2507,6 +2559,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     el('mailRate').innerHTML='<option value="">Choose rate card</option>'+rateCards.map(function(r){ return '<option value="'+r.id+'">'+escapeHtml(r.name)+'</option>'; }).join('');
     el('mailRate').value=(k&&k.rateCardId)||c.rateCardId||'';
     el('mailTo').value=c.email||''; el('mailCc').value=''; el('mailErr').textContent=''; el('mailHelp').style.display='none';
+    mailExtra=[]; renderMailFiles(); el('mailFiles').value=''; el('mailFileMsg').textContent='';
     el('mailFrom').innerHTML='<option value="">Loading...</option>'; el('btnMailSend').disabled=true;
     mailRefreshText(); el('mailModalBg').classList.add('show');
     try{
@@ -2537,11 +2590,16 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         var pb=pdfNew(false); drawInvoice(pb,invoiceModelForIssue(inv)); drawWageRegister(pb,data); drawAttendanceSheet(pb,data); pdfFoot(pb,'Computer-generated billing documents');
         blob=pb.build(); name='Billing-pack-'+pdfName(inv.invoiceNo)+'.pdf';
       } else { blob=buildInvoicePdf(invoiceModelForIssue(inv)); name='Invoice-'+pdfName(inv.invoiceNo)+'.pdf'; }
+      var mainB64=await b64Of(blob), nExtra=mailExtra.length, tot=mainB64.length;
+      mailExtra.forEach(function(x){ tot+=x.b64.length; });
+      if(tot>MAIL_TOTAL_B64) throw new Error('The '+(withPack?'billing pack':'invoice')+' and the extra files are too large together. Remove a file, or send without the extra files.');
       btn.textContent='Sending...';
-      await mailApi('POST',{from:el('mailFrom').value,to:to,cc:el('mailCc').value.trim(),subject:el('mailSubject').value,message:el('mailMsg').value,keepCopy:el('mailCopy').checked,filename:name,pdfBase64:await b64Of(blob)});
-      var upd={emailedAt:Date.now(),emailedTo:to,emailKind:kind}; if(inv.status==='draft') upd.status='sent';
+      var payload={from:el('mailFrom').value,to:to,cc:el('mailCc').value.trim(),subject:el('mailSubject').value,message:el('mailMsg').value,keepCopy:el('mailCopy').checked,filename:name,pdfBase64:mainB64};
+      if(nExtra) payload.extra=mailExtra.map(function(x){ return {filename:x.name, base64:x.b64}; });
+      await mailApi('POST',payload);
+      var upd={emailedAt:Date.now(),emailedTo:to,emailKind:kind}; if(nExtra) upd.emailedFiles=mailExtra.map(function(x){ return x.name; }); if(inv.status==='draft') upd.status='sent';
       try{ if(db) await db.doc('invoices/'+inv.id).update(upd); }catch(e2){}
-      toast((kind==='reminder'?'Reminder':'Invoice')+' emailed to '+to+'.'); el('mailModalBg').classList.remove('show');
+      toast((kind==='reminder'?'Reminder':'Invoice')+' emailed to '+to+(nExtra?' with '+nExtra+' extra file'+(nExtra>1?'s':''):'')+'.'); el('mailModalBg').classList.remove('show');
     }catch(e){ err.textContent=(e&&e.message)||'Could not send the email.'; }
     btn.disabled=false; btn.textContent=old;
   }
@@ -2554,6 +2612,15 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     el('mailFrom').addEventListener('change', mailRefreshText);
     ['mailSubject','mailMsg'].forEach(function(id){ el(id).addEventListener('input', function(){ mailEdited=true; }); });
     el('btnMailSend').addEventListener('click', sendInvoiceMail);
+    el('mailFiles').addEventListener('change', async function(){
+      var input=el('mailFiles'), files=input.files; el('mailFileMsg').textContent='';
+      var msgs=await mailAddFiles(files); input.value='';
+      el('mailFileMsg').textContent=msgs.join(' ');
+    });
+    el('mailFileList').addEventListener('click', function(ev){
+      var b=ev.target.closest&&ev.target.closest('[data-mfdel]'); if(!b) return;
+      mailExtra.splice(Number(b.dataset.mfdel),1); el('mailFileMsg').textContent=''; renderMailFiles();
+    });
   }
 
   /* ---------- pay changes: wages that go up or down from a date, with a history ---------- */
@@ -4906,23 +4973,38 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     await downloadPayslipPdf(found, run, ym);
   }
 
+  // why a person cannot go in the bank transfer file ('' when they can)
+  function bankIssueOf(r){
+    var acct=String(r.bankAcc||'').replace(/\s/g,''), ifsc=String(r.ifsc||'').toUpperCase().replace(/\s/g,'');
+    if(!/^\d{9,18}$/.test(acct)) return 'bank account number is missing or invalid';
+    if(!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) return 'IFSC code is missing or invalid';
+    if(!((r.net||0)>0)) return 'net pay is zero or less';
+    return '';
+  }
+  function bankSkipped(rows){ return (rows||[]).map(function(r){ return {name:r.name, empCode:r.empCode, why:bankIssueOf(r), net:r.net}; }).filter(function(x){ return x.why; }); }
   async function exportCsv(ym){
     ym = ym || document.getElementById('payMonth').value || thisMonth();
     var run = await getRun(ym);
     if(!run || run.status!=='approved'){ toast('This month\'s payroll must be approved before the bank file can be downloaded.'); return; }
     var rows=[['Employee ID','Name','Site','Bank Account','IFSC','Days Present','Gross','PF','ESI','PT','Advance','Net Pay']];
     run.rows.forEach(function(r){
+      if(bankIssueOf(r)) return;   // a bank would reject the whole file for one bad line, so these people are left out and listed on screen
       rows.push([r.empCode||'', r.name, r.site||'', r.bankAcc||'', r.ifsc||'', r.present, r.gross, r.pf, r.esi, r.pt, (r.advance||0), r.net]);
     });
     var csv = rows.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+    var saved=false;
     if(downloadsCap){
-      try{ await downloadsCap.save({filename:'payroll-'+ym+'.csv', data:csv}); return; }catch(e){}
+      try{ await downloadsCap.save({filename:'payroll-'+ym+'.csv', data:csv}); saved=true; }catch(e){}
     }
-    var blob=new Blob([csv],{type:'text/csv'});
-    var url=URL.createObjectURL(blob);
-    var a=document.createElement('a'); a.href=url; a.download='payroll-'+ym+'.csv';
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
+    if(!saved){
+      var blob=new Blob([csv],{type:'text/csv'});
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement('a'); a.href=url; a.download='payroll-'+ym+'.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    }
+    var sk=bankSkipped(run.rows);
+    if(sk.length) toast(sk.length+' '+(sk.length===1?'person is':'people are')+' not in the bank file: '+sk.slice(0,3).map(function(x){ return x.name; }).join(', ')+(sk.length>3?' and '+(sk.length-3)+' more':'')+'. Pay '+(sk.length===1?'them':'them')+' another way. The list is on the Payslips and bank file step.');
   }
 
   // ---------- SETTINGS ----------
@@ -8156,6 +8238,15 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   }
   function cycClosed(ym){ return !!cycDoc(ym).closed; }
   function cycEmps(ym){ return state.employees.filter(function(e){ return employedInMonth(e,ym) && empGroupId(e,ym)===payScope; }).sort(compareByEmpCode); }
+  // the errors that were pushed through for the calculation now on screen (null when there are none)
+  function cycOverride(ym){ var c=cycDoc(ym), r=cycRun(ym), o=c.override; return (o && c.validated && r && r.calculatedAt && o.stamp===r.calculatedAt)?o:null; }
+  function overrideBannerHtml(ym, withList){
+    var o=cycOverride(ym); if(!o) return '';
+    var d=new Date(o.at), when=d.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})+', '+d.toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit'});
+    var h='<div class="banner" style="border-color:#B07A10;background:var(--warn-soft,#FFF4DA)"><b>Pushed through with '+o.n+' error'+(o.n>1?'s':'')+' that '+(o.n>1?'were':'was')+' not fixed.</b> By '+escapeHtml(o.byLabel||'someone')+' on '+escapeHtml(when)+'. Reason: '+escapeHtml(o.reason||'')+'.';
+    if(withList && o.items && o.items.length){ h+='<ul style="margin:.4rem 0 0 1.1rem">'+o.items.slice(0,12).map(function(i){ return '<li>'+escapeHtml(i.name||'')+': '+escapeHtml(i.msg||'')+'</li>'; }).join('')+(o.items.length>12?'<li>and '+(o.items.length-12)+' more</li>':'')+'</ul>'; }
+    return h+'</div>';
+  }
   function cycValidatedOk(ym){ var c=cycDoc(ym), r=cycRun(ym); return !!(c.validated && r && r.calculatedAt && c.validatedStamp===r.calculatedAt); }
   function cycDone(id,ym){
     var c=cycDoc(ym), r=cycRun(ym);
@@ -8191,7 +8282,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     cycAttCache={};
     var c=cycles[key];
     if(!c || c.closed) return;
-    if(c.reviewed || c.validated) patchCycleKey(key,{reviewed:false,validated:false,issues:null},'Attendance or employee data changed, so the review and validation must be done again');
+    if(c.reviewed || c.validated) patchCycleKey(key,{reviewed:false,validated:false,issues:null,override:null},'Attendance or employee data changed, so the review and validation must be done again');
   }
   function cycleReset(ym){ cycleResetKey(cycKey(ym)); }
   function subscribeCycleData(){
@@ -8378,15 +8469,23 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     if(!(r&&r.rows&&r.rows.length)) return cycGate([['calculate','Calculate monthly payroll']]);
     var t=cycTotals(r.rows), h='';
     h+='<div class="card"><div class="stat-grid"><div class="stat"><b>'+fmtMoney(t.pf)+'</b><span>PF from employees</span></div><div class="stat"><b>'+fmtMoney(t.pfEr)+'</b><span>PF by employer</span></div><div class="stat"><b>'+fmtMoney(t.esi)+'</b><span>ESI from employees</span></div><div class="stat"><b>'+fmtMoney(t.esiEr)+'</b><span>ESI by employer</span></div></div></div>';
-    h+='<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><p class="muted" style="margin:0;max-width:64ch">The checks cover UAN, ESIC number, bank details, negative pay and unusual values. Errors must be fixed. Warnings can be accepted.</p>'+(closed?'':'<button class="btn" data-cyc="runChecks">'+(c.issues?'Run checks again':'Run checks')+'</button>')+'</div></div>';
+    h+='<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><p class="muted" style="margin:0;max-width:64ch">The checks cover UAN, ESIC number, bank details, negative pay and unusual values. Errors should be fixed. If you must carry on now, Accounts or an administrator can push the payroll through with a reason. Warnings can be accepted.</p>'+(closed?'':'<button class="btn" data-cyc="runChecks">'+(c.issues?'Run checks again':'Run checks')+'</button>')+'</div></div>';
     if(!c.issues) return h+'<div class="card"><p class="muted" style="margin:0"><b>Checks not run yet.</b> Run the checks before sending this payroll for approval.</p></div>';
     var errs=c.issues.filter(function(i){return i.lv==='error';}), warns=c.issues.filter(function(i){return i.lv==='warn';});
-    if(cycValidatedOk(ym)) h+='<div class="banner"><b>Validated.</b> '+(warns.length?warns.length+' warning'+(warns.length>1?'s':'')+' accepted. ':'No issues found. ')+'This payroll can go for approval.</div>';
-    else if(errs.length) h+='<div class="banner" style="border-color:var(--bad)"><b>'+errs.length+' error'+(errs.length>1?'s':'')+' to fix.</b> Update the employee record, recalculate, then run the checks again.</div>';
+    var pushedO=cycOverride(ym);
+    if(pushedO){ h+=overrideBannerHtml(ym,false)+'<div class="banner">This payroll can go for approval. The approver will see these errors and the reason.'+((canPay()&&!closed&&pushStateOk(ym))?' <button class="btn small ghost" data-cyc="undoPush">Withdraw the push-through</button>':'')+'</div>'; }
+    else if(cycValidatedOk(ym)) h+='<div class="banner"><b>Validated.</b> '+(warns.length?warns.length+' warning'+(warns.length>1?'s':'')+' accepted. ':'No issues found. ')+'This payroll can go for approval.</div>';
+    else if(errs.length){
+      h+='<div class="banner" style="border-color:var(--bad)"><b>'+errs.length+' error'+(errs.length>1?'s':'')+' to fix.</b> Update the employee record, recalculate, then run the checks again.</div>';
+      if(!closed){
+        if(canPay()) h+='<div class="card"><h2>Push through with the errors</h2><p class="muted">Use this only when you must carry on now, for example when a UAN, an ESIC number or a bank account will be added later. The errors stay on record, the approver is told which they are and why, and people whose bank details are missing are left out of the bank file. PF and ESIC files also leave out people whose UAN or ESIC number is missing.</p><label class="muted" for="pushReason">Reason (required)</label><textarea id="pushReason" rows="2" style="width:100%" maxlength="300" placeholder="For example: the UAN of the new joiners will be added before the PF return"></textarea><label class="chk" style="display:flex;gap:.5rem;align-items:center;margin-top:.5rem"><input type="checkbox" id="pushAck" style="width:auto;min-height:0"> I know that these '+errs.length+' error'+(errs.length>1?'s are':' is')+' not fixed.</label><div class="row" style="margin-top:.7rem"><button class="btn" data-cyc="pushThrough">Push through with '+errs.length+' error'+(errs.length>1?'s':'')+'</button></div></div>';
+        else h+='<div class="card"><p class="muted" style="margin:0">Only Accounts or an administrator can push a payroll through with errors.</p></div>';
+      }
+    }
     else h+='<div class="banner"><b>The payroll was recalculated after these checks.</b> Run the checks again.</div>';
     if(c.issues.length){
       h+='<div class="card"><div class="scrollx"><table><thead><tr><th>Level</th><th>Employee</th><th>Issue</th><th></th></tr></thead><tbody>';
-      errs.concat(warns).forEach(function(i){ h+='<tr><td>'+xTag(i.lv==='error'?'Error':'Warning',i.lv==='error'?'bad':'warn')+'</td><td><b>'+escapeHtml(i.name)+'</b></td><td>'+escapeHtml(i.msg)+'</td><td>'+((i.id&&!closed)?'<button class="btn small ghost" data-cyc="fixEmp" data-id="'+i.id+'">Fix</button>':'')+'</td></tr>'; });
+      errs.concat(warns).forEach(function(i){ h+='<tr><td>'+(i.lv==='error'?(pushedO?xTag('Pushed through','warn'):xTag('Error','bad')):xTag('Warning','warn'))+'</td><td><b>'+escapeHtml(i.name)+'</b></td><td>'+escapeHtml(i.msg)+'</td><td>'+((i.id&&!closed)?'<button class="btn small ghost" data-cyc="fixEmp" data-id="'+i.id+'">Fix</button>':'')+'</td></tr>'; });
       h+='</tbody></table></div></div>';
     }
     return h;
@@ -8400,6 +8499,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var t=cycTotals(r.rows), st=cycStatus(ym), ident=await myIdentity(), amApprover=isApproverId(ident.id);
     var h='<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">'+escapeHtml(xMonthLabel(ym))+' payroll summary</h2>'+xTag(st[0],st[1])+'</div><div class="stat-grid" style="margin-top:.8rem"><div class="stat"><b>'+t.n+'</b><span>Employees</span></div><div class="stat"><b>'+fmtMoney(t.gross)+'</b><span>Gross pay</span></div><div class="stat"><b>'+fmtMoney(t.gross-t.net)+'</b><span>Deductions</span></div><div class="stat"><b>'+fmtMoney(t.net)+'</b><span>Net pay</span></div><div class="stat"><b>'+fmtMoney(t.cost)+'</b><span>Cost to company</span></div></div></div>';
     if(r.status==='rejected' && r.remark) h+='<div class="banner"><b>Last rejection:</b> '+escapeHtml(r.remark)+'</div>';
+    h+=overrideBannerHtml(ym,true);
     if(appr) h+='<div class="banner">Approved'+(r.approvedByLabel?' by '+escapeHtml(r.approvedByLabel):'')+'. Continue to payslips and the bank file.</div>';
     else if(!sub){
       h+='<div class="card"><h2>Send for approval</h2><p class="muted">An approver checks the totals and approves the payroll or sends it back. The person who submits it cannot approve it.</p><button class="btn" data-cyc="submit">Submit for approval</button></div>';
@@ -8420,6 +8520,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var h=closed?'<div class="banner">'+escapeHtml(xMonthLabel(ym))+' is closed. Attendance and payroll are locked.'+(canReopen?' <button class="btn small ghost" data-cyc="reopen">Reopen month</button>':'')+'</div>'
       :'<div class="card"><h2>Payslips and bank file</h2><p class="muted">Download what you need below. When everything has been paid and checked, close the month. Closing locks attendance and payroll for '+escapeHtml(xMonthLabel(ym))+'.</p><button class="btn" data-cyc="close">Close '+escapeHtml(xMonthLabel(ym))+'</button></div>';
     h+='<div class="card"><h2>Downloads</h2><div class="row"><button class="btn" data-cyc="allSlips">All payslips (one PDF)</button><button class="btn ghost" data-cyc="bank">Bank transfer file (CSV)</button><button class="btn ghost" data-cyc="register">Payroll register (PDF)</button></div></div>';
+    var bsk=bankSkipped(r.rows);
+    if(bsk.length) h+='<div class="banner" style="border-color:#B07A10;background:var(--warn-soft,#FFF4DA)"><b>'+bsk.length+' '+(bsk.length===1?'person is':'people are')+' left out of the bank transfer file.</b> Pay them another way, or correct the bank details in the employee record before the next payroll.<ul style="margin:.4rem 0 0 1.1rem">'+bsk.map(function(x){ return '<li>'+escapeHtml(x.name||'')+(x.empCode?' ('+escapeHtml(x.empCode)+')':'')+': '+escapeHtml(x.why)+(x.net>0?', net pay '+fmtMoney(x.net):'')+'</li>'; }).join('')+'</ul></div>';
     h+=waCardHtml(ym, await waInfo());
     h+='<div class="card"><div class="scrollx"><table><thead><tr><th>ID</th><th>Employee</th><th>Site</th><th class="right">Gross</th><th class="right">Deductions</th><th class="right">Net pay</th><th></th></tr></thead><tbody>';
     r.rows.forEach(function(x){ h+='<tr><td>'+escapeHtml(x.empCode||'')+'</td><td>'+escapeHtml(x.name)+'</td><td>'+escapeHtml(x.site||'')+'</td><td class="right">'+fmtMoney(x.gross)+'</td><td class="right">'+fmtMoney(x.gross-x.net)+'</td><td class="right"><b>'+fmtMoney(x.net)+'</b></td><td><button class="btn small ghost" data-cyc="slip" data-id="'+x.empId+'">Payslip</button></td></tr>'; });
@@ -8527,7 +8629,30 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   async function cycRunChecks(){
     var ym=cycMonth(), r=cycRun(ym); if(!r||!r.rows) return;
     var issues=cycChecks(ym), errs=issues.filter(function(i){return i.lv==='error';}).length, warns=issues.length-errs;
-    await patchCycle(ym,{issues:issues, validated:errs===0, validatedStamp:r.calculatedAt}, errs? 'Checks run: '+errs+' error'+(errs>1?'s':'')+' to fix' : 'Checks run: validated'+(warns?' with '+warns+' warning'+(warns>1?'s':'')+' accepted':''));
+    await patchCycle(ym,{issues:issues, validated:errs===0, validatedStamp:r.calculatedAt, override:null}, errs? 'Checks run: '+errs+' error'+(errs>1?'s':'')+' to fix' : 'Checks run: validated'+(warns?' with '+warns+' warning'+(warns>1?'s':'')+' accepted':''));
+  }
+  function pushStateOk(ym){ var r=cycRun(ym); return !!(r && r.status!=='submitted' && r.status!=='approved'); }
+  async function cycPushThrough(){
+    var ym=cycMonth(), r=cycRun(ym), c=cycDoc(ym);
+    if(!canPay()){ toast('Only Accounts or an administrator can push a payroll through with errors.'); return; }
+    if(cycClosed(ym)){ toast('This month is closed.'); return; }
+    if(!r || !r.rows || !c.issues || c.validatedStamp!==r.calculatedAt){ toast('Run the checks first.'); return; }
+    if(!pushStateOk(ym)){ toast('This payroll has already been sent for approval.'); return; }
+    var errs=c.issues.filter(function(i){ return i.lv==='error'; });
+    if(!errs.length){ toast('There are no errors to push through.'); return; }
+    var rs=document.getElementById('pushReason'), reason=String((rs&&rs.value)||'').trim();
+    if(reason.length<8){ toast('Write the reason in a few words (at least 8 characters).'); return; }
+    var ak=document.getElementById('pushAck'); if(!(ak&&ak.checked)){ toast('Tick the box to confirm that you know the errors are not fixed.'); return; }
+    var ident=await myIdentity();
+    var o={stamp:r.calculatedAt, at:Date.now(), by:ident.id, byLabel:ident.label, reason:reason.slice(0,300), n:errs.length, items:errs.slice(0,200).map(function(i){ return {id:i.id, name:i.name, msg:i.msg}; })};
+    await patchCycle(ym,{validated:true, validatedStamp:r.calculatedAt, override:o}, 'Validation passed with '+errs.length+' error'+(errs.length>1?'s':'')+' pushed through by '+ident.label+'. Reason: '+o.reason);
+    toast('Pushed through. The approver will see the list of errors and your reason.');
+  }
+  async function cycUndoPush(){
+    var ym=cycMonth();
+    if(!canPay()){ toast('Only Accounts or an administrator can do this.'); return; }
+    if(cycClosed(ym) || !pushStateOk(ym)){ toast('This payroll has already been sent for approval.'); return; }
+    await patchCycle(ym,{validated:false, override:null}, 'Push-through withdrawn, so the checks must be run again');
   }
   async function cycAllPayslips(){
     var ym=cycMonth(), r=cycRun(ym);
@@ -8545,6 +8670,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       case 'confirmReview': await patchCycle(ym,{reviewed:true},'Overtime, leave and absence review confirmed'); break;
       case 'calc': await cycCalculate(); break;
       case 'runChecks': await cycRunChecks(); break;
+      case 'pushThrough': await cycPushThrough(); break;
+      case 'undoPush': await cycUndoPush(); break;
       case 'submit': await submitRun(ym); cycRefresh(true); break;
       case 'approve': await approveRun(ym); cycRefresh(true); break;
       case 'reject': { var rm=document.getElementById('cycRemark'), txt=rm?rm.value.trim():''; if(!txt){ toast('Enter a reason for rejecting.'); break; } await rejectRun(ym,txt); cycRefresh(true); break; }

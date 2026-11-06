@@ -685,4 +685,33 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-At the bottom of the left menu a small line reads, for example, "Version: 5 Nov 2026, build 6". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+At the bottom of the left menu a small line reads, for example, "Version: 5 Nov 2026, build 7". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+
+
+## Pushing a payroll through when there are errors
+
+On the **Validate PF, ESI and deductions** step, errors (a missing UAN, ESIC number or bank detail, a negative net pay) normally stop the payroll from going for approval. If you must carry on now, **Accounts or an administrator** can use the card **Push through with the errors**:
+1. Write the reason (at least 8 characters), for example "UAN of the new joiners will be added before the PF return".
+2. Tick the box that says you know the errors are not fixed.
+3. Press **Push through with N errors**.
+
+The errors stay on record and are shown in amber as **Pushed through**. The payroll can then be submitted, and the **approver sees a banner** on the approval step with the number of errors, who pushed them through, when, the reason, and the list of people and problems. The step is also written in the activity log. **Withdraw the push-through** puts things back (until the payroll is submitted). A push-through belongs to one calculation only: running the checks again, recalculating, or changing attendance or an employee's record withdraws it, and the checks must be passed or pushed through again. Other roles cannot push through.
+
+### What happens to the people with the errors
+- **Bank transfer file:** a bank rejects a whole upload for one bad line, so the file now leaves out anyone whose bank account number or IFSC is missing or invalid, or whose net pay is zero or less. After the download a message says who was left out, and the **Payslips and bank file** step keeps a yellow list with the reason and the net pay, so you can pay them another way.
+- **PF return file (ECR):** people without a 12-digit UAN were already left out and listed. **ESIC sheet:** people without an ESIC number too.
+- Payslips are made for everyone as usual.
+
+## Additional documents on invoice and billing pack emails
+
+In **Invoicing, Email**, under what to attach, there is now **Additional documents (optional)**. Choose up to **4 files** to go with the invoice or the billing pack, for example a copy of the work order, a signed attendance sheet or a payment advice.
+- Allowed: **PDF, JPG, PNG, Word (.doc, .docx), Excel (.xls, .xlsx), CSV and text**. Programs, web pages, zip files and Word or Excel files with macros are refused.
+- Size: **about 3 MB for each file and 7 MB in all**. A **photo** over about 0.6 MB is made smaller automatically (longest side 1800 pixels, saved as JPEG), so an 11 MB phone photo goes as under 1 MB.
+- Each file has a **Remove** button, and the list shows the total. The files start empty every time the window is opened, and if the sending fails the files stay on the list so you can try again.
+- The email service checks every file again: the type must be allowed and the content must match the name (a PDF renamed .png is refused), names are cleaned, and two files with the same name never overwrite each other.
+- The email log keeps the number of files and their names, and the invoice records the names under "emailed files".
+
+### You must redeploy the email service
+The email service has changed. **Replace the code of the Worker** (`worker/send-ratecard.js`, in Cloudflare under the Worker's Edit code) and deploy it. Until you do, an email with an extra document is refused with a message saying the attachment is not a PDF, and emails with no extra document keep working. If you use the Supabase Edge function instead, replace `supabase/functions/send-ratecard/index.ts` and deploy it. Nothing else changes: no new secret or variable is needed.
+
+Large attachments make the Worker do more work. If sending fails with a message about the Worker running out of time or CPU on your Cloudflare plan, send fewer or smaller files.
