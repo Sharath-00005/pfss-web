@@ -120,7 +120,9 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 .daycell.H{background:var(--warn-soft);color:var(--warn);border-color:var(--warn)}
 .daycell.L{background:var(--info-soft);color:var(--info);border-color:var(--info)}
 .daycell.D{background:var(--brand-soft);color:var(--brand);border-color:var(--brand);position:relative}
-.daycell.off{background-image:repeating-linear-gradient(135deg,transparent 0 4px,rgba(120,120,140,.22) 4px 7px)}
+.daycell.hol:not(.D):not(.A):not(.H):not(.L),.daycell.off:not(.D):not(.A):not(.H):not(.L){background-color:rgba(140,140,158,.34);color:var(--ink-soft,#555);border-color:rgba(120,120,140,.55)}
+.daycell.off{background-image:repeating-linear-gradient(135deg,transparent 0 4px,rgba(90,90,110,.30) 4px 7px)}
+.daycell.hol{box-shadow:inset 0 -3px 0 rgba(178,55,45,.75)}
 .daycell.D::after{content:"x" attr(data-duty);position:absolute;right:2px;bottom:1px;font-size:.5rem;font-weight:800;line-height:1}
 .empty-state{text-align:center;color:var(--muted);padding:2.5rem 1rem}
 .banner{border-radius:4px;padding:12px 16px;margin-top:18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border:1px solid var(--line);font-size:.88rem}
@@ -363,7 +365,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 <body>
 <div class="appshell">
   <nav class="side" id="sideNav">
-    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small></div></div>
+    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="appBuild" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Build 5 Nov 2026 · 44</small></div></div>
     <div class="grp">Menu</div>
     <button class="navbtn on" id="tabs-dashboard" data-tab="dashboard">Dashboard</button>
     <button class="navbtn" id="tabs-cycle" data-tab="cycle">Pay cycle</button>
@@ -379,6 +381,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <button class="navbtn" id="tabs-settings" data-tab="settings">Settings</button>
     <div class="grp" id="railTitle">Pay cycle</div>
     <ul class="rail" id="workflowRail"></ul>
+    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 5 Nov 2026, build 6</div>
   </nav>
 
   <div class="main-col">
@@ -454,12 +457,19 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         <div class="field"><label>Site</label><select id="attSiteFilter"><option value="">All sites</option></select></div>
       </div>
       <p class="muted">Click a day cell to cycle: Present → Absent (unpaid) → Half-day → Paid Leave → 1.5 duties → 2 duties → Present. Unmarked days count as Present. Use Paid Leave for approved vacation/earned leave that should NOT cut their pay. Use 1.5 or 2 duties when someone worked more than one duty that day: each extra duty is paid as an extra day at the normal daily rate, and shows as a violet cell with the number of duties. Days that are a person's weekly off, or a company holiday for them, show with stripes and are paid as part of the wage. On those days click once for worked (the holiday is paid and one extra duty is added, shown as "Holiday work" on the payslip), twice for half a day worked, three times for absent (the holiday is not paid), and again to go back to a paid day off.</p>
+      <div id="attKey" class="muted" style="display:flex;flex-wrap:wrap;gap:.9rem;align-items:center;margin:.2rem 0 .7rem;font-size:.8rem"><span><span class="daycell P" style="cursor:default">P</span> present</span><span><span class="daycell A" style="cursor:default">A</span> absent</span><span><span class="daycell H" style="cursor:default">H</span> half day</span><span><span class="daycell L" style="cursor:default">L</span> paid leave</span><span><span class="daycell D" data-duty="2" style="cursor:default">D</span> extra duty</span><span><span class="daycell hol" style="cursor:default">2</span> company holiday (red mark)</span><span><span class="daycell off" style="cursor:default">4</span> weekly off or holiday that is a paid day off for the person</span></div>
       <div id="holBox" style="margin:.2rem 0 .9rem;padding:.7rem .9rem;border:1px solid var(--line);border-radius:10px;background:var(--panel)">
         <div style="font-weight:700">Company holidays in <span id="holMonthLabel"></span></div>
         <div class="muted" style="font-size:.82rem;margin:.15rem 0 .4rem">They are days off for the people who have "Company holidays are paid days off" ticked on their employee record. A weekly off comes from each person's own weekly off day.</div>
         <div class="pill-row" id="holList" style="margin:.2rem 0 .5rem"></div>
         <div class="row" style="align-items:flex-end"><div class="field" style="max-width:190px"><label>Date</label><input type="date" id="holDate"></div><div class="field grow"><label>Name</label><input id="holName" maxlength="40" placeholder="For example, Deepavali"></div><button class="btn small" id="btnHolAdd" type="button">Add holiday</button></div>
         <div id="holErr" style="color:var(--bad);min-height:1.2em;margin-top:.3rem" role="alert"></div>
+      </div>
+      <div id="offBox" style="margin:.2rem 0 .9rem;padding:.7rem .9rem;border:1px solid var(--line);border-radius:10px;background:var(--panel);display:none">
+        <div style="font-weight:700">Weekly off and company holidays for the people shown</div>
+        <div class="muted" style="font-size:.82rem;margin:.15rem 0 .4rem">This decides who gets Sundays and company holidays as paid days off, and who is paid extra for working them. Use the Site filter above to choose a site, then apply it to everyone listed. You can still change one person in their employee record.</div>
+        <div id="offNow" class="muted" style="font-size:.82rem;margin-bottom:.4rem"></div>
+        <div class="row" style="align-items:flex-end"><div class="field" style="max-width:220px"><label>Weekly off day</label><select id="offWeekly"><option value="">None, works any day</option><option value="0" selected>Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option></select></div><div class="field grow"><label><input type="checkbox" id="offHoliday" checked style="width:auto;margin-right:.4rem">Company holidays are paid days off</label></div><button class="btn small" id="btnOffApply" type="button">Apply</button></div>
       </div>
       <div class="scrollx" id="attContainer"></div>
     </div>
@@ -790,7 +800,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       <p class="muted">Used by the pay cycle. Overtime hours and night shifts are entered for each employee every month. Extra duties (1.5 or 2 duties on one day) are marked in the daily Attendance, and each extra duty is paid as an extra day at the normal daily rate. Work on a person's weekly off or a company holiday is paid on top of the holiday pay already in the wage, at the rate set here (1 means a normal day). Recalculate payroll after changing these.</p>
       <div class="row">
         <div class="field"><label>Overtime multiplier</label><input type="number" step="0.1" id="setOtMult"></div>
-        <div class="field"><label>Night shift allowance (\u20b9 per shift)</label><input type="number" id="setNightAllow"></div>
+        <div class="field"><label>Night shift allowance (₹ per shift)</label><input type="number" id="setNightAllow"></div>
         <div class="field"><label>Employer ESIC %</label><input type="number" step="0.01" id="setEsiEr"></div>
         <div class="field"><label>Warn when overtime is over (hours)</label><input type="number" id="setOtWarn"></div>
         <div class="field"><label>A duty worked on a weekly off or holiday is paid at (times the daily rate)</label><input type="number" step="0.5" min="0.5" id="setHolidayMult"></div>
@@ -2987,7 +2997,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   // and a new pay typed in here replaces any dated pay changes (it is then used for every month not yet approved)
   function payForSave(data, existing){
     if(!existing) return {data:data, ok:true};
-    if(!canPay()){ PAY_FORM_KEYS.forEach(function(k){ delete data[k]; }); return {data:data, ok:true}; }
+    if(!canPay()){ PAY_FORM_KEYS.forEach(function(k){ delete data[k]; }); delete data.weeklyOff; delete data.holidayOff; return {data:data, ok:true}; }
     if((existing.payHistory||[]).length){
       var was=payFieldsOf(existing), now=payFieldsOf(data), changed=['wageType','wageAmount','payStd','basicAmt','daAmt','dutyHrs'].some(function(k){ return was[k]!==now[k]; });
       if(changed){
@@ -4018,6 +4028,31 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var ym=document.getElementById('attMonth').value||thisMonth();
     document.getElementById('holMonthLabel').textContent=xMonthLabel(ym); box.innerHTML=holListHtml(ym);
   }
+  // the weekly off and holiday setting for everyone shown on the Attendance screen
+  var attShown=[];
+  function offSummary(list){
+    var wk={}, hol=0; list.forEach(function(e){ var w=(e.weeklyOff!=null && String(e.weeklyOff)!=='')?DOW_NAMES[Number(e.weeklyOff)]:'none'; wk[w]=(wk[w]||0)+1; if(e.holidayOff) hol++; });
+    var parts=Object.keys(wk).map(function(k){ return wk[k]+' with '+(k==='none'?'no weekly off':k+' off'); });
+    return 'Now, of the '+list.length+' people shown: '+parts.join(', ')+'; '+hol+' get company holidays as paid days off.';
+  }
+  function renderOffBox(list){
+    var box=document.getElementById('offBox'); if(!box) return;
+    box.style.display=(canPay() && list.length)?'':'none'; if(!canPay() || !list.length) return;
+    document.getElementById('offNow').textContent=offSummary(list);
+    document.getElementById('btnOffApply').textContent='Apply to the '+list.length+' '+(list.length===1?'person':'people')+' shown';
+  }
+  async function applyOffToShown(weekly, holidayOff){
+    if(!canPay()) return 'Only Accounts or an administrator can change this.';
+    var list=state.employees.filter(function(e){ return attShown.indexOf(e.id)>=0; }), n=0;
+    for(var i=0;i<list.length;i++){
+      var e=list[i], was=(e.weeklyOff!=null)?String(e.weeklyOff):'';
+      if(was===String(weekly) && !!e.holidayOff===!!holidayOff) continue;
+      if(db){ try{ await db.doc('employees/'+e.id).update({weeklyOff:String(weekly), holidayOff:!!holidayOff}); }catch(err){ return 'Could not save for '+(e.name||'an employee')+'. '+((err&&err.message)||''); } }
+      e.weeklyOff=String(weekly); e.holidayOff=!!holidayOff; n++;
+    }
+    var ym=document.getElementById('attMonth').value||thisMonth(); if(!cycClosed(ym)) await invalidateRun(ym);
+    return {changed:n, total:list.length};
+  }
   function setupHolidaysUI(){
     var f=function(i){ return document.getElementById(i); }; if(!f('btnHolAdd')) return;
     f('btnHolAdd').addEventListener('click', async function(){
@@ -4025,6 +4060,13 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       var msg=await holAdd(ym, f('holDate').value, f('holName').value);
       if(msg){ err.textContent=msg; return; }
       f('holName').value=''; renderHolidays(); renderAttendance(); toast('Holiday saved.');
+    });
+    f('btnOffApply').addEventListener('click', async function(){
+      var w=f('offWeekly').value, h=f('offHoliday').checked, n=attShown.length;
+      if(!confirm('Set the weekly off to '+(w===''?'none':DOW_NAMES[Number(w)])+' and company holidays '+(h?'as paid days off':'as working days')+' for '+n+' '+(n===1?'person':'people')+'?')) return;
+      var r=await applyOffToShown(w,h);
+      if(typeof r==='string'){ toast(r); return; }
+      toast('Saved for '+r.changed+' of '+r.total+' people. Recalculate the month\'s payroll if you have already calculated it.'); renderAttendance();
     });
     f('holList').addEventListener('click', async function(ev){
       var b=ev.target.closest&&ev.target.closest('[data-holdel]'); if(!b) return;
@@ -4186,7 +4228,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var active = state.employees.filter(function(e){return employedInMonth(e,ym) && (!siteF || e.site===siteF);})
       .sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
 
-    renderHolidays();
+    renderHolidays(); attShown=active.map(function(e){ return e.id; }); renderOffBox(active);
     var container=document.getElementById('attContainer');
     if(!active.length){ container.innerHTML='<p class="muted">No active employees to show.</p>'; return; }
 
@@ -4200,8 +4242,9 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         var ds0 = ym+'-'+String(d).padStart(2,'0');
         if((e.doj && ds0<e.doj) || (e.dol && ds0>e.dol)){ cells += '<span class="daycell X" title="Not employed on this day">'+d+'</span>'; continue; }
         var st = days[String(d)] || 'P', dv=(st==='P' && dutyOk(duty[String(d)]))?Number(duty[String(d)]):1, offN=offName(e,ym,d), offA=offN?' data-off="'+escapeHtml(offN)+'"':'';
-        if(dv>1) cells += '<span class="daycell D'+(offN?' off':'')+'" data-emp="'+e.id+'" data-day="'+d+'" data-duty="'+dv+'"'+offA+' title="'+escapeHtml(dayTitle(d,st,dv,offN))+'">'+d+'</span>';
-        else cells += '<span class="daycell '+st+(offN?' off':'')+'" data-emp="'+e.id+'" data-day="'+d+'"'+offA+' title="'+escapeHtml(dayTitle(d,st,1,offN))+'">'+d+'</span>';
+        var holN=(!offN && holMap(ym)[String(d)]!=null)?holMap(ym)[String(d)]:'', holC=holN?' hol':'', holT=holN?' (company holiday: '+holN+', not a paid day off for this person)':'';
+        if(dv>1) cells += '<span class="daycell D'+(offN?' off':'')+holC+'" data-emp="'+e.id+'" data-day="'+d+'" data-duty="'+dv+'"'+offA+' title="'+escapeHtml(dayTitle(d,st,dv,offN)+holT)+'">'+d+'</span>';
+        else cells += '<span class="daycell '+st+(offN?' off':'')+holC+'" data-emp="'+e.id+'" data-day="'+d+'"'+offA+' title="'+escapeHtml(dayTitle(d,st,1,offN)+holT)+'">'+d+'</span>';
       }
       html += '<tr><td>'+escapeHtml(e.name)+'</td><td>'+escapeHtml(e.site||'—')+'</td><td><div class="daygrid">'+cells+'</div></td></tr>';
     }
@@ -4219,12 +4262,13 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         if(cycClosed(ym)){ toast('This month is closed. Reopen it in the pay cycle to change attendance.'); return; }
         var cur = cell.dataset.duty ? 'D'+cell.dataset.duty : (cell.classList.contains('A')?'A':cell.classList.contains('H')?'H':cell.classList.contains('L')?'L':'P');
         var offLbl=cell.dataset.off||'', next = (offLbl ? orderOff[cur] : order[cur]) || 'P', dayN=cell.dataset.day;
+        var holTip=cell.classList.contains('hol')?(cell.title.indexOf(' (company holiday')>0?cell.title.slice(cell.title.indexOf(' (company holiday')):''):'';
         cell.classList.remove('P','A','H','L','D'); cell.removeAttribute('data-duty');
         if(next.charAt(0)==='D'){
-          var dv=Number(next.slice(1)); cell.classList.add('D'); cell.setAttribute('data-duty',String(dv)); cell.title=dayTitle(dayN,'P',dv,offLbl);
+          var dv=Number(next.slice(1)); cell.classList.add('D'); cell.setAttribute('data-duty',String(dv)); cell.title=dayTitle(dayN,'P',dv,offLbl)+holTip;
           await setAttendanceDay(cell.dataset.emp, ym, dayN, 'P', dv);
         } else {
-          cell.classList.add(next); cell.title=dayTitle(dayN,next,1,offLbl);
+          cell.classList.add(next); cell.title=dayTitle(dayN,next,1,offLbl)+holTip;
           await setAttendanceDay(cell.dataset.emp, ym, dayN, next);
         }
       });
@@ -7717,7 +7761,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       var ds=ym+'-'+String(d).padStart(2,'0');
       if((e.doj && ds<e.doj) || (e.dol && ds>e.dol)){ marks.push('-'); dutyArr.push(1); offArr.push(false); out++; continue; }
       var st=days[String(d)]||'P'; marks.push(st);
-      var dv=(st==='P' && dutyOk(duty[String(d)]))?Number(duty[String(d)]):1; dutyArr.push(dv); extra+=dv-1; var offH=!!offKind(e,ym,d); offArr.push(offH); if(offH && st==='P') wo++; if(dv>1 && offH) hx+=dv-1;
+      var dv=(st==='P' && dutyOk(duty[String(d)]))?Number(duty[String(d)]):1; dutyArr.push(dv); extra+=dv-1; var offH=offKind(e,ym,d); offArr.push(offH); if(offH && st==='P') wo++; if(dv>1 && offH) hx+=dv-1;
       if(st==='A') lop+=1; else if(st==='H') lop+=0.5;
     }
     return {dim:dim, marks:marks, duty:dutyArr, off:offArr, wo:wo, extra:extra, hx:hx, pay:dim-lop-out, payB:dim-lop-out+((state.settings&&state.settings.billExtraDuty===false)?0:extra), lop:lop, out:out};
@@ -7916,18 +7960,20 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     y+=20; pb.text(ML,y+8,'Unit name: ',8.8,{color:C.mute}); pb.text(ML+50,y+8,data.site,9.4,{bold:true});
     if(data.client&&data.client.name) pb.text(ML+300,y+8,'Client: '+data.client.name,8.8,{color:C.mute});
     y+=18;
-    var SW=[30,24,24,30], fixed=18+44+26+108+SW[0]+SW[1]+SW[2]+SW[3], dw=Math.floor((CWt-fixed)/dim*10)/10, x0=ML, hh=20, rh=17;
+    var SW=[30,24,24,30], fixed=18+44+26+108+SW[0]+SW[1]+SW[2]+SW[3], dw=Math.floor((CWt-fixed)/dim*10)/10, x0=ML, hh=27, rh=17, holD=holMap(data.ym);
     var X={sl:x0, id:x0+18, desig:x0+62, name:x0+88, d0:x0+196, pres:x0+196+dw*dim}; X.wo=X.pres+SW[0]; X.ot=X.wo+SW[1]; X.tot=X.ot+SW[2];
-    var offAny=[]; for(var q=0;q<dim;q++) offAny.push(data.rows.some(function(r){ return r.att.off && r.att.off[q]; }));
+    // each day's heading: a company holiday reads HOL, a weekly off reads the weekday (SUN), both in red
+    var dayKind=[]; for(var q=0;q<dim;q++) dayKind.push(holD[String(q+1)]!=null ? 'HOL' : (data.rows.some(function(r){ return r.att.off && r.att.off[q]==='weekly'; }) ? DOW_NAMES[dowOf(data.ym,q+1)].slice(0,3).toUpperCase() : ''));
     function thead(){
       pb.rect(ML,y,CWt,hh,{fill:C.ink});
-      pb.text(X.sl+9,y+13,'Sr',7,{bold:true,color:C.white,align:'center'}); pb.text(X.id+3,y+13,'ID No',7,{bold:true,color:C.white});
-      pb.text(X.desig+13,y+13,'Desig',7,{bold:true,color:C.white,align:'center'}); pb.text(X.name+3,y+13,'Name',7,{bold:true,color:C.white});
+      pb.text(X.sl+9,y+17,'Sr',7,{bold:true,color:C.white,align:'center'}); pb.text(X.id+3,y+17,'ID No',7,{bold:true,color:C.white});
+      pb.text(X.desig+13,y+17,'Desig',7,{bold:true,color:C.white,align:'center'}); pb.text(X.name+3,y+17,'Name',7,{bold:true,color:C.white});
       for(var d=1; d<=dim; d++){
-        if(offAny[d-1]) pb.rect(X.d0+dw*(d-1),y,dw,hh,{fill:RED});
-        pb.text(X.d0+dw*(d-1)+dw/2,y+13,String(d),6.8,{bold:true,color:C.white,align:'center'});
+        var k=dayKind[d-1], dx=X.d0+dw*(d-1);
+        if(k){ pb.rect(dx,y,dw,hh,{fill:RED}); pb.text(dx+dw/2,y+10,k,5,{bold:true,color:C.white,align:'center'}); pb.text(dx+dw/2,y+21,String(d),6.8,{bold:true,color:C.white,align:'center'}); }
+        else pb.text(dx+dw/2,y+17,String(d),6.8,{bold:true,color:C.white,align:'center'});
       }
-      [['Present',X.pres,SW[0]],['W/O',X.wo,SW[1]],['O/T',X.ot,SW[2]],['Total',X.tot,SW[3]]].forEach(function(c){ pb.text(c[1]+c[2]/2,y+13,c[0],6.6,{bold:true,color:C.white,align:'center'}); });
+      [['Present',X.pres,SW[0]],['W/O',X.wo,SW[1]],['O/T',X.ot,SW[2]],['Total',X.tot,SW[3]]].forEach(function(c){ pb.text(c[1]+c[2]/2,y+17,c[0],6.6,{bold:true,color:C.white,align:'center'}); });
       y+=hh;
     }
     thead();
@@ -7941,7 +7987,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       att.marks.forEach(function(m,i){
         var cl=X.d0+dw*i, cx=cl+dw/2, dv=(showX && m==='P' && att.duty && att.duty[i]>1)?att.duty[i]:1, offH=!!(att.off && att.off[i]);
         if(m==='-'){ pb.text(cx,y+11.5,'-',7.4,{align:'center',color:'#9A9A92'}); return; }
-        if(offH) pb.rect(cl,y,dw,rh,{fill:'#F5D3CE'});
+        if(offH || dayKind[i]==='HOL') pb.rect(cl,y,dw,rh,{fill:'#F5D3CE'});
         if(m==='P'){
           if(offH){   // a day off: blank when not worked, P when worked, 4 when half a day was worked
             if(dv>=2) pb.text(cx,y+11.5,'P',7.6,{align:'center',color:RED,bold:true});
@@ -7971,8 +8017,9 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var hol=holMap(data.ym), hk=Object.keys(hol).map(Number).sort(function(a,b){ return a-b; });
     var keyLines=['P = present   PP = two duties   4 over P = one and a half duties (the 4 is an extra half day)   A = absent   H = half day   L = paid leave   - = not employed on that day',
       'Red days are weekly offs and holidays: blank = not worked (paid), P = worked (an extra duty), 4 = worked half a day.   Present + W/O + O/T = Total.   W/O = paid weekly offs and holidays   O/T = extra duties'+(showX?'':' (not billed, so not shown)')];
+    keyLines.splice(1,0,'HOL = company holiday, shaded for everyone.   SUN (or another weekday) = weekly off.   A red heading and a shaded column mark these days.');
     if(hk.length) keyLines.push('Holidays: '+hk.map(function(k){ return k+' '+xMonthShort(data.ym)+' '+hol[String(k)]; }).join(', '));
-    keyLines.forEach(function(t,i){ pb.text(ML,y+6+i*9.5,t,6.9,{color:C.mute}); });
+    keyLines.forEach(function(t,i){ pb.text(ML,y+6+i*9.5,t,6.9,{color:(t.indexOf('Holidays: ')===0)?RED:C.mute,bold:(t.indexOf('Holidays: ')===0)}); });
     y+=keyLines.length*9.5-9.5;
     if(y+70>LIMIT){ y=pdfHead(pb,true); }
     y+=14; var sy=y+34;

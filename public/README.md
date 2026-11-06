@@ -668,3 +668,21 @@ The attendance sheet for a client (from the Billing pack) now follows the paper 
 - If **Count extra duties ... in client billing** is switched off in Settings, the sheet shows ordinary days only, O/T shows "-", and the key says extra duties are not shown.
 
 For October 2026, the rows of the sample (examples folder) come to the same Present, W/O, O/T and Total as the paper register: 25, 6, 12, 43 for a person with 12 extra duties, 25, 6, 10.5, 41.5 with a half day, 23, 6, -, 29 with two absent days, and 16, 4, -, 20 for someone who joined on the 9th.
+
+
+## Holidays are visible for everyone, and one click sets weekly offs
+
+### On the Attendance screen
+- A **company holiday** is marked on its day for **everyone** in the grid: a gray cell with a red mark along the bottom, and the hover text "company holiday: Gandhi Jayanthi, not a paid day off for this person". This shows even when nobody's record has been set up.
+- For the people to whom it is a **paid day off** (their weekly off day, or a company holiday when their record has the holidays tick), the cell is **gray with stripes**. Clicking it works as described in the section on holidays above.
+- A small key above the holiday box shows what each kind of cell means.
+
+### One click for everyone shown
+For Accounts and the administrator, the box **Weekly off and company holidays for the people shown** sits under the holiday box. Choose the weekly off day, tick or untick **Company holidays are paid days off**, and press **Apply to the N people shown**. It sets it on everyone currently listed, so choose a site in the Site filter first to set one site only. The line above the button shows how things are now ("11 with no weekly off; 0 get company holidays as paid days off"). People whose record already has the same setting are not touched. You can still change one person in their employee record. If the month is already calculated, recalculate it afterwards.
+
+### On the attendance sheet PDF
+A company holiday has a **red heading that reads HOL** above the day number, and the whole column is shaded for every person. A weekly off has a red heading with the weekday, such as **SUN**. The holiday names are listed in red under the table, with a short key.
+
+
+## Version line in the menu
+At the bottom of the left menu a small line reads, for example, "Version: 5 Nov 2026, build 6". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
