@@ -381,7 +381,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <button class="navbtn" id="tabs-settings" data-tab="settings">Settings</button>
     <div class="grp" id="railTitle">Pay cycle</div>
     <ul class="rail" id="workflowRail"></ul>
-    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 6 Nov 2026, build 9</div>
+    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 6 Nov 2026, build 10</div>
   </nav>
 
   <div class="main-col">
@@ -1371,10 +1371,15 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <div class="field" id="mailFilesBox"><label for="mailFiles">Additional documents (optional)</label>
       <input type="file" id="mailFiles" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.csv,.txt">
       <div id="mailFileList" style="margin-top:.4rem"></div>
-      <div id="mailProofRow" style="display:none;margin-top:.4rem"><label for="mailProofMonth" style="font-size:.82rem">PF and ESIC challans are for the month of</label> <input type="month" id="mailProofMonth" style="max-width:190px"></div>
+      <div id="mailSentBox" style="display:none;margin-top:.5rem">
+        <label class="chk" style="display:flex;gap:.45rem;align-items:center;font-size:.86rem"><input type="checkbox" id="mailSentOn" checked style="width:auto;min-height:0"> Mention the attached documents in the message</label>
+        <textarea id="mailSent" rows="2" aria-label="Sentence about the attached documents" style="width:100%;margin-top:.25rem"></textarea>
+        <div class="row" style="gap:.5rem;margin-top:.25rem"><button class="btn small ghost" type="button" id="btnMailSentSave">Keep this wording for every email</button><button class="btn small ghost" type="button" id="btnMailSentReset">Use the original wording</button></div>
+        <div class="muted" style="font-size:.76rem;margin-top:.2rem">You can change the sentence here for this email only. The month name is the month before the invoice month, and it moves on by itself when you keep the wording.</div>
+      </div>
       <div id="mailLineHint" class="muted" style="display:none;font-size:.82rem;margin-top:.3rem"></div>
       <div id="mailFileMsg" style="color:var(--bad);min-height:1.1em;font-size:.84rem" role="alert"></div>
-      <div class="muted" style="font-size:.78rem">For example a copy of the work order, a signed attendance sheet or a payment advice. Up to 4 files, about 3 MB each and 7 MB in all. Photos are made smaller automatically. PDF, JPG, PNG, Word, Excel, CSV and text files can be attached. Say what each file is, and the message gets a sentence to match, for example about the PF and ESIC challans.</div>
+      <div class="muted" style="font-size:.78rem">For example a copy of the work order, a signed attendance sheet or a payment advice. Up to 4 files, about 3 MB each and 7 MB in all. Photos are made smaller automatically. PDF, JPG, PNG, Word, Excel, CSV and text files can be attached. The message gets a sentence about them, which you can change.</div>
     </div>
     <div class="field"><label>Send from</label><select id="mailFrom"></select></div>
     <div class="row">
@@ -2535,35 +2540,44 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       }catch(e){ resolve(null); }
     });
   }
-  var MAIL_KINDS=[['pf','PF challan or receipt'],['esic','ESIC challan or receipt'],['other','Other document']];
-  var mailLineCur='';   // the line about the attached documents as it now stands in the message ('' when it is not there)
-  // a guess from the file name, which the person can change
-  function mailGuessKind(name){
-    var n=' '+String(name||'').toLowerCase().replace(/[_.\-\s]+/g,' ')+' ';
-    if(/ (esic|esi) /.test(n)) return 'esic';
-    if(/ (pf|epf|ecr|trrn|provident) /.test(n)) return 'pf';
-    return 'other';
-  }
+  var mailLineCur='';          // the sentence as it now stands in the message ('' when it is not there)
+  var mailTemplates={};        // saved wording: {attachSentence}
+  var mailSentTpl='', mailSentEdited=false;
+  var MAIL_SENT_DEFAULT='We have also attached the PF and ESIC challans and payment receipts for {month}, as proof that the contributions for our staff have been paid.';
   function mailPrevMonth(ym){ var y=Number(String(ym).slice(0,4)), m=Number(String(ym).slice(5,7))-1; if(m<1){ m=12; y--; } return y+'-'+String(m).padStart(2,'0'); }
-  // one sentence for the email, made from the files that are really attached
+  function mailSentStd(){ var t=mailTemplates.attachSentence; return (t && String(t).trim())?String(t):MAIL_SENT_DEFAULT; }
+  // {month} is the month before the invoice month, {files} the names of the attached files
+  function mailSentRender(tpl){
+    var mon=(mailInv)?xMonthLabel(mailPrevMonth(mailInv.month||thisMonth())):'', names=mailExtra.map(function(x){ return x.name; }).join(', ');
+    return String(tpl||'').split('{month}').join(mon).split('{files}').join(names);
+  }
+  function mailSentFill(){ var ta=document.getElementById('mailSent'); if(ta) ta.value=mailSentRender(mailSentTpl); }
+  // the sentence that goes in the message: only when files are attached and the box is ticked
   function mailDocsLine(){
-    var pf=mailExtra.some(function(x){ return x.kind==='pf'; }), es=mailExtra.some(function(x){ return x.kind==='esic'; }), oth=mailExtra.filter(function(x){ return x.kind!=='pf' && x.kind!=='esic'; }).length, out=[];
-    var pm=document.getElementById('mailProofMonth'), mon=(pm && pm.value)?xMonthLabel(pm.value):'';
-    if(pf||es){
-      var what=(pf&&es)?'the PF and ESIC challans and payment receipts':(pf?'the PF challan and payment receipt':'the ESIC challan and payment receipt');
-      out.push('We have also attached '+what+(mon?' for '+mon:'')+', as proof that the '+((pf&&es)?'contributions':'contribution')+' for our staff '+((pf&&es)?'have':'has')+' been paid.');
-    }
-    if(oth) out.push(((pf||es)?(oth>1?oth+' more documents are':'1 more document is')+' attached as well.':'We have also attached '+(oth>1?oth+' more documents':'1 more document')+' with this email.'));
-    return out.join(' ');
+    var on=document.getElementById('mailSentOn'), ta=document.getElementById('mailSent');
+    if(!mailExtra.length || !on || !on.checked || !ta) return '';
+    return String(ta.value||'').trim();
   }
   function renderMailFiles(){
     var box=document.getElementById('mailFileList'); if(!box) return;
-    var any=mailExtra.some(function(x){ return x.kind==='pf'||x.kind==='esic'; }), row=document.getElementById('mailProofRow'); if(row) row.style.display=any?'':'none';
+    var sb=document.getElementById('mailSentBox'); if(sb) sb.style.display=mailExtra.length?'':'none';
     if(!mailExtra.length){ box.innerHTML=''; return; }
-    box.innerHTML=mailExtra.map(function(x,i){ return '<div style="display:flex;align-items:center;gap:.6rem;padding:.2rem 0;border-bottom:1px solid var(--line);flex-wrap:wrap"><span style="flex:1;min-width:8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(x.name)+'</span><select data-mfkind="'+i+'" aria-label="What is '+escapeHtml(x.name)+'" style="max-width:13.5rem;min-height:30px">'+MAIL_KINDS.map(function(k){ return '<option value="'+k[0]+'"'+(x.kind===k[0]?' selected':'')+'>'+k[1]+'</option>'; }).join('')+'</select><span class="muted">'+mailSizeText(x.size)+'</span><button class="btn small ghost" type="button" data-mfdel="'+i+'">Remove</button></div>'; }).join('')+'<div class="muted" style="font-size:.8rem;margin-top:.2rem">'+mailExtra.length+' extra file'+(mailExtra.length>1?'s':'')+', '+mailSizeText(mailExtraBytes())+' in all</div>';
+    box.innerHTML=mailExtra.map(function(x,i){ return '<div style="display:flex;align-items:center;gap:.6rem;padding:.2rem 0;border-bottom:1px solid var(--line)"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(x.name)+'</span><span class="muted">'+mailSizeText(x.size)+'</span><button class="btn small ghost" type="button" data-mfdel="'+i+'">Remove</button></div>'; }).join('')+'<div class="muted" style="font-size:.8rem;margin-top:.2rem">'+mailExtra.length+' extra file'+(mailExtra.length>1?'s':'')+', '+mailSizeText(mailExtraBytes())+' in all</div>';
+  }
+  // keep this wording for every email from now on; the month before the invoice month is saved as {month} so it moves on by itself
+  async function mailSentSave(){
+    var ta=document.getElementById('mailSent'), txt=String(ta.value||'').trim();
+    if(!txt){ toast('Write the sentence first.'); return; }
+    var mon=mailInv?xMonthLabel(mailPrevMonth(mailInv.month||thisMonth())):'', names=mailExtra.map(function(x){ return x.name; }).join(', '), tpl=txt;
+    if(mon) tpl=tpl.split(mon).join('{month}');
+    if(names && tpl.indexOf(names)>-1) tpl=tpl.split(names).join('{files}');
+    mailTemplates.attachSentence=tpl; mailSentTpl=tpl; mailSentEdited=false;
+    if(db){ try{ await db.doc('emailTemplates/attachSentence').set({text:tpl}); }catch(e){ toast('Could not save the wording.'); return; } }
+    mailSentFill(); toast('Saved. This wording will be used for your next emails.');
   }
   // the files or their kinds changed: the sentence in the message follows, unless the person has been typing in the message
   function mailDocsChanged(){
+    if(!mailSentEdited) mailSentFill();
     var el=function(x){ return document.getElementById(x); }, line=mailDocsLine(), hint=el('mailLineHint'); if(!hint) return;
     hint.style.display='none';
     if(!mailEdited){ mailRefreshText(); return; }
@@ -2594,7 +2608,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       if(blob.size>MAIL_FILE_BYTES){ msgs.push(f.name+' is too large ('+mailSizeText(f.size)+'). The limit is about 3 MB for each file.'); continue; }
       if(mailExtraBytes()+blob.size>MAIL_TOTAL_BYTES){ msgs.push(f.name+' was not added: the extra files would be over 7 MB in all.'); continue; }
       var b64; try{ b64=await b64Of(blob); }catch(e){ msgs.push(f.name+' could not be read.'); continue; }
-      mailExtra.push({name:name, size:blob.size, b64:b64, kind:mailGuessKind(name)});
+      mailExtra.push({name:name, size:blob.size, b64:b64});
     }
     renderMailFiles(); mailDocsChanged(); return msgs;
   }
@@ -2630,7 +2644,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     el('mailRate').innerHTML='<option value="">Choose rate card</option>'+rateCards.map(function(r){ return '<option value="'+r.id+'">'+escapeHtml(r.name)+'</option>'; }).join('');
     el('mailRate').value=(k&&k.rateCardId)||c.rateCardId||'';
     el('mailTo').value=c.email||''; el('mailCc').value=''; el('mailErr').textContent=''; el('mailHelp').style.display='none';
-    mailExtra=[]; mailLineCur=''; el('mailProofMonth').value=mailPrevMonth(inv.month||thisMonth()); renderMailFiles(); el('mailFiles').value=''; el('mailFileMsg').textContent=''; el('mailLineHint').style.display='none';
+    mailExtra=[]; mailLineCur=''; mailSentTpl=mailSentStd(); mailSentEdited=false; el('mailSentOn').checked=true; mailSentFill(); renderMailFiles(); el('mailFiles').value=''; el('mailFileMsg').textContent=''; el('mailLineHint').style.display='none';
     el('mailFrom').innerHTML='<option value="">Loading...</option>'; el('btnMailSend').disabled=true;
     mailRefreshText(); el('mailModalBg').classList.add('show');
     try{
@@ -2692,11 +2706,10 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       var b=ev.target.closest&&ev.target.closest('[data-mfdel]'); if(!b) return;
       mailExtra.splice(Number(b.dataset.mfdel),1); el('mailFileMsg').textContent=''; renderMailFiles(); mailDocsChanged();
     });
-    el('mailFileList').addEventListener('change', function(ev){
-      var sel=ev.target.closest&&ev.target.closest('[data-mfkind]'); if(!sel) return;
-      var x=mailExtra[Number(sel.dataset.mfkind)]; if(x){ x.kind=sel.value; renderMailFiles(); mailDocsChanged(); }
-    });
-    el('mailProofMonth').addEventListener('input', mailDocsChanged);
+    el('mailSent').addEventListener('input', function(){ mailSentEdited=true; mailDocsChanged(); });
+    el('mailSentOn').addEventListener('change', mailDocsChanged);
+    el('btnMailSentSave').addEventListener('click', mailSentSave);
+    el('btnMailSentReset').addEventListener('click', function(){ mailSentTpl=MAIL_SENT_DEFAULT; mailSentEdited=false; mailDocsChanged(); });
     el('mailLineHint').addEventListener('click', function(ev){ if(ev.target.closest&&ev.target.closest('#btnMailLineAdd')) mailLineInsert(); });
   }
 
@@ -5528,6 +5541,10 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         renderInvoicesTable();
         renderInvoiceStats();
       }, function(err){ toast('Could not load invoices: '+err.code); });
+      db.collection('emailTemplates').onSnapshot(function(snap){
+        var o={}; snap.docs.forEach(function(d){ var x=d.data()||{}; if(d.id==='attachSentence' && x.text) o.attachSentence=String(x.text); });
+        mailTemplates=o;
+      }, function(){});
       db.collection('invoiceCounters').onSnapshot(function(snap){
         var o={}; snap.docs.forEach(function(d){ var x=d.data()||{}; if(d.id==='config') o.config={prefix:x.prefix, pad:x.pad}; else if(x.fy) o[x.fy]={fy:x.fy, next:x.next}; });
         invCounters=o;
