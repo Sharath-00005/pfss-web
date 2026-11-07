@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-At the bottom of the left menu a small line reads, for example, "Version: 5 Nov 2026, build 7". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+At the bottom of the left menu a small line reads, for example, "Version: 6 Nov 2026, build 8". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -715,3 +715,26 @@ In **Invoicing, Email**, under what to attach, there is now **Additional documen
 The email service has changed. **Replace the code of the Worker** (`worker/send-ratecard.js`, in Cloudflare under the Worker's Edit code) and deploy it. Until you do, an email with an extra document is refused with a message saying the attachment is not a PDF, and emails with no extra document keep working. If you use the Supabase Edge function instead, replace `supabase/functions/send-ratecard/index.ts` and deploy it. Nothing else changes: no new secret or variable is needed.
 
 Large attachments make the Worker do more work. If sending fails with a message about the Worker running out of time or CPU on your Cloudflare plan, send fewer or smaller files.
+
+
+## Invoice numbers: PFSS/26-27/0001
+
+### The format
+Every new invoice is numbered like **PFSS/26-27/0001, 0002, 0003**: the prefix, the **financial year** (April to March, worked out from the **invoice date**, so an invoice dated 2 April 2027 is PFSS/27-28/0001) and a running number that **starts again at 0001 every financial year**. The number is filled in for you and can be changed in the **Invoice #** box.
+
+GST (CGST Rule 46(b)) says a tax invoice number must be consecutive, **at most 16 characters**, use only **letters, numbers, - and /**, and be **unique for the financial year**. PFSS/26-27/0001 is 15 characters. The box stops at 16 characters and checks what you type as you type: a character that is not allowed, a number starting with / or - (the e-invoice portal does not accept that), and a number already used by another invoice (it names that invoice) are all refused, also when you press Save. Please confirm with your CA if you use more than one series.
+
+### Changing the number of an invoice
+- **New invoice:** type another number in the box, or press **Use the next number**. If you change the invoice date to another financial year, the suggestion follows it, unless you have typed a number yourself.
+- **Saved invoice:** Accounts and the administrator can change the number in the same box (for a manager the box is locked). A **draft** changes at once. An invoice that was **already issued** (sent, paid, or emailed) first shows a warning: the client still has the old number, the Document ID on that copy no longer matches, and an invoice already in a GST return has to be corrected in the return.
+- **History:** each invoice keeps its earlier numbers (shown under the box as "Earlier numbers of this invoice"), and the **Verify an invoice** check still recognises a Document ID printed under an earlier number and tells you the invoice was renumbered, and from what to what.
+- Document IDs now read like INV-PFSS-26-27-0001-7K3D9Q2M4X1B (the slashes become dashes), and downloaded invoices are named Invoice-PFSS_26-27_0001.pdf.
+
+### The "Invoice numbers" window (Invoicing page, Accounts and administrator)
+- **Prefix and digits:** the prefix (1 to 6 letters or numbers, PFSS to begin with) and 3, 4 or 5 digits. It checks that the whole number stays within 16 characters. A new prefix starts a new series.
+- **Next number:** choose the financial year and set the number the next invoice gets, for example 11 if invoices 1 to 10 were made outside the system. It cannot be lower than the highest number already used (the window tells you that number). Saving an invoice moves the next number on by itself, and **the number of a deleted invoice is not given out again**.
+- **Renumber existing invoices:** lists the invoices whose number is not yet in the series of their financial year (for example 101, 102, INV-0004). Tick the ones to renumber. They are numbered **in date order**, financial year by financial year, **after the highest number already used**, and the new numbers are shown before you apply. **Drafts are ticked, sent or paid invoices are not**, because the client has the old number. Ticked invoices stay consecutive, and the old numbers go into each invoice's history.
+
+### Things to know
+- Do not delete an invoice that was sent. GST wants consecutive numbers, and a deleted number leaves a gap.
+- The numbering settings are saved in their own records (collection invoiceCounters), so no database change is needed. They are part of the data backup and the restore.

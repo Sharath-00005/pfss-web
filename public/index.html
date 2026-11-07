@@ -381,7 +381,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <button class="navbtn" id="tabs-settings" data-tab="settings">Settings</button>
     <div class="grp" id="railTitle">Pay cycle</div>
     <ul class="rail" id="workflowRail"></ul>
-    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 5 Nov 2026, build 7</div>
+    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 6 Nov 2026, build 8</div>
   </nav>
 
   <div class="main-col">
@@ -638,7 +638,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <div class="card">
       <div class="row" style="justify-content:space-between">
         <h2>Invoices</h2>
-        <button class="btn" id="btnAddInvoice">+ New invoice</button>
+        <div class="row" style="gap:.5rem"><button class="btn ghost" id="btnInvNumbers" type="button">Invoice numbers</button><button class="btn" id="btnAddInvoice">+ New invoice</button></div>
       </div>
       <div class="row">
         <div class="field"><label>Client</label><select id="invClientFilter"><option value="">All clients</option></select></div>
@@ -1440,7 +1440,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <h3 id="invModalTitle">New invoice</h3>
     <input type="hidden" id="invId">
     <div class="row">
-      <div class="field"><label>Invoice #</label><input id="invNo" readonly style="background:var(--panel);font-weight:700;color:var(--accent)"></div>
+      <div class="field"><label for="invNo">Invoice #</label><input id="invNo" maxlength="16" autocomplete="off" spellcheck="false" style="font-weight:700;color:var(--accent)"><div class="row" style="gap:.4rem;align-items:center;margin-top:.2rem"><button class="btn small ghost" id="btnInvNoNext" type="button" style="min-height:24px;padding:0 8px">Use the next number</button></div><div id="invNoHint" class="muted" style="font-size:.76rem;max-width:30ch;margin-top:.2rem"></div></div>
       <div class="field"><label>Client *</label><select id="invClient"></select></div>
       <div class="field"><label>Billing month</label><input type="month" id="invMonth"></div>
     </div>
@@ -1489,6 +1489,33 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       <button class="btn ghost" id="btnDownloadInvoice">Download PDF</button>
       <button class="btn" id="btnSaveInvoice">Save invoice</button>
     </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="invNumModalBg">
+  <div class="modal" style="max-width:860px">
+    <button class="close-x" id="invNumClose">&times;</button>
+    <h3>Invoice numbers</h3>
+    <p class="muted">Invoices are numbered like <b>PFSS/26-27/0001</b>: a prefix, the financial year (April to March) and a running number that starts again at 0001 every financial year. GST allows at most 16 characters (letters, numbers, - and /), and a number cannot be used twice in a financial year.</p>
+    <div class="row">
+      <div class="field"><label for="invPrefix">Prefix</label><input id="invPrefix" maxlength="6" autocomplete="off" style="max-width:110px"></div>
+      <div class="field"><label for="invPad">Digits</label><select id="invPad"><option value="3">3 (001)</option><option value="4">4 (0001)</option><option value="5">5 (00001)</option></select></div>
+      <div class="field grow"><label>Looks like</label><div id="invExample" style="font-weight:700;padding:.5rem 0"></div></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="invNumFy">Financial year</label><select id="invNumFy"></select></div>
+      <div class="field"><label for="invNextNum">Next number</label><input type="number" id="invNextNum" min="1" step="1" style="max-width:130px"></div>
+      <div class="field grow"><label>&nbsp;</label><div id="invNumInfo" class="muted" style="font-size:.84rem"></div></div>
+    </div>
+    <div id="invNumErr" style="color:var(--bad);min-height:1.2em" role="alert"></div>
+    <div class="row" style="margin-top:.3rem"><button class="btn" id="btnInvNumSave" type="button">Save</button></div>
+    <p class="muted" style="font-size:.82rem">Set the next number when you start the system part-way through a year, for example after invoices 1 to 10 were made outside it. It cannot go below the highest number already used. Saving an invoice moves it on by itself, and the number of a deleted invoice is not given out again.</p>
+    <hr style="border:0;border-top:1px solid var(--line);margin:1rem 0">
+    <h4 style="margin:0 0 .3rem">Renumber existing invoices</h4>
+    <p class="muted" style="margin-top:0">These invoices are not yet in the format above for the financial year of their invoice date. Tick the ones to renumber. They are numbered in date order, after the highest number already used. Drafts are ticked. Invoices that were already sent are not, because the client has the old number.</p>
+    <div id="renumBox"></div>
+    <div id="renumNote" style="color:#8a5a00;min-height:1.2em;margin-top:.4rem"></div>
+    <div class="row" style="margin-top:.4rem"><button class="btn" id="btnRenumApply" type="button" style="display:none">Renumber</button></div>
   </div>
 </div>
 
@@ -3998,14 +4025,14 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     if(t.slice(0,9).toUpperCase()==='PFSS-INV|'){ var p=t.split('|'); if(p.length>=6){ no=p[1]; hex=String(p[5]).trim().toUpperCase(); } }
     else if((mm=/^INV-(.+)-([0-9A-Fa-f]{12})$/i.exec(t))){ no=mm[1]; hex=mm[2].toUpperCase(); }
     if(!no || !hex || !/^[0-9A-F]{12}$/.test(hex)) return {kind:'badformat'};
-    var matches=invoices.filter(function(i){ return String(i.invoiceNo)===no || invNoKey(i.invoiceNo)===invNoKey(no); });
+    var matches=invoices.filter(function(i){ return String(i.invoiceNo)===no || invNoKey(i.invoiceNo)===invNoKey(no) || (i.numberHistory||[]).some(function(h){ return invNoKey(h.no)===invNoKey(no); }); });
     if(!matches.length && no.indexOf('...')>-1){   // a long invoice number was shortened when printed: find the invoice from its code
       matches=invoices.filter(function(i){ var h=invFingerprint(invoiceModelFromSaved(i)).hex; return h===hex || (i.fingerprints||[]).some(function(x){ return x.hex===hex; }); });
     }
     if(!matches.length) return {kind:'nonumber', no:no};
     var cur=matches.map(function(inv){ return {inv:inv, fp:invFingerprint(invoiceModelFromSaved(inv))}; }), k;
     for(k=0;k<cur.length;k++) if(cur[k].fp.hex===hex) return {kind:'genuine', inv:cur[k].inv, fp:cur[k].fp};
-    for(k=0;k<cur.length;k++){ var h=(cur[k].inv.fingerprints||[]).filter(function(x){ return x.hex===hex; })[0]; if(h) return {kind:'changed', inv:cur[k].inv, fp:cur[k].fp, entry:h}; }
+    for(k=0;k<cur.length;k++){ var h=(cur[k].inv.fingerprints||[]).filter(function(x){ return x.hex===hex; })[0]; if(h){ var rn=(cur[k].inv.numberHistory||[]).filter(function(x){ return invNoKey(x.no)===invNoKey(no); })[0]; return {kind:'changed', inv:cur[k].inv, fp:cur[k].fp, entry:h, renum:(rn && invNoKey(cur[k].inv.invoiceNo)!==invNoKey(no))?rn:null}; } }
     return {kind:'nomatch', no:no, inv:matches[0]};
   }
   function verifyHtml(r){
@@ -4018,6 +4045,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       var d=r.inv.status==='draft';
       return box(d?'warn':'ok',d?'Matches, but the invoice is now a draft.':'Genuine. This Document ID matches the invoice saved in the system.',sum(r.inv,true)+'. Nothing on the invoice has changed since this ID was made.'+(d?' It has since been moved back to Draft, so check why it was changed.':''));
     }
+    if(r.kind==='changed' && r.renum) return box('warn','This ID was issued under an earlier number of this invoice.',sum(r.inv,true)+'. The invoice number was changed from <b>'+escapeHtml(r.renum.no)+'</b> to <b>'+escapeHtml(r.renum.to||String(r.inv.invoiceNo))+'</b>'+(Date.parse(r.renum.at)?' on '+escapeHtml(pdfStampDate(Date.parse(r.renum.at))):'')+'. A copy carrying the old number is an earlier version of this invoice, which now has the Document ID <b>'+escapeHtml(r.fp.id)+'</b>.');
     if(r.kind==='changed') return box('bad','This ID was issued, but the invoice has been changed since.',sum(r.inv,true)+'. '+(Date.parse(r.entry.at)?'This Document ID was made on '+escapeHtml(pdfStampDate(Date.parse(r.entry.at)))+(r.entry.by?' by '+escapeHtml(r.entry.by):''):'This Document ID belongs to an earlier version of the invoice')+'. The invoice now has the Document ID <b>'+escapeHtml(r.fp.id)+'</b>, so a copy carrying the older ID is not the current invoice.');
     return box('bad','Does not match.','This system never produced that Document ID for '+sum(r.inv)+'. The PDF may have been changed, or the ID was typed or copied wrongly. The current Document ID for that invoice is <b>'+escapeHtml(invFingerprint(invoiceModelFromSaved(r.inv)).id)+'</b>.');
   }
@@ -5450,6 +5478,10 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         renderInvoicesTable();
         renderInvoiceStats();
       }, function(err){ toast('Could not load invoices: '+err.code); });
+      db.collection('invoiceCounters').onSnapshot(function(snap){
+        var o={}; snap.docs.forEach(function(d){ var x=d.data()||{}; if(d.id==='config') o.config={prefix:x.prefix, pad:x.pad}; else if(x.fy) o[x.fy]={fy:x.fy, next:x.next}; });
+        invCounters=o;
+      }, function(){});
     }catch(e){ toast('Invoices unavailable.'); }
   }
 
@@ -5469,13 +5501,169 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     renderContracts(); renderAttention();
   }
 
-  function nextInvoiceNo(){
-    var max=0;
-    invoices.forEach(function(i){
-      var m=/^INV-(\d+)$/.exec(i.invoiceNo||'');
-      if(m){ var n=parseInt(m[1],10); if(n>max) max=n; }
+  /* ---------- invoice numbers: PFSS/26-27/0001, with a new series every financial year (April to March) ---------- */
+  var invCounters={};   // config: {prefix, pad}; for each financial year {fy, next}
+  var invNoEdited=false;
+  function fyCodeOf(d){
+    var t=String(d||'').slice(0,10), y=Number(t.slice(0,4)), m=Number(t.slice(5,7));
+    if(!y||!m){ var n=new Date(); y=n.getFullYear(); m=n.getMonth()+1; }
+    var a=m>=4?y:y-1;
+    return String(a%100).padStart(2,'0')+'-'+String((a+1)%100).padStart(2,'0');
+  }
+  function fyLabel(fy){ var a=Number(fy.slice(0,2)); return (a>=70?'19':'20')+fy.slice(0,2)+'-'+fy.slice(3); }
+  function invNumCfg(){
+    var c=invCounters.config||{}, prefix=String(c.prefix||'PFSS').replace(/[^A-Za-z0-9]/g,'').slice(0,6)||'PFSS', pad=Number(c.pad);
+    if(!(pad>=3 && pad<=5)) pad=4;
+    return {prefix:prefix, pad:pad};
+  }
+  function invSeriesPrefix(fy){ return invNumCfg().prefix+'/'+fy+'/'; }
+  function invSeq(no, fy){ var p=invSeriesPrefix(fy), t=String(no||'').trim(); if(t.indexOf(p)!==0) return 0; var rest=t.slice(p.length); return /^\d+$/.test(rest)?parseInt(rest,10):0; }
+  function invCounterNext(fy){ var c=invCounters[fy]; return (c && Number(c.next)>0)?Number(c.next):1; }
+  function invHighest(fy, ignoreId){ var max=0; invoices.forEach(function(i){ if(ignoreId && i.id===ignoreId) return; var q=invSeq(i.invoiceNo,fy); if(q>max) max=q; }); return max; }
+  function invFormat(fy, n){ return invSeriesPrefix(fy)+String(n).padStart(invNumCfg().pad,'0'); }
+  // the number to suggest for an invoice with this date: after the highest used in that financial year, and never below the "next number" that was set
+  function nextInvoiceNo(dateStr, ignoreId){ var fy=fyCodeOf(dateStr); return invFormat(fy, Math.max(invCounterNext(fy), invHighest(fy,ignoreId)+1)); }
+  // '' when the number can be used, otherwise what is wrong with it (CGST Rule 46: up to 16 characters, letters, digits, - and /, not used twice)
+  function invNoProblem(no, id){
+    var t=String(no==null?'':no).trim();
+    if(!t) return 'Enter an invoice number.';
+    if(t.length>16) return 'An invoice number can have at most 16 characters under GST. This one has '+t.length+'.';
+    if(!/^[A-Za-z0-9\/-]+$/.test(t)) return 'Use only letters, numbers, - and / in an invoice number.';
+    if(/^[\/-]/.test(t)) return 'An invoice number cannot start with / or -.';
+    var dup=invoices.filter(function(i){ return i.id!==id && String(i.invoiceNo||'').trim().toUpperCase()===t.toUpperCase(); })[0];
+    if(dup) return 'Invoice '+dup.invoiceNo+' already exists ('+(dup.clientName||'client')+', '+xFmt(dup.invoiceDate)+'). A number cannot be used twice.';
+    return '';
+  }
+  function invFormatProblem(prefix, pad){
+    if(!/^[A-Za-z0-9]{1,6}$/.test(String(prefix||''))) return 'The prefix can have 1 to 6 letters or numbers.';
+    pad=Number(pad); if(!(pad>=3 && pad<=5)) return 'Choose 3, 4 or 5 digits for the running number.';
+    var len=String(prefix).length+1+5+1+pad; if(len>16) return 'This format would be '+len+' characters long, and GST allows 16. Use a shorter prefix or fewer digits.';
+    return '';
+  }
+  async function invSetCounter(fy, next){
+    invCounters[fy]={fy:fy, next:next};
+    if(db){ try{ await db.doc('invoiceCounters/'+fy.replace('-','')).set({fy:fy, next:next}); }catch(e){ return false; } }
+    return true;
+  }
+  async function invSetConfig(prefix, pad){
+    invCounters.config={prefix:prefix, pad:Number(pad)};
+    if(db){ try{ await db.doc('invoiceCounters/config').set({prefix:prefix, pad:Number(pad)}); }catch(e){ return false; } }
+    return true;
+  }
+  // after an invoice is saved with a number of the series, the next one starts after it (a deleted invoice's number is not handed out again)
+  async function invBumpCounter(no, dateStr){ var fy=fyCodeOf(dateStr), q=invSeq(no,fy); if(q>0 && q+1>invCounterNext(fy)) await invSetCounter(fy,q+1); }
+  function invWasIssued(i){ return !!(i && ((i.status && i.status!=='draft') || i.emailedAt)); }
+  function invByDate(a,b){ return String(a.invoiceDate||'').localeCompare(String(b.invoiceDate||'')) || String(a.invoiceNo||'').localeCompare(String(b.invoiceNo||''),undefined,{numeric:true}); }
+  // invoices whose number is not yet in the series of their own financial year
+  function renumCandidates(){ return invoices.filter(function(i){ return invSeq(i.invoiceNo, fyCodeOf(i.invoiceDate))===0; }).sort(invByDate); }
+  // the new numbers for the chosen invoices: by financial year, in date order, after the highest number already used there
+  function renumPlan(ids){
+    var chosen=invoices.filter(function(i){ return ids.indexOf(i.id)>=0; }), byFy={}, out={};
+    chosen.forEach(function(i){ var fy=fyCodeOf(i.invoiceDate); (byFy[fy]=byFy[fy]||[]).push(i); });
+    Object.keys(byFy).forEach(function(fy){
+      var max=0; invoices.forEach(function(i){ if(ids.indexOf(i.id)>=0) return; var q=invSeq(i.invoiceNo,fy); if(q>max) max=q; });
+      var start=Math.max(max+1, invCounterNext(fy));
+      byFy[fy].sort(invByDate).forEach(function(i,k){ out[i.id]=invFormat(fy,start+k); });
     });
-    return 'INV-'+String(max+1).padStart(4,'0');
+    return out;
+  }
+  async function renumApply(ids){
+    var plan=renumPlan(ids), keys=Object.keys(plan), who=(me&&(me.name||me.email))||'', now=new Date().toISOString(), top={}, done=0;
+    keys.sort(function(a,b){ return invByDate(invoices.find(function(x){return x.id===a;})||{}, invoices.find(function(x){return x.id===b;})||{}); });
+    for(var k=0;k<keys.length;k++){
+      var id=keys[k], inv=invoices.find(function(x){ return x.id===id; }), no=plan[id]; if(!inv) continue;
+      var hist=(inv.fingerprints||[]).slice();
+      try{
+        var fo=invFingerprint(invoiceModelFromSaved(inv)); if(!hist.some(function(h){ return h.hex===fo.hex; })) hist.push({hex:fo.hex, at:'', by:''});
+        var fn=invFingerprint(invoiceModelFromSaved(Object.assign({}, inv, {invoiceNo:no}))); if(!hist.some(function(h){ return h.hex===fn.hex; })) hist.push({hex:fn.hex, at:now, by:who});
+      }catch(e){}
+      var upd={invoiceNo:no, fingerprints:hist.slice(-25), numberHistory:(inv.numberHistory||[]).concat([{no:inv.invoiceNo, to:no, at:now, by:who}]).slice(-20)};
+      if(db){ try{ await db.doc('invoices/'+id).update(upd); }catch(e){ return {done:done, total:keys.length, error:'Could not save the number of invoice '+inv.invoiceNo+'. The ones before it were renumbered.'}; } }
+      var fy=fyCodeOf(inv.invoiceDate); Object.assign(inv, upd); done++; top[fy]=Math.max(top[fy]||0, invSeq(no,fy));
+    }
+    for(var f in top) await invBumpCounter(invFormat(f,top[f]), '20'+f.slice(0,2)+'-06-01');
+    return {done:done, total:keys.length};
+  }
+  function invNoHintRefresh(){
+    var h=document.getElementById('invNoHint'); if(!h) return;
+    var id=document.getElementById('invId').value, v=document.getElementById('invNo').value, old=id?invoices.find(function(x){ return x.id===id; }):null;
+    var changed=!old || String(old.invoiceNo)!==String(v).trim(), prob=changed?invNoProblem(v,id):'';
+    if(prob){ h.style.color='var(--bad)'; h.textContent=prob; return; }
+    h.style.color=''; var hist=(old&&old.numberHistory)||[];
+    h.textContent=hist.length?'Earlier numbers of this invoice: '+hist.map(function(x){ return x.no; }).join(', ')+'.':(old?'Changing the number of an invoice that was already sent needs care: the client has the old one.':'Like PFSS/26-27/0001, a new series every financial year (April to March). Up to 16 characters.');
+  }
+
+  /* ---------- the "Invoice numbers" window: the format, the next number, and renumbering ---------- */
+  function invFyOptions(){
+    var set={}, cur=fyCodeOf(''), a=Number(cur.slice(0,2)); set[cur]=1; set[String((a+1)%100).padStart(2,'0')+'-'+String((a+2)%100).padStart(2,'0')]=1;
+    invoices.forEach(function(i){ set[fyCodeOf(i.invoiceDate)]=1; });
+    return Object.keys(set).sort(function(x,y){ return (Number(x.slice(0,2))<70?100:0)+Number(x.slice(0,2))-((Number(y.slice(0,2))<70?100:0)+Number(y.slice(0,2))); });
+  }
+  function invNumRefresh(){
+    var f=function(i){ return document.getElementById(i); }, fy=f('invNumFy').value, pre=f('invPrefix').value.trim(), pad=f('invPad').value, prob=invFormatProblem(pre,pad);
+    f('invExample').textContent=prob?'':pre+'/'+fy+'/'+'1'.padStart(Number(pad),'0')+'  ('+(pre.length+1+5+1+Number(pad))+' characters)';
+    f('invNumErr').textContent=prob;
+    var hi=invHighest(fy);
+    f('invNumInfo').textContent='Highest used in '+fyLabel(fy)+': '+(hi?invFormat(fy,hi):'none yet')+'. The next invoice dated in this year gets '+invFormat(fy,Math.max(invCounterNext(fy),hi+1))+'.';
+  }
+  function renumTicked(){ return Array.prototype.map.call(document.querySelectorAll('#renumBox [data-rn]:checked'), function(x){ return x.dataset.rn; }); }
+  function renumRefresh(){
+    var f=function(i){ return document.getElementById(i); }, ids=renumTicked(), plan=renumPlan(ids);
+    document.querySelectorAll('#renumBox [data-rnnew]').forEach(function(td){ td.textContent=plan[td.dataset.rnnew]||'(stays as it is)'; });
+    var n=ids.length, iss=ids.filter(function(id){ return invWasIssued(invoices.find(function(x){ return x.id===id; })); }).length, b=f('btnRenumApply');
+    b.style.display=''; b.disabled=!n; b.textContent=n?'Renumber '+n+' invoice'+(n>1?'s':''):'Tick the invoices to renumber';
+    f('renumNote').textContent=iss?iss+' of the ticked '+(iss>1?'invoices were':'invoice was')+' already issued, so '+(iss>1?'their clients have':'its client has')+' the old '+(iss>1?'numbers':'number')+'.':'';
+  }
+  function renderRenumList(){
+    var box=document.getElementById('renumBox'), cands=renumCandidates();
+    if(!cands.length){ box.innerHTML='<p class="muted" style="margin:0">All invoices already follow the current format.</p>'; document.getElementById('btnRenumApply').style.display='none'; document.getElementById('renumNote').textContent=''; return; }
+    var h='<div class="scrollx"><table><thead><tr><th></th><th>Current number</th><th>Client</th><th>Invoice date</th><th>Status</th><th>New number</th></tr></thead><tbody>';
+    cands.forEach(function(i){ var iss=invWasIssued(i); h+='<tr><td><input type="checkbox" data-rn="'+i.id+'"'+(iss?'':' checked')+' style="width:auto;min-height:0" aria-label="Renumber '+escapeHtml(i.invoiceNo||'')+'"></td><td><b>'+escapeHtml(i.invoiceNo||'')+'</b></td><td>'+escapeHtml(i.clientName||'')+'</td><td>'+escapeHtml(xFmt(i.invoiceDate))+'</td><td>'+(iss?xTag('Issued','warn'):xTag('Draft','info'))+'</td><td data-rnnew="'+i.id+'"></td></tr>'; });
+    box.innerHTML=h+'</tbody></table></div>'; renumRefresh();
+  }
+  function renderInvNumModal(){
+    var f=function(i){ return document.getElementById(i); }, c=invNumCfg(), cur=fyCodeOf('');
+    f('invPrefix').value=c.prefix; f('invPad').value=String(c.pad); f('invNumErr').textContent='';
+    f('invNumFy').innerHTML=invFyOptions().map(function(fy){ return '<option value="'+fy+'">'+fyLabel(fy)+'</option>'; }).join(''); f('invNumFy').value=cur;
+    f('invNextNum').value=Math.max(invCounterNext(cur), invHighest(cur)+1); invNumRefresh(); renderRenumList();
+  }
+  async function invNumSave(){
+    var f=function(i){ return document.getElementById(i); }, err=f('invNumErr'); err.textContent='';
+    if(!canPay()){ err.textContent='Only Accounts or an administrator can change invoice numbers.'; return; }
+    var pre=f('invPrefix').value.trim(), pad=f('invPad').value, fy=f('invNumFy').value, nx=Math.floor(Number(f('invNextNum').value)), prob=invFormatProblem(pre,pad);
+    if(prob){ err.textContent=prob; return; }
+    if(!(nx>=1)){ err.textContent='Enter the next number: 1 or more.'; return; }
+    var oldCfg=invCounters.config; invCounters.config={prefix:pre, pad:Number(pad)};
+    var hi=invHighest(fy);
+    if(nx<hi+1){ invCounters.config=oldCfg; err.textContent='Invoice '+invFormat(fy,hi)+' already exists, so the next number cannot be lower than '+(hi+1)+'.'; return; }
+    invCounters.config=oldCfg;
+    var cfgNow=invNumCfg(), ok1=true;
+    if(cfgNow.prefix!==pre || cfgNow.pad!==Number(pad)) ok1=await invSetConfig(pre,pad);
+    var ok2=await invSetCounter(fy,nx);
+    if(!ok1 || !ok2){ err.textContent='Could not save. Please try again.'; return; }
+    toast('Invoice numbering saved.'); invNumRefresh(); renderRenumList();
+  }
+  async function renumApplyClick(){
+    var ids=renumTicked(); if(!ids.length) return;
+    var iss=ids.filter(function(id){ return invWasIssued(invoices.find(function(x){ return x.id===id; })); }).length;
+    if(!confirm('Renumber '+ids.length+' invoice'+(ids.length>1?'s':'')+' as shown in the list? The old numbers are kept in each invoice\'s history.'+(iss?'\n\n'+iss+' of them '+(iss>1?'were':'was')+' already issued: the clients have the old numbers, the Document IDs on copies already sent still verify as earlier versions, and an invoice already in a GST return must be corrected there.':''))) return;
+    var r=await renumApply(ids);
+    toast(r.error?r.error:'Renumbered '+r.done+' invoice'+(r.done===1?'':'s')+'.');
+    renderRenumList(); invNumRefresh(); renderInvoicesTable();
+  }
+  function setupInvNumUI(){
+    var f=function(i){ return document.getElementById(i); }; if(!f('btnInvNumbers')) return;
+    f('btnInvNumbers').addEventListener('click', function(){
+      if(!canPay()){ toast('Only Accounts or an administrator can change invoice numbers.'); return; }
+      renderInvNumModal(); f('invNumModalBg').classList.add('show');
+    });
+    f('invNumClose').addEventListener('click', function(){ f('invNumModalBg').classList.remove('show'); });
+    f('invNumModalBg').addEventListener('click', function(ev){ if(ev.target===f('invNumModalBg')) f('invNumModalBg').classList.remove('show'); });
+    f('invPrefix').addEventListener('input', invNumRefresh); f('invPad').addEventListener('change', invNumRefresh);
+    f('invNumFy').addEventListener('change', function(){ var fy=f('invNumFy').value; f('invNextNum').value=Math.max(invCounterNext(fy), invHighest(fy)+1); invNumRefresh(); });
+    f('btnInvNumSave').addEventListener('click', invNumSave);
+    f('renumBox').addEventListener('change', function(ev){ if(ev.target.matches && ev.target.matches('[data-rn]')) renumRefresh(); });
+    f('btnRenumApply').addEventListener('click', renumApplyClick);
   }
 
   function renderClientDropdowns(){
@@ -5609,6 +5797,10 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 
   function setupInvoiceUI(){
     document.getElementById('btnAddInvoice').addEventListener('click', function(){ openInvoiceModal(null); });
+    document.getElementById('invNo').addEventListener('input', function(){ invNoEdited=true; invNoHintRefresh(); });
+    document.getElementById('invDate').addEventListener('change', function(){ if(!invNoEdited && !document.getElementById('invId').value){ document.getElementById('invNo').value=nextInvoiceNo(document.getElementById('invDate').value); invNoHintRefresh(); } });
+    document.getElementById('btnInvNoNext').addEventListener('click', function(){ var id=document.getElementById('invId').value; document.getElementById('invNo').value=nextInvoiceNo(document.getElementById('invDate').value,id); invNoEdited=false; invNoHintRefresh(); });
+    setupInvNumUI();
     document.getElementById('invModalClose').addEventListener('click', closeInvoiceModal);
     document.getElementById('btnSaveInvoice').addEventListener('click', saveInvoice);
     document.getElementById('btnDeleteInvoice').addEventListener('click', deleteInvoice);
@@ -5731,11 +5923,13 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var inv = id ? invoices.find(function(x){return x.id===id;}) : null;
     document.getElementById('invModalTitle').textContent = inv? 'Edit invoice' : 'New invoice';
     document.getElementById('invId').value = id||'';
-    document.getElementById('invNo').value = inv? inv.invoiceNo : nextInvoiceNo();
+    document.getElementById('invNo').value = inv? inv.invoiceNo : '';
     renderClientDropdowns();
     document.getElementById('invClient').value = inv? inv.clientId : (clients[0]? clients[0].id : '');
     document.getElementById('invMonth').value = inv? inv.month : thisMonth();
     document.getElementById('invDate').value = inv? inv.invoiceDate : new Date().toISOString().slice(0,10);
+    invNoEdited=false; if(!inv) document.getElementById('invNo').value=nextInvoiceNo(document.getElementById('invDate').value);
+    document.getElementById('invNo').readOnly=!!(inv && !canPay()); invNoHintRefresh();
     document.getElementById('invDue').value = inv? inv.dueDate : '';
     document.getElementById('invStatus').value = inv? inv.status : 'draft';
     document.getElementById('invGstPct').value = inv? inv.gstPct : ((state.settings.costing && state.settings.costing.gstPct) || 18);
@@ -5760,7 +5954,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var preview = renderInvoicePreview();
     if(!preview.items.length || !preview.items.some(function(i){return i.description;})){ toast('Add at least one line item.'); return; }
     var data = {
-      invoiceNo: document.getElementById('invNo').value,
+      invoiceNo: String(document.getElementById('invNo').value||'').trim(),
       clientId: clientId,
       clientName: client.name,
       month: document.getElementById('invMonth').value,
@@ -5781,16 +5975,24 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       rcmBase: Math.round(preview.rcmBase), rcmTax: Math.round(preview.rcmTax),
       tdsPct: preview.tdsPct, tdsAmt: Math.round(preview.tdsAmt), netReceivable: Math.round(preview.receivable)
     };
+    var oldNo=id?invoices.find(function(x){ return x.id===id; }):null, numChanged=!oldNo || String(oldNo.invoiceNo)!==data.invoiceNo;
+    if(numChanged){
+      var prob=invNoProblem(data.invoiceNo,id); if(prob){ toast(prob); invNoHintRefresh(); document.getElementById('invNo').focus(); return; }
+      if(oldNo && !canPay()){ toast('Only Accounts or an administrator can change the number of a saved invoice.'); return; }
+      if(oldNo && invWasIssued(oldNo) && !confirm('Invoice '+oldNo.invoiceNo+' was already issued. If you change its number to '+data.invoiceNo+', the copy the client has still shows the old number, its Document ID no longer matches, and if it is in a GST return the return must be corrected too.\n\nChange the number anyway?')) return;
+    }
     try{
       var oldInv=id?invoices.find(function(x){ return x.id===id; }):null, hist=((oldInv&&oldInv.fingerprints)||[]).slice(), fpNow=invFingerprint(invoiceModelFromSaved(data));
       if(oldInv){ var fpOld=invFingerprint(invoiceModelFromSaved(oldInv)); if(!hist.some(function(x){ return x.hex===fpOld.hex; })) hist.push({hex:fpOld.hex, at:'', by:''}); }
       if(!hist.some(function(x){ return x.hex===fpNow.hex; })) hist.push({hex:fpNow.hex, at:new Date().toISOString(), by:(me&&(me.name||me.email))||''});
       data.fingerprints=hist.slice(-25);
+      if(oldInv && String(oldInv.invoiceNo)!==data.invoiceNo) data.numberHistory=(oldInv.numberHistory||[]).concat([{no:oldInv.invoiceNo, to:data.invoiceNo, at:new Date().toISOString(), by:(me&&(me.name||me.email))||''}]).slice(-20);
     }catch(e){}
     if(!db){ toast('Storage unavailable — cannot save.'); return; }
     try{
       if(id){ await db.doc('invoices/'+id).update(data); }
       else{ await db.collection('invoices').add(data); }
+      if(numChanged) await invBumpCounter(data.invoiceNo, data.invoiceDate);
       toast('Invoice saved.');
       closeInvoiceModal();
     }catch(e){ toast('Save failed: '+(e.code||e.message||'error')); }
