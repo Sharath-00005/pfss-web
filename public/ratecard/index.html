@@ -168,6 +168,9 @@ tr.sec td{background:var(--bg);color:var(--brand);font-weight:700}
           <div><label for="rt_washing">Washing allowance (&#8377;)</label><input id="rt_washing" type="number" inputmode="decimal" step="0.01"></div>
           <div><label for="rt_special">Special allowance (&#8377;)</label><input id="rt_special" type="number" inputmode="decimal" step="0.01"></div>
         </div>
+        <label for="rt_basis" style="margin-top:10px">Bill by</label>
+        <select id="rt_basis"><option value="month">Fixed monthly amount (pro-rata by the days of the month)</option><option value="perday">Per day (the monthly amount &divide; days per month, for each day paid)</option></select>
+        <div class="muted" style="margin-top:6px">Per day: for a rate of 8 hours x 26 days, the client pays 1/26 of the amount for every day paid, so 30,000 for 30 days if the amount is 26,000.</div>
       </div>
       <div class="f-cs">
         <div class="grid3">
@@ -830,7 +833,7 @@ var COMPANY={tradeName:'PUBLIC FORCE SECURITY SERVICES', legalName:'Satish Kumar
 /*KA-BEGIN*/
   // ---- The Karnataka rate structure, May 2026 (the "Customer billing structure (CTC breakup)" and the employee take-home pay) ----
   // Every money line is rounded to the paisa, line by line, in the order of the table, so the lines add up exactly.
-  var KA_DEFAULTS = {pfPct:12, edliPct:1, esicPct:3.25, bonusPct:8.33, bonusCeiling:15000, leavePct:4.81, uniform:500, washing:0, special:0, servicePct:8, gstPct:18, pfCeiling:0, empPfPct:12, empEsicPct:0.75, hours:8, days:26};
+  var KA_DEFAULTS = {billBasis:'month', pfPct:12, edliPct:1, esicPct:3.25, bonusPct:8.33, bonusCeiling:15000, leavePct:4.81, uniform:500, washing:0, special:0, servicePct:8, gstPct:18, pfCeiling:0, empPfPct:12, empEsicPct:0.75, hours:8, days:26};
   function kaR2(x){ return Math.round((Number(x)||0)*100+1e-9)/100; }
   // One column of the structure. f is the share of the month worked (1 = a full month), used for the wage register.
   function computeKa(card, role, f){
@@ -916,7 +919,7 @@ var COMPANY={tradeName:'PUBLIC FORCE SECURITY SERVICES', legalName:'Satish Kumar
     var N=function(x){ return Number(x)||0; };
     var g=govCfg(), hrs=N(card.hours)||8, notes=['The Total Monthly Invoice Amount includes GST @ '+(N(card.gstPct))+'%.',
       'Rates are based on the Minimum Wages notification of the Karnataka Government'+(g&&g.edition?' ('+String(g.edition).replace(/\s*\(in force from[^)]*\)/,'')+')':'')+'. Any change in minimum wages, VDA, statutory contributions and/or taxes will be charged as per law.',
-      'Wage calculation is considered for '+hrs+' working hours per day and '+(N(card.days)||26)+' working days per month.'+(roles.some(function(r){ return (N(r.dutyHrs)||hrs)>hrs; })?' The Extra hrs line applies to the longer duty shown above the column.':'')];
+      'Wage calculation is considered for '+hrs+' working hours per day and '+(N(card.days)||26)+' working days per month.'+(roles.some(function(r){ return (N(r.dutyHrs)||hrs)>hrs; })?' The Extra hrs line applies to the longer duty shown above the column.':'')+(card.billBasis==='perday'?' Billing is per day: the amounts above are for '+(N(card.days)||26)+' days, and each day paid is billed at 1/'+(N(card.days)||26)+' of them, so a 30-day month is billed 30/'+(N(card.days)||26)+' of the amounts and a 31-day month 31/'+(N(card.days)||26)+'.':'')];
     if(N(card.washing)>0||N(card.special)>0) notes.push('Uniform, washing and special allowance are flat amounts per person per month.');
     return notes;
   }
@@ -1055,7 +1058,7 @@ function isCs(){ return (APP.card&&APP.card.format)!=='wagebreakup'; }
 function isKa(){ return (APP.card&&APP.card.format)==='ka'; }
 // starting rates for each format
 function formatDefaults(fmt){
-  if(fmt==='ka') return {format:'ka',pfPct:12,edliPct:1,esicPct:3.25,bonusPct:8.33,bonusCeiling:15000,leavePct:4.81,servicePct:8,gstPct:18,pfCeiling:0,uniform:500,washing:0,special:0,medical:0,training:0,leaveDays:0,natHolPct:0,relievePct:0,showExtra:false,extraHrs:4};
+  if(fmt==='ka') return {format:'ka',billBasis:'month',pfPct:12,edliPct:1,esicPct:3.25,bonusPct:8.33,bonusCeiling:15000,leavePct:4.81,servicePct:8,gstPct:18,pfCeiling:0,uniform:500,washing:0,special:0,medical:0,training:0,leaveDays:0,natHolPct:0,relievePct:0,showExtra:false,extraHrs:4};
   if(fmt==='wagebreakup') return {format:'wagebreakup',pfPct:13,esicPct:3.25,bonusPct:8.33,servicePct:7,gstPct:18,showExtra:false,extraHrs:4};
   var ceil=(state.settings.pfCeilingEnabled===false)?0:pfCeilNow(state.settings);
   return {format:'costsheet',pfPct:13,esicPct:3.25,bonusPct:8.33,servicePct:5,gstPct:18,pfCeiling:ceil,medical:300,uniform:250,training:200,leaveDays:21,natHolPct:1,relievePct:16.67,showExtra:false,extraHrs:4};
@@ -1084,7 +1087,7 @@ function cardForPdf(){
     pfPct:num(c.pfPct),esicPct:num(c.esicPct),bonusPct:num(c.bonusPct),servicePct:num(c.servicePct),gstPct:num(c.gstPct),
     empPfPct:num(c.empPfPct),empEsicPct:num(c.empEsicPct),showEmp:!!c.showEmp,showExtra:!!c.showExtra,extraHrs:num(c.extraHrs)||4,
     pfCeiling:num(c.pfCeiling),medical:num(c.medical),uniform:num(c.uniform),training:num(c.training),leaveDays:num(c.leaveDays),natHolPct:num(c.natHolPct),relievePct:num(c.relievePct),
-    edliPct:num(c.edliPct),bonusCeiling:num(c.bonusCeiling),leavePct:num(c.leavePct),washing:num(c.washing),special:num(c.special)};
+    edliPct:num(c.edliPct),bonusCeiling:num(c.bonusCeiling),leavePct:num(c.leavePct),washing:num(c.washing),special:num(c.special),billBasis:(c.billBasis==='perday')?'perday':'month'};
 }
 function rolesForPdf(){
   return APP.roles.map(function(r,i){ return {roleName:(r.roleName||'').trim()||('Column '+(i+1)),skill:r.skill||'',dutyHrs:num(r.dutyHrs)||8,basic:num(r.basic),vda:num(r.vda),
@@ -1096,7 +1099,7 @@ function ready(){ return APP.roles.some(function(r){ return num(r.basic)>0; }); 
 var CARD_FIELDS=[['cl_name','clientName'],['cl_email','clientEmail'],['rc_name','name'],['rc_state','state'],['rc_zone','zone'],['rc_place','place'],['rc_revision','revision'],['rc_hours','hours'],['rc_days','days'],
   ['rt_pf','pfPct'],['rt_esic','esicPct'],['rt_bonus','bonusPct'],['rt_ceil','pfCeiling'],['rt_medical','medical'],['rt_uniform','uniform'],['rt_training','training'],['rt_leave','leaveDays'],['rt_natHol','natHolPct'],['rt_relieve','relievePct'],
   ['rt_service','servicePct'],['rt_gst','gstPct'],['rt_epf','empPfPct'],['rt_eesic','empEsicPct'],['rt_extrahrs','extraHrs'],
-  ['rt_edli','edliPct'],['rt_bonusceil','bonusCeiling'],['rt_leavepct','leavePct'],['rt_washing','washing'],['rt_special','special']];
+  ['rt_edli','edliPct'],['rt_bonusceil','bonusCeiling'],['rt_leavepct','leavePct'],['rt_washing','washing'],['rt_special','special'],['rt_basis','billBasis']];
 function applyFormatUI(){
   var f=APP.card.format||'ka', cs=(f!=='wagebreakup'), ka=(f==='ka'), old=(f==='costsheet');
   document.querySelectorAll('.f-cs').forEach(function(el){ el.hidden=!cs; });
@@ -1145,7 +1148,7 @@ function renderTotals(){
   el.innerHTML='<h2>'+(ka?'Total monthly invoice amount per person':'Grand total per person per month')+'</h2>'+roles.map(function(r){
     var c=computeRole(card,r);
     return '<div class="tot"><span>'+esc(r.roleName)+(cs?' <span class="muted">('+r.dutyHrs+'h)</span>':'')+'</span><b>'+fmt2(ka?c.total:c.grandTotal)+'</b></div>';
-  }).join('')+'<div class="muted" style="margin-top:8px">'+(ka?'Service charge @ '+card.servicePct+'% and GST @ '+card.gstPct+'% are included.':'Service charge included. GST @ '+card.gstPct+'% is charged extra.')+'</div>';
+  }).join('')+'<div class="muted" style="margin-top:8px">'+(ka?'Service charge @ '+card.servicePct+'% and GST @ '+card.gstPct+'% are included.'+(card.billBasis==='perday'?' Billed per day: 1/'+(card.days||26)+' of this for each day paid.':''):'Service charge included. GST @ '+card.gstPct+'% is charged extra.')+'</div>';
 }
 function syncCardFromForm(){
   CARD_FIELDS.forEach(function(f){ APP.card[f[1]]=$(f[0]).value; });
@@ -1388,7 +1391,7 @@ function renderSaved(){
   if(!APP.saved.length){ el.innerHTML='<div class="card muted">No saved rate cards yet. Build one and tap Save this card.</div>'; return; }
   el.innerHTML=APP.saved.slice().sort(function(a,b){ return (b.updatedAt||0)-(a.updatedAt||0); }).map(function(rc){
     var tot=(rc.roles||[]).map(function(r){ return esc(r.roleName||'Column')+((rc.format==='costsheet'||rc.format==='ka')?' ('+(num(r.dutyHrs)||8)+'h)':'')+' '+fmt2(computeRole(rc,r).grandTotal); }).join(' &middot; ');
-    return '<div class="card saved"><div><b>'+esc(rc.name||'Rate card')+(rc.format==='ka'?'':' <span class="muted">(old structure)</span>')+'</b><span class="muted">'+(rc.clientName?esc(rc.clientName)+' &middot; ':'')+tot+'</span></div>'+
+    return '<div class="card saved"><div><b>'+esc(rc.name||'Rate card')+(rc.format==='ka'?(rc.billBasis==='perday'?' <span class="muted">(billed per day)</span>':''):' <span class="muted">(old structure)</span>')+'</b><span class="muted">'+(rc.clientName?esc(rc.clientName)+' &middot; ':'')+tot+'</span></div>'+
       '<div style="display:flex;gap:8px"><button type="button" class="btn sm" data-open="'+esc(rc.id)+'">Open</button><button type="button" class="btn sm ghost" data-rm="'+esc(rc.id)+'">Delete</button></div></div>';
   }).join('');
 }
@@ -1400,7 +1403,7 @@ function openSaved(id){
     hours:rc.hours||8,days:rc.days||26,pfPct:rc.pfPct,esicPct:rc.esicPct,bonusPct:rc.bonusPct,servicePct:rc.servicePct,gstPct:rc.gstPct,
     pfCeiling:rc.pfCeiling,medical:rc.medical,uniform:rc.uniform,training:rc.training,leaveDays:rc.leaveDays,natHolPct:rc.natHolPct,relievePct:rc.relievePct,
     empPfPct:rc.empPfPct!=null?rc.empPfPct:(state.settings.pfRate||12),empEsicPct:rc.empEsicPct!=null?rc.empEsicPct:(state.settings.esiRate||0.75),
-    edliPct:rc.edliPct,bonusCeiling:rc.bonusCeiling,leavePct:rc.leavePct,washing:rc.washing,special:rc.special,
+    edliPct:rc.edliPct,bonusCeiling:rc.bonusCeiling,leavePct:rc.leavePct,washing:rc.washing,special:rc.special,billBasis:(rc.billBasis==='perday')?'perday':'month',
     showEmp:rc.showEmp!==false,showExtra:!!rc.showExtra,extraHrs:rc.extraHrs||4});
   APP.roles=(rc.roles||[]).map(function(r){ return {roleName:r.roleName||'',skill:r.skill||'',dutyHrs:r.dutyHrs||8,basic:r.basic||'',vda:r.vda||'',specialAllowance:r.specialAllowance||'',extraHours:r.extraHours||'',washingAllowance:r.washingAllowance||'',uniform:r.uniform||''}; });
   APP.msgEdited=false; fillForm(); showView('vForm'); toast('Opened. Change anything, then preview.');
@@ -1471,7 +1474,7 @@ function defaultMessage(from){
   var card=cardForPdf(), roles=rolesForPdf(), name=(APP.card.clientName||'').trim(), cs=(card.format==='costsheet'||card.format==='ka'), ka=(card.format==='ka');
   var lines=roles.map(function(r){ var c=computeRole(card,r); return '  '+r.roleName+(cs?' ('+r.dutyHrs+' hrs duty)':'')+': Rs. '+fmt2(ka?c.total:c.grandTotal).replace('\u20b9',''); }).join('\n');
   return 'Dear '+(name?name+' Team':'Sir/Madam')+',\n\nThank you for your interest in Public Force Security Services. Please find attached our rate card ('+(card.name||'wage break-up')+') for security manpower services. We provide security services, manpower outsourcing and housekeeping and facility services PAN-India.\n\n'+
-    (ka?'Total monthly invoice amount per person (service charge and GST @ '+card.gstPct+'% included):\n':'Grand total per person per month (service charge included):\n')+lines+'\n\n'+(ka?'':'GST @ '+card.gstPct+'% is charged additionally as applicable.\n\n')+(profileSelected()?'I have also attached our company profile, which tells you more about who we are and how we work.\n\n':'')+
+    (ka?'Total monthly invoice amount per person (service charge and GST @ '+card.gstPct+'% included):\n':'Grand total per person per month (service charge included):\n')+lines+'\n\n'+(ka?'':'GST @ '+card.gstPct+'% is charged additionally as applicable.\n\n')+(ka&&card.billBasis==='perday'?'Billing is per day: the amounts above are for '+(card.days||26)+' days, and each day paid is billed at 1/'+(card.days||26)+' of them.\n\n':'')+(profileSelected()?'I have also attached our company profile, which tells you more about who we are and how we work.\n\n':'')+
     'We would be happy to discuss your requirements or arrange a site visit. Please reply to this email or call us on 99860 20293.\n\nWarm regards,\n'+senderLabel(from)+'\nPublic Force Security Services';
 }
 async function fnFetch(method,body){
