@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-At the bottom of the left menu a small line reads, for example, "Version: 6 Nov 2026, build 8". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+At the bottom of the left menu a small line reads, for example, "Version: 6 Nov 2026, build 9". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -738,3 +738,14 @@ GST (CGST Rule 46(b)) says a tax invoice number must be consecutive, **at most 1
 ### Things to know
 - Do not delete an invoice that was sent. GST wants consecutive numbers, and a deleted number leaves a gap.
 - The numbering settings are saved in their own records (collection invoiceCounters), so no database change is needed. They are part of the data backup and the restore.
+
+
+## PF and ESIC challans (or any document) with the invoice email
+
+When you attach additional documents to an invoice or billing pack email, **say what each file is**. Each file in the list has a choice: **PF challan or receipt**, **ESIC challan or receipt**, or **Other document**. The choice is guessed from the file name (a name with PF, EPF, ECR or TRRN reads as PF, ESIC or ESI as ESIC) and you can change it. The wording in the message then follows the files that are really attached, so the email never says a challan is attached when it is not, or the other way round.
+
+- **PF and ESIC attached:** the message gets a sentence after the bank details paragraph, for example "We have also attached the PF and ESIC challans and payment receipts for October 2026, as proof that the contributions for our staff have been paid." With only one of them it names that one. Other documents add "1 more document is attached as well", or "We have also attached 2 more documents with this email" when there are no challans.
+- **The month:** a box "PF and ESIC challans are for the month of" appears when a challan is attached. It starts at the month before the invoice month (an invoice for November starts at October), and you can change it.
+- **Files change, the sentence follows:** adding, removing, or changing the kind of a file updates the sentence, and it comes out again when the files do. Switching between invoice and payment reminder keeps it.
+- **If you have typed in the message yourself,** your text is never changed behind your back. A note offers a button, "Add it before Warm regards", and after that the sentence is updated in place while your own words stay.
+- Nothing is saved by this: it only writes the message. The wording of the sentence is in the program; ask for a change if you want it said differently.
