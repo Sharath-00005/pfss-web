@@ -381,7 +381,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <button class="navbtn" id="tabs-settings" data-tab="settings">Settings</button>
     <div class="grp" id="railTitle">Pay cycle</div>
     <ul class="rail" id="workflowRail"></ul>
-    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 7 Nov 2026, build 16</div>
+    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 7 Nov 2026, build 17</div>
   </nav>
 
   <div class="main-col">
@@ -1087,6 +1087,11 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         <div class="field"><label>Washing allowance (₹)</label><input type="number" id="rcWashing" step="0.01"></div>
         <div class="field"><label>Special allowance (₹)</label><input type="number" id="rcSpecial" step="0.01"></div>
       </div>
+    </div>
+    <div class="card rc-ka" style="margin:.6rem 0;background:var(--bg)">
+      <div style="font-weight:700">How the client is billed for the days</div>
+      <div class="field" style="margin-top:.4rem"><label for="rcBasis">Bill by</label><select id="rcBasis"><option value="month">Fixed monthly amount: the full amount for a full month, pro-rata by the days of the month</option><option value="perday">Per day: the monthly amount divided by the days per month above, for each day paid</option></select></div>
+      <div class="muted" style="font-size:.84rem">Choose <b>Per day</b> for a client whose rate is for 8 hours x 26 days: the table shows the amount for 26 days (for example 26,000), and the client pays 1/26 of it for every day paid, so 30,000 for a month of 30 days and 31,000 for 31 days. Days paid include weekly offs and holidays, and extra duties. The wage register and the invoice follow it.</div>
     </div>
     <div class="row">
       <div class="field"><label>Employee PF % (deducted from wages)</label><input type="number" id="rcEmpPf" step="0.01"></div>
@@ -2716,8 +2721,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     el('mailSite').innerHTML='<option value="">Choose site</option>'+sites.map(function(s){ return '<option value="'+escapeHtml(s)+'">'+escapeHtml(s)+'</option>'; }).join('');
     el('mailSite').value=k&&k.site?k.site:(sites.filter(function(s){ return c.name && s.toLowerCase().indexOf(String(c.name).toLowerCase().split(' ')[0])>-1; })[0]||'');
     el('mailMonth').value=inv.month||thisMonth();
-    el('mailRate').innerHTML='<option value="">Choose rate card</option>'+rateCards.map(function(r){ return '<option value="'+r.id+'">'+escapeHtml(r.name)+'</option>'; }).join('');
-    el('mailRate').value=(k&&k.rateCardId)||c.rateCardId||'';
+    el('mailRate').innerHTML='<option value="">Choose rate card</option>'+rateCards.map(function(r){ return '<option value="'+r.id+'">'+escapeHtml(rcLabelText(r))+'</option>'; }).join('');
+    el('mailRate').value=(k&&k.rateCardId)||c.defaultRateCardId||c.rateCardId||'';
     el('mailTo').value=c.email||''; el('mailCc').value=''; el('mailErr').textContent=''; el('mailHelp').style.display='none';
     mailExtra=[]; mailLineCur=''; mailSentTpl=mailSentStd(); mailSentEdited=false; el('mailSentOn').checked=true; mailSentFill(); renderMailFiles(); el('mailFiles').value=''; el('mailFileMsg').textContent=''; el('mailLineHint').style.display='none';
     el('mailFrom').innerHTML='<option value="">Loading...</option>'; el('btnMailSend').disabled=true;
@@ -5293,7 +5298,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 /*KA-BEGIN*/
   // ---- The Karnataka rate structure, May 2026 (the "Customer billing structure (CTC breakup)" and the employee take-home pay) ----
   // Every money line is rounded to the paisa, line by line, in the order of the table, so the lines add up exactly.
-  var KA_DEFAULTS = {pfPct:12, edliPct:1, esicPct:3.25, bonusPct:8.33, bonusCeiling:15000, leavePct:4.81, uniform:500, washing:0, special:0, servicePct:8, gstPct:18, pfCeiling:0, empPfPct:12, empEsicPct:0.75, hours:8, days:26};
+  var KA_DEFAULTS = {billBasis:'month', pfPct:12, edliPct:1, esicPct:3.25, bonusPct:8.33, bonusCeiling:15000, leavePct:4.81, uniform:500, washing:0, special:0, servicePct:8, gstPct:18, pfCeiling:0, empPfPct:12, empEsicPct:0.75, hours:8, days:26};
   function kaR2(x){ return Math.round((Number(x)||0)*100+1e-9)/100; }
   // One column of the structure. f is the share of the month worked (1 = a full month), used for the wage register.
   function computeKa(card, role, f){
@@ -5379,7 +5384,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var N=function(x){ return Number(x)||0; };
     var g=govCfg(), hrs=N(card.hours)||8, notes=['The Total Monthly Invoice Amount includes GST @ '+(N(card.gstPct))+'%.',
       'Rates are based on the Minimum Wages notification of the Karnataka Government'+(g&&g.edition?' ('+String(g.edition).replace(/\s*\(in force from[^)]*\)/,'')+')':'')+'. Any change in minimum wages, VDA, statutory contributions and/or taxes will be charged as per law.',
-      'Wage calculation is considered for '+hrs+' working hours per day and '+(N(card.days)||26)+' working days per month.'+(roles.some(function(r){ return (N(r.dutyHrs)||hrs)>hrs; })?' The Extra hrs line applies to the longer duty shown above the column.':'')];
+      'Wage calculation is considered for '+hrs+' working hours per day and '+(N(card.days)||26)+' working days per month.'+(roles.some(function(r){ return (N(r.dutyHrs)||hrs)>hrs; })?' The Extra hrs line applies to the longer duty shown above the column.':'')+(card.billBasis==='perday'?' Billing is per day: the amounts above are for '+(N(card.days)||26)+' days, and each day paid is billed at 1/'+(N(card.days)||26)+' of them, so a 30-day month is billed 30/'+(N(card.days)||26)+' of the amounts and a 31-day month 31/'+(N(card.days)||26)+'.':'')];
     if(N(card.washing)>0||N(card.special)>0) notes.push('Uniform, washing and special allowance are flat amounts per person per month.');
     return notes;
   }
@@ -5503,7 +5508,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     totalRow('GRAND TOTAL',sums(all),true);
     y+=8;
     if(y+70>LIMIT){ y=pdfHead(pb,true); }
-    pb.text(ML,y+6,'Amounts in Rs. Calculated from the rate card for the days worked (Pay Days). Total Billing includes the service charge and GST. Uniform, washing and special allowance are flat amounts.',6.6,{color:C.mute});
+    pb.text(ML,y+6,'Amounts in Rs. Calculated from the rate card for the days worked (Pay Days). '+(rc.billBasis==='perday'?'Billed per day: the monthly amount divided by '+(N(rc.days)||26)+', for each day paid. ':'')+'Total Billing includes the service charge and GST. Uniform, washing and special allowance are flat amounts.',6.6,{color:C.mute});
     pb.text(ML,y+44,'Prepared by',7.6,{color:C.mute}); pb.line(ML,y+38,ML+150,y+38,0.5,C.ink);
     pb.text(pb.W-24,y+44,'Authorised signatory (with seal)',7.6,{color:C.mute,align:'right'}); pb.line(pb.W-24-190,y+38,pb.W-24,y+38,0.5,C.ink);
   }
@@ -5591,7 +5596,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       var names = roles.map(function(r){ return escapeHtml(r.roleName||'Role'); }).join(', ') || '\u2014';
       var totals = roles.map(function(r){ return escapeHtml(r.roleName||'Role')+((rc.format==='costsheet'||rc.format==='ka')?' ('+(Number(r.dutyHrs)||rc.hours||8)+'h)':'')+': <b>'+fmt2(computeRole(rc,r).grandTotal)+'</b>'; }).join('<br>') || '\u2014';
       var tr=document.createElement('tr');
-      tr.innerHTML = '<td>'+escapeHtml(rc.name)+(rc.format==='ka'?'':' <span class="tag warn">old structure</span>')+'</td><td>'+escapeHtml(rc.state||'\u2014')+'</td>'+
+      tr.innerHTML = '<td>'+escapeHtml(rc.name)+(rc.format==='ka'?(rc.billBasis==='perday'?' <span class="tag info">billed per day</span>':''):' <span class="tag warn">old structure</span>')+'</td><td>'+escapeHtml(rc.state||'\u2014')+'</td>'+
         '<td>'+(rc.hours||8)+'h x '+(rc.days||26)+'d</td>'+
         '<td>'+names+'</td>'+
         '<td class="right">'+totals+'</td>'+
@@ -5612,7 +5617,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     document.getElementById('btnDownloadRc').addEventListener('click', downloadRateCard);
     document.getElementById('btnAddRole').addEventListener('click', function(){ addRoleBlock(null); });
     document.getElementById('btnRcToKa').addEventListener('click', function(){ copyRcToKa(document.getElementById('rcId').value); });
-    ['rcPf','rcEsic','rcBonus','rcEmpPf','rcEmpEsic','rcShowEmp','rcShowExtra','rcExtraHrs','rcService','rcGst','rcPfCeil','rcMedical','rcUniform','rcTraining','rcLeaveDays','rcNatHol','rcRelieve','rcPlace','rcRevision','rcName','rcHours','rcDays','rcState','rcEdli','rcBonusCeil','rcLeavePct','rcWashing','rcSpecial'].forEach(function(id){
+    ['rcPf','rcEsic','rcBonus','rcEmpPf','rcEmpEsic','rcShowEmp','rcShowExtra','rcExtraHrs','rcService','rcGst','rcPfCeil','rcMedical','rcUniform','rcTraining','rcLeaveDays','rcNatHol','rcRelieve','rcPlace','rcRevision','rcName','rcHours','rcDays','rcState','rcEdli','rcBonusCeil','rcLeavePct','rcWashing','rcSpecial','rcBasis'].forEach(function(id){
       document.getElementById(id).addEventListener('input', renderRcPreview);
     });
     document.getElementById('rcFormat').addEventListener('change', function(){
@@ -5652,7 +5657,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       var d=KA_DEFAULTS;
       set('rcPf',d.pfPct); set('rcEdli',d.edliPct); set('rcEsic',d.esicPct); set('rcBonus',d.bonusPct); set('rcBonusCeil',d.bonusCeiling); set('rcLeavePct',d.leavePct);
       set('rcPfCeil',0); set('rcUniform',d.uniform); set('rcWashing',d.washing); set('rcSpecial',d.special); set('rcService',d.servicePct); set('rcGst',d.gstPct);
-      set('rcMedical',0); set('rcTraining',0); set('rcLeaveDays',0); set('rcNatHol',0); set('rcRelieve',0);
+      set('rcMedical',0); set('rcTraining',0); set('rcLeaveDays',0); set('rcNatHol',0); set('rcRelieve',0); set('rcBasis','month');
     } else if(format==='costsheet'){
       set('rcPf',13); set('rcEsic',3.25); set('rcBonus',8.33); set('rcService',5); set('rcGst',18);
       set('rcPfCeil',(state.settings.pfCeilingEnabled===false)?0:pfCeilNow());
@@ -5705,7 +5710,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       showEmp: g('rcShowEmp').checked, showExtra: g('rcShowExtra').checked, extraHrs: Number(g('rcExtraHrs').value)||4,
       pfCeiling: n('rcPfCeil'), medical: n('rcMedical'), uniform: n('rcUniform'), training: n('rcTraining'),
       leaveDays: n('rcLeaveDays'), natHolPct: n('rcNatHol'), relievePct: n('rcRelieve'),
-      edliPct: n('rcEdli'), bonusCeiling: n('rcBonusCeil'), leavePct: n('rcLeavePct'), washing: n('rcWashing'), special: n('rcSpecial'),
+      edliPct: n('rcEdli'), bonusCeiling: n('rcBonusCeil'), leavePct: n('rcLeavePct'), washing: n('rcWashing'), special: n('rcSpecial'), billBasis: (g('rcBasis').value==='perday')?'perday':'month',
       servicePct: n('rcService'), gstPct: n('rcGst')
     };
   }
@@ -5780,6 +5785,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       roles.forEach(function(r,i){ var v=d[3](r,computed[i]); html += '<td class="right">'+((duty&&v===0)?'-':fmt2(v))+'</td>'; });
       html += '</tr>';
     });
+    if(ka && card.billBasis==='perday') html += '<tr><td colspan="'+(3+roles.length)+'" class="muted">Billed per day: each day paid is billed at 1/'+(Number(card.days)||26)+' of these amounts, so a 30-day month is '+(Math.round(3000/(Number(card.days)||26))/100)+' times and a 31-day month '+(Math.round(3100/(Number(card.days)||26))/100)+' times.</td></tr>';
     if(!ka){
       var blank=cs?'':'<td></td>';
       html += '<tr>'+blank+'<td>+ GST @ '+(Number(card.gstPct)||0)+'% (charged additionally)</td><td>'+(Number(card.gstPct)||0)+'%</td>'+computed.map(function(c){return '<td class="right">'+fmt2(c.gstAmt)+'</td>';}).join('')+'</tr>';
@@ -5810,7 +5816,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       setIf('rcPf',rc.pfPct); setIf('rcEsic',rc.esicPct); setIf('rcBonus',rc.bonusPct); setIf('rcService',rc.servicePct); setIf('rcGst',rc.gstPct);
       setIf('rcPfCeil',rc.pfCeiling); setIf('rcMedical',rc.medical); setIf('rcUniform',rc.uniform); setIf('rcTraining',rc.training);
       setIf('rcLeaveDays',rc.leaveDays); setIf('rcNatHol',rc.natHolPct); setIf('rcRelieve',rc.relievePct);
-      setIf('rcEdli',rc.edliPct); setIf('rcBonusCeil',rc.bonusCeiling); setIf('rcLeavePct',rc.leavePct); setIf('rcWashing',rc.washing); setIf('rcSpecial',rc.special);
+      setIf('rcEdli',rc.edliPct); setIf('rcBonusCeil',rc.bonusCeiling); setIf('rcLeavePct',rc.leavePct); setIf('rcWashing',rc.washing); setIf('rcSpecial',rc.special); el('rcBasis').value=(rc.billBasis==='perday')?'perday':'month';
     }
     el('rcEmpPf').value = (rc && rc.empPfPct!=null) ? rc.empPfPct : (state.settings.pfRate||12);
     el('rcEmpEsic').value = (rc && rc.empEsicPct!=null) ? rc.empEsicPct : (state.settings.esiRate||0.75);
@@ -6131,7 +6137,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     document.getElementById('clAddress').value = c?c.address:'';
     var rcSel=document.getElementById('clRateCard');
     rcSel.innerHTML = '<option value="">None</option>' + rateCards.map(function(rc){
-      return '<option value="'+rc.id+'">'+escapeHtml(rc.name)+'</option>';
+      return '<option value="'+rc.id+'">'+escapeHtml(rcLabelText(rc))+'</option>';
     }).join('');
     rcSel.value = c?(c.defaultRateCardId||''):'';
     document.getElementById('clGstExempt').checked = c? !!c.gstExempt : false;
@@ -6765,7 +6771,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     document.getElementById('ctTerms').value=k?(k.terms==null?30:k.terms):30;
     document.getElementById('ctService').value=k?(k.servicePct==null?'':k.servicePct):(state.settings.costing&&state.settings.costing.servicePct||'');
     var rs=document.getElementById('ctRate');
-    rs.innerHTML='<option value="">None</option>'+rateCards.map(function(r){return '<option value="'+r.id+'">'+escapeHtml(r.name)+'</option>';}).join('');
+    rs.innerHTML='<option value="">None</option>'+rateCards.map(function(r){return '<option value="'+r.id+'">'+escapeHtml(rcLabelText(r))+'</option>';}).join('');
     rs.value=k?k.rateCardId||'':'';
     document.getElementById('ctNotes').value=k?k.notes||'':'';
     document.getElementById('ctBasis').value=k?(k.billingBasis||'rate'):'rate';
@@ -8491,7 +8497,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   // One employee's share of the rate card for the days worked (the columns of the wage register).
   function employeeBilling(card, rr, pay, dim, e){
     if(card.format==='ka'){
-      var k=computeKa(card, rr, pay/dim);
+      // fixed monthly amount: the share is days paid over the days of the month; per day: days paid over the days per month of the card (26)
+      var k=computeKa(card, rr, pay/((card.billBasis==='perday')?(Number(card.days)||26):dim));
       return {ka:true, basic:k.basic, da:k.da, gC:k.gross, extra:k.extra, wages:k.wages, gross:k.wages, pf:k.pf, edli:k.edli, esic:k.esic, bonus:k.bonus, leave:k.leave, statutory:k.statutory,
         uniform:k.uniform, washing:k.washing, special:k.special, tdc:k.tdc, service:k.service, ctc:k.ctc, gst:k.gst, billing:k.total, scamt:k.tdc,
         pf12:k.empPf, esic075:k.empEsic, esicOn:k.esicOn, pt:(e&&pay>0)?k.pt:0};
@@ -8779,8 +8786,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     sel.value=guess;
     document.getElementById('packMonth').value=inv.month||thisMonth();
     var rs=document.getElementById('packRate');
-    rs.innerHTML='<option value="">Choose rate card</option>'+rateCards.map(function(r){return '<option value="'+r.id+'">'+escapeHtml(r.name)+'</option>';}).join('');
-    rs.value=(k&&k.rateCardId)||client.rateCardId||'';
+    rs.innerHTML='<option value="">Choose rate card</option>'+rateCards.map(function(r){return '<option value="'+r.id+'">'+escapeHtml(rcLabelText(r))+'</option>';}).join('');
+    rs.value=(k&&k.rateCardId)||client.defaultRateCardId||client.rateCardId||'';
     document.getElementById('packInfo').textContent='Invoice '+(inv.invoiceNo||'')+' for '+(client.name||'')+'. Choose the site, month and rate card the per-employee breakdown should use.';
     var w=document.getElementById('packWarn'); w.style.display='none'; w.innerHTML='';
     var pc=document.getElementById('packCheck'); pc.style.display='none'; pc.innerHTML=''; document.getElementById('packModal').style.maxWidth='560px';
@@ -8817,8 +8824,12 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       var r=data.rows[i], e=r.e, b=r.b;
       if(!b){ out.push({e:e, noRole:true, match:false, reasons:['This person has no matching role on the rate card, so the register leaves them out. Payroll still pays them.']}); continue; }
       var p=await computePayroll(e,ym), regDays=r.att.payB, payDays=p.present+p.extraDuty+p.holidayDuty, reasons=[];
-      var regMonthly=regDays>0?b.gross*dim/regDays:0, payMonthly=p.present>0?p.baseGross*dim/p.present:0;
-      if(regDays>0 && p.present>0 && Math.abs(regMonthly-payMonthly)>TOL) reasons.push('The rate card pays '+M(regMonthly)+' a month for this role, but this person is paid '+M(payMonthly)+' a month in Payroll.');
+      var perday=(rc.billBasis==='perday'), bd=perday?(Number(rc.days)||26):dim, M2=function(x){ return '\u20b9'+(Math.round(x*100)/100).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); };
+      var regMonthly=regDays>0?b.gross*bd/regDays:0, payMonthly=p.present>0?p.baseGross*bd/p.present:0;
+      if(regDays>0 && p.present>0 && Math.abs(regMonthly-payMonthly)>TOL){
+        if(perday) reasons.push('The rate card is billed per day: '+M2(regMonthly/bd)+' a day ('+M(regMonthly)+' for '+bd+' days), but this person is paid '+M2(payMonthly/bd)+' a day in Payroll. Set their pay as a daily wage of '+M2(regMonthly/bd)+' to match.');
+        else reasons.push('The rate card pays '+M(regMonthly)+' a month for this role, but this person is paid '+M(payMonthly)+' a month in Payroll.');
+      }
       if(Math.abs(regDays-payDays)>0.001){
         if(st.billExtraDuty===false && (p.extraDuty+p.holidayDuty)>0) reasons.push('Extra duties are not counted in the register, because "count extra duties in client billing" is off in Settings.');
         else reasons.push('The register counts '+regDays+' days and Payroll '+payDays+' days.');
@@ -9093,6 +9104,22 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   function exOf(id,ym){ return extrasMap[id+'|'+ym]||{}; }
 
   // ---------- validation checks (step 4) ----------
+  // the name of a rate card in a list, with how the client is billed when it is per day
+  function rcLabelText(r){ return (r.name||'')+((r.format==='ka' && r.billBasis==='perday')?' (billed per day)':''); }
+  // the rate card (new structure) that bills this person's site, found through the contract of the site
+  function billingCardOf(e){
+    var ks=contracts.filter(function(k){ return k.site===e.site && k.rateCardId; });
+    for(var i=0;i<ks.length;i++){ var rc=rateCards.find(function(r){ return r.id===ks[i].rateCardId; }); if(rc && rc.format==='ka' && findRcRole(rc,e.role,e.dutyHrs)) return rc; }
+    return null;
+  }
+  // a person whose pay type does not follow how the client is billed: per day needs a daily wage, a fixed monthly amount needs a monthly wage
+  function payBasisMismatch(e){
+    var rc=billingCardOf(e); if(!rc) return '';
+    var daily=(e.wageType==='daily'), perday=(rc.billBasis==='perday');
+    if(perday && !daily) return 'The client ('+rc.name+') is billed per day, but this person is paid a monthly wage. Pay a daily wage so that a month of 30 or 31 days is paid as the client pays it.';
+    if(!perday && daily) return 'The client ('+rc.name+') is billed a fixed monthly amount, but this person is paid a daily wage. In a month of 31 days that pays more than is billed.';
+    return '';
+  }
   function cycChecks(ym){
     var run=cycRun(ym), out=[], seen={}, st=state.settings;
     ((run&&run.rows)||[]).forEach(function(r){
@@ -9107,6 +9134,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       if(e.esiApplicable && !((r.esi||0)>0) && (r.present>0)) add('warn','Marked ESI applicable, but pay is above the ESI limit, so no ESI is deducted.');
       var basicEarned=r.struct ? ((r.basicPay||0)+(r.daPay||0)) : ((r.gross||0)-(r.otPay||0)-(r.nightPay||0)-(r.addPay||0))*empBasicPct(e,st)/100;
       if(e.pfApplicable && st.pfCeilingEnabled && basicEarned>pfCeilNow()) add('warn','Basic pay is above the PF wage ceiling. PF is limited to '+fmtMoney(pfCeilNow()*(st.pfRate||12)/100)+'.');
+      var bm=payBasisMismatch(e); if(bm) add('warn',bm);
       if((r.otHrs||0)>(st.otWarnHours||50)) add('warn','Overtime of '+r.otHrs+' hours is unusually high.');
       if(((r.extraDuty||0)+(r.holidayDuty||0))>XD_WARN) add('warn','Extra duty and holiday work of '+dutyNum((r.extraDuty||0)+(r.holidayDuty||0))+' duties in the month is unusually high. Please check the days marked.');
       var acct=String(e.bankAcc||'').replace(/\s/g,''); if(acct) (seen[acct]=seen[acct]||[]).push(r.name);

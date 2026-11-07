@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-At the bottom of the left menu a small line reads, for example, "Version: 7 Nov 2026, build 16". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+At the bottom of the left menu a small line reads, for example, "Version: 7 Nov 2026, build 17". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -840,3 +840,22 @@ The card stays on one page where it can: when the table, the notes and the signa
 - If no signature image has been saved in Settings (Authorised signatory, signature and stamps), the downloaded PDF has a blank signature line, as before.
 - This applies to every rate card PDF, in the new structure and in the two old ones. Invoices, payslips and letters are not changed.
 - The notes and the signature stay on the same page as the table whenever they fit: rows are made slightly tighter when needed, and only a card that is still too long moves the notes and the signature to a second page.
+
+
+## Two kinds of client: a rate for the full month, and a rate per day (8 hours x 26 days)
+
+Some clients pay a **fixed amount for the month**. Others have a rate for **8 hours x 26 days** and pay for **every day** of the month: for a monthly amount of 26,000 that is 26,000 for 26 days, **30,000 for 30 days and 31,000 for 31 days**. Both kinds can be in use at the same time. How a client is billed is set **on its rate card**, and **the pay type of the people at that client must follow it**.
+
+| | Rate for the full month (the default) | Rate per day (8 x 26) |
+|---|---|---|
+| **Rate card, "Bill by"** | Fixed monthly amount | Per day |
+| **What the client pays** | The same amount in every month for a full month, for example 26,000 in a month of 28, 30 or 31 days. A part month is pro-rata by the days of the month. | The monthly amount divided by the days per month on the card (26), for each day paid: 26,000 for 26 days, 30,000 for 30 days, 31,000 for 31 days. |
+| **Pay type of the people** | **Monthly wage.** The same pay every month. An absent day takes off one day of the month (wage divided by the days of the month). | **Daily wage** (the monthly amount divided by 26, a day's pay). Pay is the daily wage x the days paid: 28 days, 30 days or 31 days of pay. |
+| **Wage register and invoice** | The share of the monthly structure for the days paid out of the days of the month. | The share of the monthly structure for the days paid out of the 26 days, so 30 days paid is 30/26 of it. |
+
+- **Days paid** are all the days of the month except days absent without pay, so weekly offs and holidays are paid, and extra duties are added (the setting "Count extra duties in client billing" decides whether they are billed).
+- **Where to set it:** the rate card (Rate Card, open the card, the box "How the client is billed for the days"; on the phone app, Rates and options, "Bill by"). Every existing rate card stays "Fixed monthly amount", so nothing changes until you choose Per day for a card. A new card also starts as fixed monthly. The contract of the client must use the right card. The per-day basis is available for rate cards in the new structure.
+- **You can see it everywhere:** a per-day card is tagged "billed per day" in the Rate Card list and "(billed per day)" in every list where a rate card is chosen (billing pack, email, contract, client). The rate card table is followed by a line saying each day paid is billed at 1/26, the PDF has a note ("a 30-day month is billed 30/26 of the amounts and a 31-day month 31/26"), the email message from the phone app says it too, and the wage register has a line at the foot.
+- **A pay type that does not follow the billing is flagged:** in the pay cycle checks (a warning, which does not stop the payroll), "The client (card) is billed per day, but this person is paid a monthly wage" and "The client (card) is billed a fixed monthly amount, but this person is paid a daily wage". The warning looks at the contract of the person's site and the role on its rate card. **Check against payroll** in the billing pack says the same in words ("Set their pay as a daily wage of 782.70 to match") and shows the difference per person.
+- **For a daily-wage person** the Basic + D.A. box in the employee record should hold the same amount as the daily wage, so that PF is worked out on the whole wage.
+- **ESI, to confirm with your consultant:** the pay cycle decides each month whether ESI applies from that month's pay. A daily-wage person paid for 31 days can cross the ESI limit in a long month although the pay for 26 days is below it. ESIC rules decide coverage for a whole contribution period, so ask your CA or ESIC consultant how you want this treated; it is not changed here.
