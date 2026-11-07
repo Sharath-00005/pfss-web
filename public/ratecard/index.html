@@ -422,6 +422,23 @@ var COMPANY={tradeName:'PUBLIC FORCE SECURITY SERVICES', legalName:'Satish Kumar
     pb.text(MR,y+10,'For '+COMPANY.tradeName,9,{bold:true,align:'right'});
     if(left){ pb.line(ML,y+34,ML+170,y+34,0.6,PDFC.ink); pb.text(ML,y+46,left,8.6,{color:PDFC.mute}); }
   }
+  // how much room the notes and the signature block need at the foot of a rate card
+  function pdfSigNeed(cg){ if(cg) return 42; var sg=(state.settings&&state.settings.signature)||{}; return (sg.b64 && sg.w && sg.h)?88:60; }
+  function pdfNotesNeed(pb,notes,CW,cg){ var n=0; notes.forEach(function(t,i){ n+=pb.wrap((i+1)+'. '+t,CW,8.4,false).length; }); return 14+n*11+pdfSigNeed(cg); }
+  // like pdfSign, with the authorised signatory's signature image (saved in Settings) above the line when there is one.
+  // cg (a rate card sent by email) has no signature: it says the document is computer generated instead.
+  function pdfSignImg(pb,y,ML,MR,left,right,cg){
+    if(cg){ pb.text(MR,y+10,'For '+COMPANY.tradeName,9,{bold:true,align:'right'}); pb.text(MR,y+28,'This is a computer-generated rate card and does not require a signature.',8.6,{align:'right',color:PDFC.mute}); return; }
+    var sg=(state.settings&&state.settings.signature)||{}, has=!!(sg.b64 && sg.w && sg.h);
+    pb.text(MR,y+10,'For '+COMPANY.tradeName,9,{bold:true,align:'right'});
+    if(has){
+      var r=sg.w/sg.h, hh=Math.min(42,150/r), ww=hh*r, idx=pb.addImage(pdfB64Bytes(sg.b64),sg.w,sg.h);
+      pb.imageX(idx,MR-85-ww/2,y+16+(42-hh),ww,hh);
+    }
+    var ly=has?y+62:y+34;
+    pb.line(MR-170,ly,MR,ly,0.6,PDFC.ink); pb.text(MR,ly+12,right,8.6,{align:'right',color:PDFC.mute});
+    if(left){ pb.line(ML,ly,ML+170,ly,0.6,PDFC.ink); pb.text(ML,ly+12,left,8.6,{color:PDFC.mute}); }
+  }
   async function pdfSave(blob,fname){
     if(downloadsCap){ try{ await downloadsCap.save({filename:fname,data:blob}); return; }catch(err){ if(err&&err.code==='declined') return; } }
     var url=URL.createObjectURL(blob), a=document.createElement('a'); a.href=url; a.download=fname; document.body.appendChild(a); a.click(); a.remove();
@@ -470,10 +487,10 @@ var COMPANY={tradeName:'PUBLIC FORCE SECURITY SERVICES', legalName:'Satish Kumar
       'Wage calculation is considered for '+card.hours+' working hours per day and '+card.days+' working days per month.'];
     if(card.showExtra) notes.push('The Extra '+(Number(card.extraHrs)||4)+' Hours line covers '+(Number(card.extraHrs)||4)+' additional working hours per day.');
     if(card.showEmp!==false) notes.push('Employee deductions and in-hand salary are shown for reference. They are paid from the Total Wages and are not added to the bill.');
-    if(y+notes.length*12+80>LIMIT){ y=pdfHead(pb); }
+    if(y+notes.length*12+14+pdfSigNeed(!!(meta&&meta.computerGenerated))>LIMIT){ y=pdfHead(pb); }
     pb.text(ML,y+8,'Note:',8.8,{bold:true,color:C.goldDk}); y+=14;
     notes.forEach(function(t,i){ pb.wrap((i+1)+'. '+t,CW,8.4,false).forEach(function(l){ pb.text(ML,y+8,l,8.4,{color:C.mute}); y+=11; }); });
-    pdfSign(pb,y+10,ML,MR,null,'Authorised signatory, '+pdfSignatory().name+', '+pdfSignatory().role);
+    pdfSignImg(pb,y+10,ML,MR,null,'Authorised signatory',!!(meta&&meta.computerGenerated));
     pdfFoot(pb,'Computer-generated rate card');
     return pb.build();
   }
@@ -527,10 +544,10 @@ var COMPANY={tradeName:'PUBLIC FORCE SECURITY SERVICES', legalName:'Satish Kumar
     var notes=['GST @ '+(Number(card.gstPct)||0)+'% will be charged additional as applicable.',
       'Rates are based on the Minimum Wages notification of the Karnataka Government. Any change in minimum wages, VDA, statutory contributions and/or taxes will be charged as per law.',
       'Wage calculation is considered for '+(card.hours||8)+' working hours per day and '+(card.days||26)+' working days per month. The Extra hrs line applies to the longer duty shown above the column.'];
-    if(y+notes.length*24+80>LIMIT){ y=pdfHead(pb); }
+    if(y+pdfNotesNeed(pb,notes,CW,!!(meta&&meta.computerGenerated))>LIMIT){ y=pdfHead(pb); }
     pb.text(ML,y+8,'Note:',8.8,{bold:true,color:C.goldDk}); y+=14;
     notes.forEach(function(t,i){ pb.wrap((i+1)+'. '+t,CW,8.4,false).forEach(function(l){ pb.text(ML,y+8,l,8.4,{color:C.mute}); y+=11; }); });
-    pdfSign(pb,y+10,ML,MR,null,'Authorised signatory, '+pdfSignatory().name+', '+pdfSignatory().role);
+    pdfSignImg(pb,y+10,ML,MR,null,'Authorised signatory',!!(meta&&meta.computerGenerated));
     pdfFoot(pb,'Computer-generated rate card');
     return pb.build();
   }
@@ -894,6 +911,15 @@ var COMPANY={tradeName:'PUBLIC FORCE SECURITY SERVICES', legalName:'Satish Kumar
   }
 /*KA-ROWS-END*/
 /*KA-PDF-BEGIN*/
+  // the notes under a rate card in the new structure
+  function kaNotes(card,roles){
+    var N=function(x){ return Number(x)||0; };
+    var g=govCfg(), hrs=N(card.hours)||8, notes=['The Total Monthly Invoice Amount includes GST @ '+(N(card.gstPct))+'%.',
+      'Rates are based on the Minimum Wages notification of the Karnataka Government'+(g&&g.edition?' ('+String(g.edition).replace(/\s*\(in force from[^)]*\)/,'')+')':'')+'. Any change in minimum wages, VDA, statutory contributions and/or taxes will be charged as per law.',
+      'Wage calculation is considered for '+hrs+' working hours per day and '+(N(card.days)||26)+' working days per month.'+(roles.some(function(r){ return (N(r.dutyHrs)||hrs)>hrs; })?' The Extra hrs line applies to the longer duty shown above the column.':'')];
+    if(N(card.washing)>0||N(card.special)>0) notes.push('Uniform, washing and special allowance are flat amounts per person per month.');
+    return notes;
+  }
   // The rate card as a PDF: the table of the structure, one column for each role (the same lines as on the screen).
   function buildKaPdf(card,roles,computed,meta){
     var land=roles.length>4, pb=pdfNew(land), ML=36, CW=pb.W-72, MR=ML+CW, LIMIT=pb.H-78, C=PDFC;
@@ -905,40 +931,43 @@ var COMPANY={tradeName:'PUBLIC FORCE SECURITY SERVICES', legalName:'Satish Kumar
     if(card.name) pb.wrap(card.name,CW,9.6,true).forEach(function(l){ pb.text(pb.W/2,y+10,l,9.6,{bold:true,align:'center',color:C.goldDk}); y+=13; });
     y+=3; pb.rect(ML,y,CW,17,{fill:C.goldLt}); pb.text(pb.W/2,y+12,band,9,{bold:true,align:'center',color:C.goldDk}); y+=24;
     y=pdfMetaBand(pb,ML,CW,MR,y,meta,C);
-    var n=roles.length, ltrW=18, basisW=118, aw=Math.min(100,(CW-ltrW-basisW-170)/n), partW=CW-ltrW-basisW-aw*n, xl=ML, xp=ML+ltrW, xb=xp+partW, xa=xb+basisW, rh=15.5;
+    var n=roles.length, ltrW=18, basisW=118, aw=Math.min(100,(CW-ltrW-basisW-170)/n), partW=CW-ltrW-basisW-aw*n, xl=ML, xp=ML+ltrW, xb=xp+partW, xa=xb+basisW, rh=15;
     var lines=roles.map(function(r){ return pb.wrap(r.roleName||'Role',aw-8,8.2,true); });
     var nl=Math.max(2,Math.max.apply(null,lines.map(function(l){return l.length;}))), h1=nl*10+10;
     pb.rect(ML,y,CW,h1,{fill:C.ink});
-    pb.text(xl+ltrW/2,y+h1/2+3,'Line',7.6,{bold:true,color:C.white,align:'center'}); pb.text(xp+6,y+h1/2+3,'Customer billing structure (CTC breakup)'+(card.place?' - '+card.place:''),8.6,{bold:true,color:C.white}); pb.text(xb+basisW/2,y+h1/2+3,'Calculation basis / rate',7.8,{bold:true,color:C.white,align:'center'});
+    pb.text(xl+ltrW/2,y+h1/2+3,'Line',7.6,{bold:true,color:C.white,align:'center'}); pb.text(xp+6,y+h1/2+3,pdfFit(pb,'Customer billing structure (CTC breakup)',partW-10,8.6,true),8.6,{bold:true,color:C.white}); pb.text(xb+basisW/2,y+h1/2+3,'Calculation basis / rate',7.8,{bold:true,color:C.white,align:'center'});
     roles.forEach(function(r,i){ lines[i].forEach(function(l,k){ pb.text(xa+i*aw+aw/2,y+10+k*10,l,8.2,{bold:true,color:C.white,align:'center'}); }); });
     y+=h1;
     pb.rect(ML,y,CW,17,{fill:C.paper});
-    pb.text(xp+6,y+12,card.revision||'Monthly amount per person (Rs.)',8.4,{bold:true,color:C.goldDk});
+    pb.text(xp+6,y+12,pdfFit(pb,(card.revision||'Monthly amount per person (Rs.)')+(card.place?'  |  '+card.place:''),partW+basisW-10,8.4,true),8.4,{bold:true,color:C.goldDk});
     roles.forEach(function(r,i){ var d=N(r.dutyHrs)||N(card.hours)||8; pb.text(xa+i*aw+aw/2,y+12,d+' Hrs. Duty',8.2,{bold:true,align:'center'}); });
     y+=17;
+    // if the table, the notes and the signature would not fit on one page, the rows are made a little tighter (down to a floor)
+    var rowsData=kaRows(card,roles), nRows=0, nSec=0, nExtra=0, notes=kaNotes(card,roles);
+    rowsData.forEach(function(d){ if(d[4]==='section'){ nSec++; return; } nRows++; nExtra+=pb.wrap(d[1],partW-10,8.6,!!d[4]).length-1; });
+    var availRows=LIMIT-y-8-pdfNotesNeed(pb,notes,CW,!!(meta&&meta.computerGenerated))-12.5*nSec-9.5*nExtra;
+    if(nRows*rh>availRows) rh=Math.max(12.6,availRows/nRows);
     kaRows(card,roles).forEach(function(d){
-      if(y+rh>LIMIT){ y=pdfHead(pb); }
-      var st=d[4], col=C.ink, bold=!!st;
+      var st=d[4], col=C.ink, bold=!!st, lines=(st==='section')?[d[1]]:pb.wrap(d[1],partW-10,8.6,bold), rr=rh+(lines.length-1)*9.5;
+      if(y+rr>LIMIT){ y=pdfHead(pb); }
       if(st==='section'){ pb.rect(ML,y,CW,12.5,{fill:C.goldLt}); pb.text(xp+6,y+9,d[1].toUpperCase(),7.4,{bold:true,color:C.goldDk}); y+=12.5; return; }
-      if(st==='sub') pb.rect(ML,y,CW,rh,{fill:C.goldLt});
-      if(st==='sub2') pb.rect(ML,y,CW,rh,{fill:C.paper});
-      if(st==='net') pb.rect(ML,y,CW,rh,{fill:C.paper});
-      if(st==='grand'){ pb.rect(ML,y,CW,rh,{fill:C.ink}); col=C.white; }
-      if(d[0]) pb.text(xl+ltrW/2,y+rh-5,d[0],8.4,{bold:true,color:col,align:'center'});
-      pb.text(xp+6,y+rh-5,pdfFit(pb,d[1],partW-10,8.6,bold),8.6,{bold:bold,color:col});
-      if(d[2]) pb.text(xb+basisW/2,y+rh-5,pdfFit(pb,d[2],basisW-6,7.6,false),7.6,{align:'center',color:col});
-      roles.forEach(function(r,i){ var v=d[3](r,computed[i]); pb.text(xa+(i+1)*aw-8,y+rh-5,(v===0)?'-':pdfMoney(v),8.6,{bold:bold,color:col,align:'right'}); });
-      y+=rh; pb.line(ML,y,MR,y,0.35,C.line);
+      if(st==='sub') pb.rect(ML,y,CW,rr,{fill:C.goldLt});
+      if(st==='sub2') pb.rect(ML,y,CW,rr,{fill:C.paper});
+      if(st==='net') pb.rect(ML,y,CW,rr,{fill:C.paper});
+      if(st==='grand'){ pb.rect(ML,y,CW,rr,{fill:C.ink}); col=C.white; }
+      var by=(lines.length>1)?y+rr/2+3:y+rh-5;   // the baseline of the letter, the basis and the amounts
+      if(d[0]) pb.text(xl+ltrW/2,by,d[0],8.4,{bold:true,color:col,align:'center'});
+      lines.forEach(function(l,k){ pb.text(xp+6,(lines.length>1)?y+10+k*9.5:y+rh-5,l,8.6,{bold:bold,color:col}); });
+      if(d[2]) pb.text(xb+basisW/2,by,pdfFit(pb,d[2],basisW-6,7.6,false),7.6,{align:'center',color:col});
+      roles.forEach(function(r,i){ var v=d[3](r,computed[i]); pb.text(xa+(i+1)*aw-8,by,(v===0)?'-':pdfMoney(v),8.6,{bold:bold,color:col,align:'right'}); });
+      y+=rr; pb.line(ML,y,MR,y,0.35,C.line);
     });
-    y+=12;
-    var g=govCfg(), hrs=N(card.hours)||8, notes=['The Total Monthly Invoice Amount includes GST @ '+(N(card.gstPct))+'%.',
-      'Rates are based on the Minimum Wages notification of the Karnataka Government'+(g&&g.edition?' ('+g.edition+')':'')+'. Any change in minimum wages, VDA, statutory contributions and/or taxes will be charged as per law.',
-      'Wage calculation is considered for '+hrs+' working hours per day and '+(N(card.days)||26)+' working days per month.'+(roles.some(function(r){ return (N(r.dutyHrs)||hrs)>hrs; })?' The Extra hrs line applies to the longer duty shown above the column.':'')];
-    if(N(card.washing)>0||N(card.special)>0) notes.push('Uniform, washing and special allowance are flat amounts per person per month.');
-    if(y+notes.length*24+80>LIMIT){ y=pdfHead(pb); }
+    y+=8;
+    var notes=kaNotes(card,roles);
+    if(y+pdfNotesNeed(pb,notes,CW,!!(meta&&meta.computerGenerated))>LIMIT){ y=pdfHead(pb); }
     pb.text(ML,y+8,'Note:',8.8,{bold:true,color:C.goldDk}); y+=14;
     notes.forEach(function(t,i){ pb.wrap((i+1)+'. '+t,CW,8.4,false).forEach(function(l){ pb.text(ML,y+8,l,8.4,{color:C.mute}); y+=11; }); });
-    pdfSign(pb,y+10,ML,MR,null,'Authorised signatory, '+pdfSignatory().name+', '+pdfSignatory().role);
+    pdfSignImg(pb,y+10,ML,MR,null,'Authorised signatory',!!(meta&&meta.computerGenerated));
     pdfFoot(pb,'Computer-generated rate card');
     return pb.build();
   }
@@ -1393,10 +1422,10 @@ async function saveCard(){
 }
 
 /* ---------- the PDF: download, share, email ---------- */
-function makePdf(){
+function makePdf(forEmail){
   syncCardFromForm();
   var card=cardForPdf(), roles=rolesForPdf(), comp=roles.map(function(r){ return computeRole(card,r); });
-  return buildRateCardPdf(card,roles,comp,{client:(APP.card.clientName||'').trim(),date:pdfDate(isoToday())});
+  return buildRateCardPdf(card,roles,comp,{client:(APP.card.clientName||'').trim(),date:pdfDate(isoToday()),computerGenerated:!!forEmail});
 }
 function pdfFileName(){
   var base=(APP.card.clientName||APP.card.name||'RateCard').replace(/[^A-Za-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'RateCard';
@@ -1502,7 +1531,7 @@ async function sendEmail(){
     var body={from:$('sh_from').value,to:to,cc:$('sh_cc').value.trim(),subject:$('sh_subject').value,message:$('sh_msg').value,keepCopy:$('sh_copy').checked};
     if(po){ body.filename=PROFILE_FILE; body.pdfBase64=await blobToBase64(profileBlob()); }
     else {
-      var blob=makePdf(); body.filename=pdfFileName(); body.pdfBase64=await blobToBase64(blob);
+      var blob=makePdf(true); body.filename=pdfFileName(); body.pdfBase64=await blobToBase64(blob);
       if(profileSelected()){ btn.textContent='Preparing the company profile...'; body.extra=[{filename:PROFILE_FILE,pdfBase64:await blobToBase64(profileBlob())}]; }
     }
     btn.textContent='Sending...';
