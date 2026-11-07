@@ -119,6 +119,11 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 .daycell.A{background:var(--bad-soft);color:var(--bad);border-color:var(--bad)}
 .daycell.H{background:var(--warn-soft);color:var(--warn);border-color:var(--warn)}
 .daycell.L{background:var(--info-soft);color:var(--info);border-color:var(--info)}
+.daycell.D{background:var(--brand-soft);color:var(--brand);border-color:var(--brand);position:relative}
+.daycell.hol:not(.D):not(.A):not(.H):not(.L),.daycell.off:not(.D):not(.A):not(.H):not(.L){background-color:rgba(140,140,158,.34);color:var(--ink-soft,#555);border-color:rgba(120,120,140,.55)}
+.daycell.off{background-image:repeating-linear-gradient(135deg,transparent 0 4px,rgba(90,90,110,.30) 4px 7px)}
+.daycell.hol{box-shadow:inset 0 -3px 0 rgba(178,55,45,.75)}
+.daycell.D::after{content:"x" attr(data-duty);position:absolute;right:2px;bottom:1px;font-size:.5rem;font-weight:800;line-height:1}
 .empty-state{text-align:center;color:var(--muted);padding:2.5rem 1rem}
 .banner{border-radius:4px;padding:12px 16px;margin-top:18px;display:flex;gap:12px;align-items:center;flex-wrap:wrap;border:1px solid var(--line);font-size:.88rem}
 .banner.warn,.banner{background:var(--warn-soft);border-color:transparent;border-left:4px solid var(--signal);color:var(--warn)}
@@ -360,7 +365,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 <body>
 <div class="appshell">
   <nav class="side" id="sideNav">
-    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small></div></div>
+    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="appBuild" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Build 5 Nov 2026 · 44</small></div></div>
     <div class="grp">Menu</div>
     <button class="navbtn on" id="tabs-dashboard" data-tab="dashboard">Dashboard</button>
     <button class="navbtn" id="tabs-cycle" data-tab="cycle">Pay cycle</button>
@@ -376,6 +381,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <button class="navbtn" id="tabs-settings" data-tab="settings">Settings</button>
     <div class="grp" id="railTitle">Pay cycle</div>
     <ul class="rail" id="workflowRail"></ul>
+    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 6 Nov 2026, build 11</div>
   </nav>
 
   <div class="main-col">
@@ -450,7 +456,21 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         <div class="field"><label>Month</label><input type="month" id="attMonth"></div>
         <div class="field"><label>Site</label><select id="attSiteFilter"><option value="">All sites</option></select></div>
       </div>
-      <p class="muted">Click a day cell to cycle: Present → Absent (unpaid) → Half-day → Paid Leave → Present. Unmarked days count as Present. Use Paid Leave for approved vacation/earned leave that should NOT cut their pay.</p>
+      <p class="muted">Click a day cell to cycle: Present → Absent (unpaid) → Half-day → Paid Leave → 1.5 duties → 2 duties → Present. Unmarked days count as Present. Use Paid Leave for approved vacation/earned leave that should NOT cut their pay. Use 1.5 or 2 duties when someone worked more than one duty that day: each extra duty is paid as an extra day at the normal daily rate, and shows as a violet cell with the number of duties. Days that are a person's weekly off, or a company holiday for them, show with stripes and are paid as part of the wage. On those days click once for worked (the holiday is paid and one extra duty is added, shown as "Holiday work" on the payslip), twice for half a day worked, three times for absent (the holiday is not paid), and again to go back to a paid day off.</p>
+      <div id="attKey" class="muted" style="display:flex;flex-wrap:wrap;gap:.9rem;align-items:center;margin:.2rem 0 .7rem;font-size:.8rem"><span><span class="daycell P" style="cursor:default">P</span> present</span><span><span class="daycell A" style="cursor:default">A</span> absent</span><span><span class="daycell H" style="cursor:default">H</span> half day</span><span><span class="daycell L" style="cursor:default">L</span> paid leave</span><span><span class="daycell D" data-duty="2" style="cursor:default">D</span> extra duty</span><span><span class="daycell hol" style="cursor:default">2</span> company holiday (red mark)</span><span><span class="daycell off" style="cursor:default">4</span> weekly off or holiday that is a paid day off for the person</span></div>
+      <div id="holBox" style="margin:.2rem 0 .9rem;padding:.7rem .9rem;border:1px solid var(--line);border-radius:10px;background:var(--panel)">
+        <div style="font-weight:700">Company holidays in <span id="holMonthLabel"></span></div>
+        <div class="muted" style="font-size:.82rem;margin:.15rem 0 .4rem">They are days off for the people who have "Company holidays are paid days off" ticked on their employee record. A weekly off comes from each person's own weekly off day.</div>
+        <div class="pill-row" id="holList" style="margin:.2rem 0 .5rem"></div>
+        <div class="row" style="align-items:flex-end"><div class="field" style="max-width:190px"><label>Date</label><input type="date" id="holDate"></div><div class="field grow"><label>Name</label><input id="holName" maxlength="40" placeholder="For example, Deepavali"></div><button class="btn small" id="btnHolAdd" type="button">Add holiday</button></div>
+        <div id="holErr" style="color:var(--bad);min-height:1.2em;margin-top:.3rem" role="alert"></div>
+      </div>
+      <div id="offBox" style="margin:.2rem 0 .9rem;padding:.7rem .9rem;border:1px solid var(--line);border-radius:10px;background:var(--panel);display:none">
+        <div style="font-weight:700">Weekly off and company holidays for the people shown</div>
+        <div class="muted" style="font-size:.82rem;margin:.15rem 0 .4rem">This decides who gets Sundays and company holidays as paid days off, and who is paid extra for working them. Use the Site filter above to choose a site, then apply it to everyone listed. You can still change one person in their employee record.</div>
+        <div id="offNow" class="muted" style="font-size:.82rem;margin-bottom:.4rem"></div>
+        <div class="row" style="align-items:flex-end"><div class="field" style="max-width:220px"><label>Weekly off day</label><select id="offWeekly"><option value="">None, works any day</option><option value="0" selected>Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option></select></div><div class="field grow"><label><input type="checkbox" id="offHoliday" checked style="width:auto;margin-right:.4rem">Company holidays are paid days off</label></div><button class="btn small" id="btnOffApply" type="button">Apply</button></div>
+      </div>
       <div class="scrollx" id="attContainer"></div>
     </div>
 
@@ -618,7 +638,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <div class="card">
       <div class="row" style="justify-content:space-between">
         <h2>Invoices</h2>
-        <button class="btn" id="btnAddInvoice">+ New invoice</button>
+        <div class="row" style="gap:.5rem"><button class="btn ghost" id="btnInvNumbers" type="button">Invoice numbers</button><button class="btn" id="btnAddInvoice">+ New invoice</button></div>
       </div>
       <div class="row">
         <div class="field"><label>Client</label><select id="invClientFilter"><option value="">All clients</option></select></div>
@@ -641,6 +661,13 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       <p class="muted">What each client paid you (invoices before GST) set against what their staff cost the company, and any other costs you enter. It uses the contracts to find which client a site belongs to.</p>
       <div id="profOut"></div>
       <div class="row" style="margin-top:.6rem"><button class="btn ghost" id="btnProfitCsv" type="button">Download as CSV</button></div>
+    </div>
+
+    <div class="card" id="verifyCard">
+      <h2>Verify an invoice</h2>
+      <p class="muted">Every issued invoice PDF carries a Document ID and a QR code. Type or paste the ID, or the text the QR code gives, to check that it matches the invoice saved in this system and has not been changed since it was issued.</p>
+      <div class="row" style="align-items:flex-end"><div class="field grow"><label>Document ID or QR text</label><input id="vfInput" placeholder="INV-101-7K3D9Q2M4X1B" autocomplete="off"></div><button class="btn" id="btnVerify" type="button">Verify</button></div>
+      <div id="vfOut" style="margin-top:.8rem"></div>
     </div>
   </section>
 
@@ -770,19 +797,21 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 
     <div class="card">
       <h2>Overtime, night shifts and employer ESIC</h2>
-      <p class="muted">Used by the pay cycle. Overtime hours and night shifts are entered for each employee every month. Recalculate payroll after changing these.</p>
+      <p class="muted">Used by the pay cycle. Overtime hours and night shifts are entered for each employee every month. Extra duties (1.5 or 2 duties on one day) are marked in the daily Attendance, and each extra duty is paid as an extra day at the normal daily rate. Work on a person's weekly off or a company holiday is paid on top of the holiday pay already in the wage, at the rate set here (1 means a normal day). Recalculate payroll after changing these.</p>
       <div class="row">
         <div class="field"><label>Overtime multiplier</label><input type="number" step="0.1" id="setOtMult"></div>
-        <div class="field"><label>Night shift allowance (\u20b9 per shift)</label><input type="number" id="setNightAllow"></div>
+        <div class="field"><label>Night shift allowance (₹ per shift)</label><input type="number" id="setNightAllow"></div>
         <div class="field"><label>Employer ESIC %</label><input type="number" step="0.01" id="setEsiEr"></div>
         <div class="field"><label>Warn when overtime is over (hours)</label><input type="number" id="setOtWarn"></div>
+        <div class="field"><label>A duty worked on a weekly off or holiday is paid at (times the daily rate)</label><input type="number" step="0.5" min="0.5" id="setHolidayMult"></div>
       </div>
+      <div class="row" style="margin-top:.6rem"><label><input type="checkbox" id="setBillExtra" checked style="width:auto;margin-right:.4rem">Count extra duties (1.5 or 2 duties on one day) as days worked in client billing: the wage register, the attendance sheet and the man-days on invoices</label></div>
       <div class="row" style="margin-top:1rem"><button class="btn" id="btnSaveCycSettings">Save</button></div>
     </div>
 
     <div class="card">
-      <h2>Payslip signature and approval stamp</h2>
-      <p class="muted">Once a payroll is approved, every payslip downloaded from it carries the signature image below and an "Electronically approved" stamp showing who approved it, when, and a reference. Nothing needs signing by hand.</p>
+      <h2>Authorised signatory, signature and stamps</h2>
+      <p class="muted">The authorised signatory below is named on every invoice, payslip, payroll register and letter. Once a payroll is approved, every payslip downloaded from it carries the signature image and an "Electronically approved" stamp showing who approved it, when, and a reference. Every issued invoice carries the signature image and an "Electronically issued and authenticated" stamp with a Document ID and a QR code, which can be checked in Invoicing, Verify an invoice.</p>
       <div class="row">
         <div class="field grow"><label>Authorised signatory</label><input id="sigName"></div>
         <div class="field"><label>Designation</label><input id="sigDesig"></div>
@@ -956,6 +985,10 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       <div class="field"><label>Status</label><select id="fStatus"><option value="active">Active (working)</option><option value="left">Left the job</option></select></div>
       <div class="field" id="fLeftWrap1" style="display:none"><label>Last working day *</label><input type="date" id="fDol"></div>
       <div class="field" id="fLeftWrap2" style="display:none"><label>Reason for leaving</label><select id="fLeaveReason"><option value="">Select</option><option>Resigned</option><option>Terminated</option><option>Absconded</option><option>Contract ended</option><option>Site closed</option><option>Retired</option><option>Other</option></select></div>
+    </div>
+    <div class="row">
+      <div class="field"><label>Weekly off day</label><select id="fWeeklyOff"><option value="">None, works any day</option><option value="0">Sunday</option><option value="1">Monday</option><option value="2">Tuesday</option><option value="3">Wednesday</option><option value="4">Thursday</option><option value="5">Friday</option><option value="6">Saturday</option></select></div>
+      <div class="field grow"><label><input type="checkbox" id="fHolidayOff" style="width:auto;margin-right:.4rem">Company holidays are paid days off for this person</label><div class="muted" style="font-size:.78rem">On a weekly off or holiday, the day is paid as part of the wage. If the person works, the Attendance screen adds an extra duty on top.</div></div>
     </div>
     <div class="row">
       <div class="field"><label><input type="checkbox" id="fPf" style="width:auto;margin-right:.4rem">PF applicable</label></div>
@@ -1335,6 +1368,19 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       <div class="row"><div class="field grow"><label>Site</label><select id="mailSite"></select></div><div class="field"><label>Month</label><input type="month" id="mailMonth"></div></div>
       <div class="field"><label>Rate card (for the wage register)</label><select id="mailRate"></select></div>
     </div>
+    <div class="field" id="mailFilesBox"><label for="mailFiles">Additional documents (optional)</label>
+      <input type="file" id="mailFiles" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.csv,.txt">
+      <div id="mailFileList" style="margin-top:.4rem"></div>
+      <div id="mailSentBox" style="display:none;margin-top:.5rem">
+        <label class="chk" style="display:flex;gap:.45rem;align-items:center;font-size:.86rem"><input type="checkbox" id="mailSentOn" checked style="width:auto;min-height:0"> Mention the attached documents in the message</label>
+        <textarea id="mailSent" rows="2" aria-label="Sentence about the attached documents" style="width:100%;margin-top:.25rem"></textarea>
+        <div class="row" style="gap:.5rem;margin-top:.25rem"><button class="btn small ghost" type="button" id="btnMailSentSave">Keep this wording for every email</button><button class="btn small ghost" type="button" id="btnMailSentReset">Use the original wording</button></div>
+        <div class="muted" style="font-size:.76rem;margin-top:.2rem">You can change the sentence here for this email only. The month name is the month before the invoice month, and it moves on by itself when you keep the wording.</div>
+      </div>
+      <div id="mailLineHint" class="muted" style="display:none;font-size:.82rem;margin-top:.3rem"></div>
+      <div id="mailFileMsg" style="color:var(--bad);min-height:1.1em;font-size:.84rem" role="alert"></div>
+      <div class="muted" style="font-size:.78rem">For example a copy of the work order, a signed attendance sheet or a payment advice. Up to 10 files, about 10 MB each and 15 MB in all (a bigger email may be refused by the client's mail server). Photos are made smaller automatically. PDF, JPG, PNG, Word, Excel, CSV and text files can be attached. The message gets a sentence about them, which you can change.</div>
+    </div>
     <div class="field"><label>Send from</label><select id="mailFrom"></select></div>
     <div class="row">
       <div class="field grow"><label>To</label><input id="mailTo" placeholder="accounts@client.com"></div>
@@ -1401,7 +1447,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <h3 id="invModalTitle">New invoice</h3>
     <input type="hidden" id="invId">
     <div class="row">
-      <div class="field"><label>Invoice #</label><input id="invNo" readonly style="background:var(--panel);font-weight:700;color:var(--accent)"></div>
+      <div class="field"><label for="invNo">Invoice #</label><input id="invNo" maxlength="16" autocomplete="off" spellcheck="false" style="font-weight:700;color:var(--accent)"><div class="row" style="gap:.4rem;align-items:center;margin-top:.2rem"><button class="btn small ghost" id="btnInvNoNext" type="button" style="min-height:24px;padding:0 8px">Use the next number</button></div><div id="invNoHint" class="muted" style="font-size:.76rem;max-width:30ch;margin-top:.2rem"></div></div>
       <div class="field"><label>Client *</label><select id="invClient"></select></div>
       <div class="field"><label>Billing month</label><input type="month" id="invMonth"></div>
     </div>
@@ -1450,6 +1496,33 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       <button class="btn ghost" id="btnDownloadInvoice">Download PDF</button>
       <button class="btn" id="btnSaveInvoice">Save invoice</button>
     </div>
+  </div>
+</div>
+
+<div class="modal-bg" id="invNumModalBg">
+  <div class="modal" style="max-width:860px">
+    <button class="close-x" id="invNumClose">&times;</button>
+    <h3>Invoice numbers</h3>
+    <p class="muted">Invoices are numbered like <b>PFSS/26-27/0001</b>: a prefix, the financial year (April to March) and a running number that starts again at 0001 every financial year. GST allows at most 16 characters (letters, numbers, - and /), and a number cannot be used twice in a financial year.</p>
+    <div class="row">
+      <div class="field"><label for="invPrefix">Prefix</label><input id="invPrefix" maxlength="6" autocomplete="off" style="max-width:110px"></div>
+      <div class="field"><label for="invPad">Digits</label><select id="invPad"><option value="3">3 (001)</option><option value="4">4 (0001)</option><option value="5">5 (00001)</option></select></div>
+      <div class="field grow"><label>Looks like</label><div id="invExample" style="font-weight:700;padding:.5rem 0"></div></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="invNumFy">Financial year</label><select id="invNumFy"></select></div>
+      <div class="field"><label for="invNextNum">Next number</label><input type="number" id="invNextNum" min="1" step="1" style="max-width:130px"></div>
+      <div class="field grow"><label>&nbsp;</label><div id="invNumInfo" class="muted" style="font-size:.84rem"></div></div>
+    </div>
+    <div id="invNumErr" style="color:var(--bad);min-height:1.2em" role="alert"></div>
+    <div class="row" style="margin-top:.3rem"><button class="btn" id="btnInvNumSave" type="button">Save</button></div>
+    <p class="muted" style="font-size:.82rem">Set the next number when you start the system part-way through a year, for example after invoices 1 to 10 were made outside it. It cannot go below the highest number already used. Saving an invoice moves it on by itself, and the number of a deleted invoice is not given out again.</p>
+    <hr style="border:0;border-top:1px solid var(--line);margin:1rem 0">
+    <h4 style="margin:0 0 .3rem">Renumber existing invoices</h4>
+    <p class="muted" style="margin-top:0">These invoices are not yet in the format above for the financial year of their invoice date. Tick the ones to renumber. They are numbered in date order, after the highest number already used. Drafts are ticked. Invoices that were already sent are not, because the client has the old number.</p>
+    <div id="renumBox"></div>
+    <div id="renumNote" style="color:#8a5a00;min-height:1.2em;margin-top:.4rem"></div>
+    <div class="row" style="margin-top:.4rem"><button class="btn" id="btnRenumApply" type="button" style="display:none">Renumber</button></div>
   </div>
 </div>
 
@@ -1577,6 +1650,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     setupGroupsUI();
     setupRestoreUI();
     setupProfitUI();
+    setupVerifyUI();
+    setupHolidaysUI();
     setupAddPayUI();
     setupPayUI();
     setupAttendanceUI();
@@ -1670,6 +1745,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         });
         document.body.classList.remove('menu');
         if(b.dataset.tab==='cycle'){ renderCycle(); }
+        if(b.dataset.tab==='payroll'){ renderPayroll(); }   // so changes made in Attendance show up when the tab is opened
       });
     });
   }
@@ -1882,6 +1958,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     document.getElementById('fBasicDa').value = bdv;
     setTimeout(function(){ syncBasicDa(); renderFormPayPreview(); },0);
     document.getElementById('fEsi').checked = e? !!e.esiApplicable : true;
+    document.getElementById('fWeeklyOff').value = (e && e.weeklyOff!=null) ? String(e.weeklyOff) : '';
+    document.getElementById('fHolidayOff').checked = !!(e && e.holidayOff);
     document.getElementById('fDoj').value = e? (e.doj||'') : xToday();
     document.getElementById('fStatus').value = (e && e.active===false) ? 'left' : 'active';
     document.getElementById('fDol').value = e? (e.dol||'') : '';
@@ -1942,6 +2020,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       basicDaAmt:payStdOn()?null:bpVal,
       basicPct:null,
       esiApplicable:document.getElementById('fEsi').checked,
+      weeklyOff:document.getElementById('fWeeklyOff').value,
+      holidayOff:document.getElementById('fHolidayOff').checked,
       active:!leftV,
       doj:dojV,
       dol:leftV?dolV:'',
@@ -2436,26 +2516,182 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     return out;
   }
   function invOverdue(inv){ var today=new Date().toISOString().slice(0,10); return !!(inv.status!=='paid' && inv.dueDate && inv.dueDate<today); }
+  // extra documents that go with the invoice or the billing pack
+  var MAIL_EXTRA_MAX=10, MAIL_FILE_BYTES=10000000, MAIL_TOTAL_BYTES=15000000, MAIL_EXTS=['pdf','jpg','jpeg','png','doc','docx','xls','xlsx','csv','txt'];
+  // the older way (files sent inside the request) keeps its small limits: it is used only when the storage step has not been done yet
+  var MAIL_OLD_COUNT=4, MAIL_OLD_FILE=3000000, MAIL_OLD_TOTAL=7000000, MAIL_TOTAL_B64=9600000;
+  var MAIL_MIME={pdf:'application/pdf',jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',doc:'application/msword',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',xls:'application/vnd.ms-excel',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',csv:'text/csv',txt:'text/plain'};
+  var mailExtra=[];   // {name, size, blob, kind}
+  async function mailContentOk(blob, ext){
+    var buf; try{ buf=new Uint8Array(await blob.slice(0,2000).arrayBuffer()); }catch(e){ return true; }   // if it cannot be read here, the email service checks it again
+    var starts=function(sig){ for(var i=0;i<sig.length;i++) if(buf[i]!==sig[i]) return false; return true; };
+    if(ext==='pdf') return starts([0x25,0x50,0x44,0x46]);
+    if(ext==='png') return starts([0x89,0x50,0x4E,0x47]);
+    if(ext==='jpg'||ext==='jpeg') return starts([0xFF,0xD8,0xFF]);
+    if(ext==='docx'||ext==='xlsx') return starts([0x50,0x4B,0x03,0x04]);
+    if(ext==='doc'||ext==='xls') return starts([0xD0,0xCF,0x11,0xE0]);
+    for(var j=0;j<buf.length;j++){ var c=buf[j]; if(c<9 || (c>13 && c<32)) return false; }
+    return true;   // csv and text
+  }
+  function mailFileExt(n){ var m=String(n||'').toLowerCase().match(/\.([a-z0-9]+)$/); return m?m[1]:''; }
+  function mailSizeText(b){ return b>=1000000?(Math.round(b/100000)/10)+' MB':Math.max(1,Math.round(b/1000))+' KB'; }
+  function mailExtraBytes(){ return mailExtra.reduce(function(t,x){ return t+x.size; },0); }
+  // a big photo is made smaller (longest side 1800 px, as JPEG), so a few MB from a phone go as a few hundred KB
+  function mailShrinkImage(file){
+    return new Promise(function(resolve){
+      try{
+        var url=URL.createObjectURL(file), img=new Image();
+        img.onload=function(){
+          try{
+            var w=img.naturalWidth, h=img.naturalHeight, k=Math.min(1,1800/Math.max(w,h)), cv=document.createElement('canvas');
+            cv.width=Math.max(1,Math.round(w*k)); cv.height=Math.max(1,Math.round(h*k));
+            var cx=cv.getContext('2d'); cx.fillStyle='#fff'; cx.fillRect(0,0,cv.width,cv.height); cx.drawImage(img,0,0,cv.width,cv.height);
+            URL.revokeObjectURL(url); cv.toBlob(function(b){ resolve(b||null); },'image/jpeg',0.82);
+          }catch(e){ URL.revokeObjectURL(url); resolve(null); }
+        };
+        img.onerror=function(){ URL.revokeObjectURL(url); resolve(null); };
+        img.src=url;
+      }catch(e){ resolve(null); }
+    });
+  }
+  var mailLineCur='';          // the sentence as it now stands in the message ('' when it is not there)
+  var mailTemplates={};        // saved wording: {attachSentence}
+  var mailSentTpl='', mailSentEdited=false;
+  var MAIL_SENT_DEFAULT='We have also attached the PF and ESIC challans and payment receipts for {month}, as proof that the contributions for our staff have been paid.';
+  function mailPrevMonth(ym){ var y=Number(String(ym).slice(0,4)), m=Number(String(ym).slice(5,7))-1; if(m<1){ m=12; y--; } return y+'-'+String(m).padStart(2,'0'); }
+  function mailSentStd(){ var t=mailTemplates.attachSentence; return (t && String(t).trim())?String(t):MAIL_SENT_DEFAULT; }
+  // {month} is the month before the invoice month, {files} the names of the attached files
+  function mailSentRender(tpl){
+    var mon=(mailInv)?xMonthLabel(mailPrevMonth(mailInv.month||thisMonth())):'', names=mailExtra.map(function(x){ return x.name; }).join(', ');
+    return String(tpl||'').split('{month}').join(mon).split('{files}').join(names);
+  }
+  function mailSentFill(){ var ta=document.getElementById('mailSent'); if(ta) ta.value=mailSentRender(mailSentTpl); }
+  // the sentence that goes in the message: only when files are attached and the box is ticked
+  function mailDocsLine(){
+    var on=document.getElementById('mailSentOn'), ta=document.getElementById('mailSent');
+    if(!mailExtra.length || !on || !on.checked || !ta) return '';
+    return String(ta.value||'').trim();
+  }
+  function renderMailFiles(){
+    var box=document.getElementById('mailFileList'); if(!box) return;
+    var sb=document.getElementById('mailSentBox'); if(sb) sb.style.display=mailExtra.length?'':'none';
+    if(!mailExtra.length){ box.innerHTML=''; return; }
+    box.innerHTML=mailExtra.map(function(x,i){ return '<div style="display:flex;align-items:center;gap:.6rem;padding:.2rem 0;border-bottom:1px solid var(--line)"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(x.name)+'</span><span class="muted">'+mailSizeText(x.size)+'</span><button class="btn small ghost" type="button" data-mfdel="'+i+'">Remove</button></div>'; }).join('')+'<div class="muted" style="font-size:.8rem;margin-top:.2rem">'+mailExtra.length+' extra file'+(mailExtra.length>1?'s':'')+', '+mailSizeText(mailExtraBytes())+' in all</div>';
+  }
+  // keep this wording for every email from now on; the month before the invoice month is saved as {month} so it moves on by itself
+  async function mailSentSave(){
+    var ta=document.getElementById('mailSent'), txt=String(ta.value||'').trim();
+    if(!txt){ toast('Write the sentence first.'); return; }
+    var mon=mailInv?xMonthLabel(mailPrevMonth(mailInv.month||thisMonth())):'', names=mailExtra.map(function(x){ return x.name; }).join(', '), tpl=txt;
+    if(mon) tpl=tpl.split(mon).join('{month}');
+    if(names && tpl.indexOf(names)>-1) tpl=tpl.split(names).join('{files}');
+    mailTemplates.attachSentence=tpl; mailSentTpl=tpl; mailSentEdited=false;
+    if(db){ try{ await db.doc('emailTemplates/attachSentence').set({text:tpl}); }catch(e){ toast('Could not save the wording.'); return; } }
+    mailSentFill(); toast('Saved. This wording will be used for your next emails.');
+  }
+  // the files or their kinds changed: the sentence in the message follows, unless the person has been typing in the message
+  function mailDocsChanged(){
+    if(!mailSentEdited) mailSentFill();
+    var el=function(x){ return document.getElementById(x); }, line=mailDocsLine(), hint=el('mailLineHint'); if(!hint) return;
+    hint.style.display='none';
+    if(!mailEdited){ mailRefreshText(); return; }
+    var ta=el('mailMsg'), cur=ta.value;
+    if(mailLineCur && cur.indexOf(mailLineCur)>-1){
+      ta.value=line?cur.replace(mailLineCur,function(){ return line; }):cur.replace('\n\n'+mailLineCur,function(){ return ''; }).replace(mailLineCur,function(){ return ''; });
+      mailLineCur=line;
+    } else if(line){
+      hint.style.display=''; hint.innerHTML='You have changed the message, so the sentence about the attached documents was not added. <button class="btn small ghost" type="button" id="btnMailLineAdd" style="min-height:24px;padding:0 8px">Add it before "Warm regards"</button>';
+    }
+  }
+  function mailLineInsert(){
+    var el=function(x){ return document.getElementById(x); }, line=mailDocsLine(), ta=el('mailMsg'); if(!line) return;
+    var k=ta.value.lastIndexOf('Warm regards,');
+    ta.value=(k>-1)?ta.value.slice(0,k)+line+'\n\n'+ta.value.slice(k):ta.value.replace(/\s+$/,'')+'\n\n'+line;
+    mailLineCur=line; el('mailLineHint').style.display='none';
+  }
+  // checks each chosen file and adds it to the list; returns the messages for the ones that could not be added
+  async function mailAddFiles(files){
+    var msgs=[]; files=Array.prototype.slice.call(files||[]);
+    for(var i=0;i<files.length;i++){
+      var f=files[i], ext=mailFileExt(f.name);
+      if(MAIL_EXTS.indexOf(ext)<0){ msgs.push(f.name+': this kind of file cannot be attached. Use PDF, JPG, PNG, Word, Excel, CSV or text.'); continue; }
+      if(mailExtra.length>=MAIL_EXTRA_MAX){ msgs.push('Only '+MAIL_EXTRA_MAX+' extra files can be attached, so '+(files.length-i>1?'the rest were':f.name+' was')+' not added.'); break; }
+      if(!f.size){ msgs.push(f.name+' is empty.'); continue; }
+      var blob=f, name=f.name;
+      if((ext==='jpg'||ext==='jpeg'||ext==='png') && f.size>600000){ var sm=await mailShrinkImage(f); if(sm && sm.size<f.size){ blob=sm; name=name.replace(/\.[^.]+$/,'')+'.jpg'; } }
+      if(blob.size>MAIL_FILE_BYTES){ msgs.push(f.name+' is too large ('+mailSizeText(f.size)+'). The limit is about '+Math.round(MAIL_FILE_BYTES/1000000)+' MB for each file.'); continue; }
+      if(mailExtraBytes()+blob.size>MAIL_TOTAL_BYTES){ msgs.push(f.name+' was not added: the extra files would be over '+Math.round(MAIL_TOTAL_BYTES/1000000)+' MB in all.'); continue; }
+      if(!(await mailContentOk(blob, mailFileExt(name)))){ msgs.push(f.name+' is not really a '+mailFileExt(name).toUpperCase()+' file: its content does not match its name, so it was not added.'); continue; }
+      mailExtra.push({name:name, size:blob.size, blob:blob});
+    }
+    renderMailFiles(); mailDocsChanged(); return msgs;
+  }
+  function mailFitsOldWay(){ return mailExtra.length<=MAIL_OLD_COUNT && mailExtra.every(function(x){ return x.size<=MAIL_OLD_FILE; }) && mailExtraBytes()<=MAIL_OLD_TOTAL; }
+  // put one file in the private email-attachments storage and get a link that lasts two hours, for the email service to pass on
+  async function mailUploadOne(x){
+    var A=window.pfssAuth; if(!A){ var e0=new Error('Email works on your own site, not in this preview.'); e0.noStorage=true; throw e0; }
+    var tok=await A.token(); if(!tok){ var e1=new Error('Please sign in again.'); e1.status=401; throw e1; }
+    var base=String(A.url||'').replace(/\/+$/,'')+'/storage/v1', ext=mailFileExt(x.name), safe=x.name.replace(/[^A-Za-z0-9._-]+/g,'_').replace(/\.{2,}/g,'.').slice(-80);
+    var path=Date.now()+'-'+Math.random().toString(36).slice(2,8)+'-'+safe, hdr={apikey:A.anonKey, Authorization:'Bearer '+tok}, up, j;
+    try{ up=await fetch(base+'/object/email-attachments/'+encodeURIComponent(path),{method:'POST',headers:Object.assign({'Content-Type':MAIL_MIME[ext]||'application/octet-stream','x-upsert':'false'},hdr),body:x.blob}); }
+    catch(e){ var ne=new Error('Could not upload '+x.name+'. Please check the internet connection.'); ne.noStorage=true; ne.network=true; throw ne; }
+    if(!up.ok){ j={}; try{ j=await up.json(); }catch(e){} var ue=new Error('Could not upload '+x.name+(j.message?' ('+j.message+')':'')+'.'); ue.status=up.status; ue.noStorage=(up.status===404||up.status===400||up.status===403); throw ue; }
+    var sg=await fetch(base+'/object/sign/email-attachments/'+encodeURIComponent(path),{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr),body:JSON.stringify({expiresIn:7200})});
+    j={}; try{ j=await sg.json(); }catch(e){}
+    var su=j.signedURL||j.signedUrl; if(!sg.ok || !su){ var se=new Error('Could not get a link for '+x.name+'.'); se.status=sg.status; se.noStorage=true; throw se; }
+    return {filename:x.name, url:(su.indexOf('http')===0?su:(su.indexOf('/storage/v1')===0?String(A.url).replace(/\/+$/,'')+su:base+su)), size:x.size};
+  }
+  // the extra files for the request: links to files in storage, or (only if storage is not set up and the files are small) the files themselves
+  async function mailPrepareExtras(btn){
+    var n=mailExtra.length; if(!n) return {};
+    var urls=[];
+    try{
+      for(var i=0;i<n;i++){ btn.textContent='Uploading file '+(i+1)+' of '+n+'...'; urls.push(await mailUploadOne(mailExtra[i])); }
+      return {extraUrls:urls};
+    }catch(e){
+      if(e && e.noStorage && mailFitsOldWay()){
+        btn.textContent='Preparing the files...';
+        var out=[]; for(var k=0;k<n;k++) out.push({filename:mailExtra[k].name, base64:await b64Of(mailExtra[k].blob)});
+        return {extra:out};
+      }
+      if(e && e.noStorage && !e.network) e.message=e.message+' The storage for email files may not be set up yet: ask the administrator to run email_attachments.sql in Supabase (see the README). Without it, up to '+MAIL_OLD_COUNT+' files of '+Math.round(MAIL_OLD_FILE/1000000)+' MB, '+Math.round(MAIL_OLD_TOTAL/1000000)+' MB in all, can be sent.';
+      throw e;
+    }
+  }
+  // files left in storage for more than three days are removed (best effort, once each time the page is opened)
+  var mailCleaned=false;
+  async function mailCleanupOld(){
+    if(mailCleaned) return; mailCleaned=true;
+    try{
+      var A=window.pfssAuth; if(!A) return; var tok=await A.token(); if(!tok) return;
+      var base=String(A.url||'').replace(/\/+$/,'')+'/storage/v1', hdr={apikey:A.anonKey, Authorization:'Bearer '+tok,'Content-Type':'application/json'};
+      var r=await fetch(base+'/object/list/email-attachments',{method:'POST',headers:hdr,body:JSON.stringify({prefix:'',limit:200,offset:0,sortBy:{column:'created_at',order:'asc'}})});
+      if(!r.ok) return; var rows=await r.json(), cut=Date.now()-3*86400000;
+      var old=(rows||[]).filter(function(o){ return o && o.name && Date.parse(o.created_at||'')<cut; }).map(function(o){ return o.name; });
+      if(old.length) await fetch(base+'/object/email-attachments',{method:'DELETE',headers:hdr,body:JSON.stringify({prefixes:old})});
+    }catch(e){}
+  }
   function mailKind(){ var r=document.querySelector('input[name="mailKind"]:checked'); return r?r.value:'invoice'; }
   function mailAttach(){ var r=document.querySelector('input[name="mailAttach"]:checked'); return r?r.value:'inv'; }
   function mailSenderLabel(email){ var lp=String(email||'').split('@')[0].toLowerCase(); return lp==='accounts'?'Accounts Team':(lp==='hr'?'HR Team':'Public Force Security Services'); }
   function mailSubjectFor(inv,kind){ return (kind==='reminder'?'Payment reminder: invoice ':'Invoice ')+(inv.invoiceNo||'')+' - '+xMonthLabel(inv.month||thisMonth())+' | Public Force Security Services'; }
-  function mailMessageFor(inv,kind,withPack,from){
+  function mailMessageFor(inv,kind,withPack,from,docLine){
     var c=clients.find(function(x){ return x.id===inv.clientId; })||{}, nm=String(c.name||inv.clientName||'').trim();
     var amt='Rs. '+Math.round(inv.total||0).toLocaleString('en-IN'), mon=xMonthLabel(inv.month||thisMonth());
     var body = kind==='reminder'
       ? 'This is a gentle reminder that invoice '+(inv.invoiceNo||'')+' dated '+xFmt(inv.invoiceDate)+' for '+mon+', amount '+amt+', was due on '+xFmt(inv.dueDate)+' and is still pending in our records. A copy is attached.\n\nIf you have already made the payment, please share the payment details so we can update our records. Otherwise, we would be grateful if you could arrange it at the earliest.\n\n'
       : 'Please find attached invoice '+(inv.invoiceNo||'')+' dated '+xFmt(inv.invoiceDate)+' for the services provided in '+mon+', amount '+amt+(inv.dueDate?', due by '+xFmt(inv.dueDate):'')+'.\n\n'+(withPack?'The wage register and the attendance sheet for the month are attached with it.\n\n':'')+'Our bank details are on the invoice. Please share the payment advice once the payment is made.\n\n';
+    if(docLine) body+=docLine+'\n\n';
     return 'Dear '+(nm?nm+' Team':'Sir/Madam')+',\n\n'+body+'Warm regards,\n'+mailSenderLabel(from)+'\nPublic Force Security Services\nPhone '+COMPANY.phone;
   }
   function mailRefreshText(){
     var el=function(x){ return document.getElementById(x); }; if(!mailInv || mailEdited) return;
     el('mailSubject').value=mailSubjectFor(mailInv,mailKind());
-    el('mailMsg').value=mailMessageFor(mailInv,mailKind(),mailAttach()==='pack',el('mailFrom').value);
+    var dl=mailDocsLine(); el('mailMsg').value=mailMessageFor(mailInv,mailKind(),mailAttach()==='pack',el('mailFrom').value,dl); mailLineCur=dl; var lh=el('mailLineHint'); if(lh) lh.style.display='none';
   }
   async function openMailModal(inv){
     if(me && me.canEdit===false){ toast('Only administrators, Accounts and managers can send email.'); return; }
-    mailInv=inv; mailEdited=false;
+    mailInv=inv; mailEdited=false; mailCleanupOld();
     var el=function(x){ return document.getElementById(x); }, c=clients.find(function(x){ return x.id===inv.clientId; })||{}, k=contracts.find(function(x){ return x.id===inv.contractId; });
     el('mailTitle').textContent='Email invoice '+(inv.invoiceNo||'');
     document.querySelector('input[name="mailKind"][value="'+(invOverdue(inv)?'reminder':'invoice')+'"]').checked=true;
@@ -2467,6 +2703,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     el('mailRate').innerHTML='<option value="">Choose rate card</option>'+rateCards.map(function(r){ return '<option value="'+r.id+'">'+escapeHtml(r.name)+'</option>'; }).join('');
     el('mailRate').value=(k&&k.rateCardId)||c.rateCardId||'';
     el('mailTo').value=c.email||''; el('mailCc').value=''; el('mailErr').textContent=''; el('mailHelp').style.display='none';
+    mailExtra=[]; mailLineCur=''; mailSentTpl=mailSentStd(); mailSentEdited=false; el('mailSentOn').checked=true; mailSentFill(); renderMailFiles(); el('mailFiles').value=''; el('mailFileMsg').textContent=''; el('mailLineHint').style.display='none';
     el('mailFrom').innerHTML='<option value="">Loading...</option>'; el('btnMailSend').disabled=true;
     mailRefreshText(); el('mailModalBg').classList.add('show');
     try{
@@ -2494,14 +2731,18 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         var client=clients.find(function(x){ return x.id===inv.clientId; })||{name:inv.clientName||''};
         var data=await gatherBilling(site,ym,rc,client);
         if(!data.rows.length || !data.rows.some(function(r){ return r.b; })) throw new Error('No employees on that site match the rate card, so the wage register would be empty. Choose another site or rate card, or send the invoice only.');
-        var pb=pdfNew(false); drawInvoice(pb,invoiceModelFromSaved(inv)); drawWageRegister(pb,data); drawAttendanceSheet(pb,data); pdfFoot(pb,'Computer-generated billing documents');
+        var pb=pdfNew(false); drawInvoice(pb,invoiceModelForIssue(inv)); drawWageRegister(pb,data); drawAttendanceSheet(pb,data); pdfFoot(pb,'Computer-generated billing documents');
         blob=pb.build(); name='Billing-pack-'+pdfName(inv.invoiceNo)+'.pdf';
-      } else { blob=buildInvoicePdf(invoiceModelFromSaved(inv)); name='Invoice-'+pdfName(inv.invoiceNo)+'.pdf'; }
+      } else { blob=buildInvoicePdf(invoiceModelForIssue(inv)); name='Invoice-'+pdfName(inv.invoiceNo)+'.pdf'; }
+      var mainB64=await b64Of(blob), nExtra=mailExtra.length, prep=await mailPrepareExtras(btn);
+      if(prep.extra){ var tot=mainB64.length; prep.extra.forEach(function(x){ tot+=x.base64.length; }); if(tot>MAIL_TOTAL_B64) throw new Error('The '+(withPack?'billing pack':'invoice')+' and the extra files are too large together. Remove a file, or send without the extra files.'); }
       btn.textContent='Sending...';
-      await mailApi('POST',{from:el('mailFrom').value,to:to,cc:el('mailCc').value.trim(),subject:el('mailSubject').value,message:el('mailMsg').value,keepCopy:el('mailCopy').checked,filename:name,pdfBase64:await b64Of(blob)});
-      var upd={emailedAt:Date.now(),emailedTo:to,emailKind:kind}; if(inv.status==='draft') upd.status='sent';
+      var payload={from:el('mailFrom').value,to:to,cc:el('mailCc').value.trim(),subject:el('mailSubject').value,message:el('mailMsg').value,keepCopy:el('mailCopy').checked,filename:name,pdfBase64:mainB64};
+      if(prep.extraUrls) payload.extraUrls=prep.extraUrls; if(prep.extra) payload.extra=prep.extra;
+      await mailApi('POST',payload);
+      var upd={emailedAt:Date.now(),emailedTo:to,emailKind:kind}; if(nExtra) upd.emailedFiles=mailExtra.map(function(x){ return x.name; }); if(inv.status==='draft') upd.status='sent';
       try{ if(db) await db.doc('invoices/'+inv.id).update(upd); }catch(e2){}
-      toast((kind==='reminder'?'Reminder':'Invoice')+' emailed to '+to+'.'); el('mailModalBg').classList.remove('show');
+      toast((kind==='reminder'?'Reminder':'Invoice')+' emailed to '+to+(nExtra?' with '+nExtra+' extra file'+(nExtra>1?'s':''):'')+'.'); el('mailModalBg').classList.remove('show');
     }catch(e){ err.textContent=(e&&e.message)||'Could not send the email.'; }
     btn.disabled=false; btn.textContent=old;
   }
@@ -2514,6 +2755,20 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     el('mailFrom').addEventListener('change', mailRefreshText);
     ['mailSubject','mailMsg'].forEach(function(id){ el(id).addEventListener('input', function(){ mailEdited=true; }); });
     el('btnMailSend').addEventListener('click', sendInvoiceMail);
+    el('mailFiles').addEventListener('change', async function(){
+      var input=el('mailFiles'), files=input.files; el('mailFileMsg').textContent='';
+      var msgs=await mailAddFiles(files); input.value='';
+      el('mailFileMsg').textContent=msgs.join(' ');
+    });
+    el('mailFileList').addEventListener('click', function(ev){
+      var b=ev.target.closest&&ev.target.closest('[data-mfdel]'); if(!b) return;
+      mailExtra.splice(Number(b.dataset.mfdel),1); el('mailFileMsg').textContent=''; renderMailFiles(); mailDocsChanged();
+    });
+    el('mailSent').addEventListener('input', function(){ mailSentEdited=true; mailDocsChanged(); });
+    el('mailSentOn').addEventListener('change', mailDocsChanged);
+    el('btnMailSentSave').addEventListener('click', mailSentSave);
+    el('btnMailSentReset').addEventListener('click', function(){ mailSentTpl=MAIL_SENT_DEFAULT; mailSentEdited=false; mailDocsChanged(); });
+    el('mailLineHint').addEventListener('click', function(ev){ if(ev.target.closest&&ev.target.closest('#btnMailLineAdd')) mailLineInsert(); });
   }
 
   /* ---------- pay changes: wages that go up or down from a date, with a history ---------- */
@@ -2946,7 +3201,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   // Accounts and administrators may change the pay of an existing employee. Everyone else can see it, and can enter it only when adding a new employee.
   function canPay(){ return !!me && (me.canChangePay!==undefined ? !!me.canChangePay : !!me.canEdit); }
   var PAY_FORM_KEYS=['wageType','wageAmount','payStd','zone','skill','dutyHrs','basicAmt','daAmt','basicDaAmt','basicPct'];
-  var PAY_FORM_IDS=['fWageType','fWageAmount','fPayStd','fZone','fSkill','fDuty','fBasicAmt','fDaAmt','fBasicDa'];
+  var PAY_FORM_IDS=['fWageType','fWageAmount','fPayStd','fZone','fSkill','fDuty','fBasicAmt','fDaAmt','fBasicDa','fWeeklyOff','fHolidayOff'];
   function payFormState(e){
     var locked=!!e && !canPay(), owner=!!(me && me.isOwner);
     return {locked:locked, showRow:!!e && (owner||locked), showBtn:!!e && owner,
@@ -2957,7 +3212,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   // and a new pay typed in here replaces any dated pay changes (it is then used for every month not yet approved)
   function payForSave(data, existing){
     if(!existing) return {data:data, ok:true};
-    if(!canPay()){ PAY_FORM_KEYS.forEach(function(k){ delete data[k]; }); return {data:data, ok:true}; }
+    if(!canPay()){ PAY_FORM_KEYS.forEach(function(k){ delete data[k]; }); delete data.weeklyOff; delete data.holidayOff; return {data:data, ok:true}; }
     if((existing.payHistory||[]).length){
       var was=payFieldsOf(existing), now=payFieldsOf(data), changed=['wageType','wageAmount','payStd','basicAmt','daAmt','dutyHrs'].some(function(k){ return was[k]!==now[k]; });
       if(changed){
@@ -3041,8 +3296,10 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 
   // what the gross is made of, shown under the gross in the payroll table (the gross is the wage earned plus overtime, night shifts and arrears)
   function grossNote(r){
-    var parts=[], base=(r.baseGross!=null)?r.baseGross:r.gross, extras=(r.otPay||0)+(r.nightPay||0)+(r.arrears||0)+(r.addPay||0), absent=(r.present!=null && r.dim!=null && r.present<r.dim);
+    var parts=[], base=(r.baseGross!=null)?r.baseGross:r.gross, extras=(r.otPay||0)+(r.nightPay||0)+(r.arrears||0)+(r.addPay||0)+(r.dutyPay||0)+(r.holidayPay||0), absent=(r.present!=null && r.dim!=null && r.present<r.dim);
     if(absent) parts.push('Wage for '+r.present+' of '+r.dim+' days '+fmtMoney(base)); else if(extras) parts.push('Wage '+fmtMoney(base));
+    if(r.dutyPay) parts.push('extra duty '+dutyNum(r.extraDuty)+' '+fmtMoney(r.dutyPay));
+    if(r.holidayPay) parts.push('holiday work '+dutyNum(r.holidayDuty)+' '+fmtMoney(r.holidayPay));
     if(r.otPay) parts.push('overtime '+(r.otHrs||0)+' h '+fmtMoney(r.otPay));
     if(r.nightPay) parts.push('night shifts '+(r.nights||0)+' '+fmtMoney(r.nightPay));
     if(r.arrears) parts.push('arrears '+fmtMoney(r.arrears));
@@ -3816,6 +4073,223 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     toast(files.length+' payslips saved in one ZIP file, one PDF for each employee.');
   }
 
+  /* ---------- invoice authentication: Document ID, QR code, issue stamp and verification ---------- */
+  var DEFAULT_SIGNATORY={name:'Sharath R', role:'Accounts Head'};
+  // SHA-256, written out so the Document ID can be worked out while the PDF is being drawn
+  var SHA_K=[0x428a2f98,0x71374491,0xb5c0fbcf,0xe9b5dba5,0x3956c25b,0x59f111f1,0x923f82a4,0xab1c5ed5,0xd807aa98,0x12835b01,0x243185be,0x550c7dc3,0x72be5d74,0x80deb1fe,0x9bdc06a7,0xc19bf174,0xe49b69c1,0xefbe4786,0x0fc19dc6,0x240ca1cc,0x2de92c6f,0x4a7484aa,0x5cb0a9dc,0x76f988da,0x983e5152,0xa831c66d,0xb00327c8,0xbf597fc7,0xc6e00bf3,0xd5a79147,0x06ca6351,0x14292967,0x27b70a85,0x2e1b2138,0x4d2c6dfc,0x53380d13,0x650a7354,0x766a0abb,0x81c2c92e,0x92722c85,0xa2bfe8a1,0xa81a664b,0xc24b8b70,0xc76c51a3,0xd192e819,0xd6990624,0xf40e3585,0x106aa070,0x19a4c116,0x1e376c08,0x2748774c,0x34b0bcb5,0x391c0cb3,0x4ed8aa4a,0x5b9cca4f,0x682e6ff3,0x748f82ee,0x78a5636f,0x84c87814,0x8cc70208,0x90befffa,0xa4506ceb,0xbef9a3f7,0xc67178f2];
+  function sha256Hex(str){
+    var bytes=new TextEncoder().encode(String(str)), l=bytes.length, padLen=((l+9+63)>>6)<<6, buf=new Uint8Array(padLen); buf.set(bytes); buf[l]=0x80;
+    var dv=new DataView(buf.buffer); dv.setUint32(padLen-8, Math.floor(l*8/4294967296)); dv.setUint32(padLen-4, (l*8)>>>0);
+    var H=[0x6a09e667,0xbb67ae85,0x3c6ef372,0xa54ff53a,0x510e527f,0x9b05688c,0x1f83d9ab,0x5be0cd19], w=new Array(64), i, off;
+    for(off=0; off<padLen; off+=64){
+      for(i=0;i<16;i++) w[i]=dv.getUint32(off+i*4);
+      for(i=16;i<64;i++){
+        var x15=w[i-15], x2=w[i-2], s0=((x15>>>7)|(x15<<25))^((x15>>>18)|(x15<<14))^(x15>>>3), s1=((x2>>>17)|(x2<<15))^((x2>>>19)|(x2<<13))^(x2>>>10);
+        w[i]=(w[i-16]+s0+w[i-7]+s1)|0;
+      }
+      var a=H[0],b=H[1],c=H[2],d=H[3],e=H[4],f=H[5],g=H[6],h=H[7];
+      for(i=0;i<64;i++){
+        var S1=((e>>>6)|(e<<26))^((e>>>11)|(e<<21))^((e>>>25)|(e<<7)), ch=(e&f)^(~e&g), t1=(h+S1+ch+SHA_K[i]+w[i])|0,
+            S0=((a>>>2)|(a<<30))^((a>>>13)|(a<<19))^((a>>>22)|(a<<10)), mj=(a&b)^(a&c)^(b&c), t2=(S0+mj)|0;
+        h=g; g=f; f=e; e=(d+t1)|0; d=c; c=b; b=a; a=(t1+t2)|0;
+      }
+      H[0]=(H[0]+a)|0; H[1]=(H[1]+b)|0; H[2]=(H[2]+c)|0; H[3]=(H[3]+d)|0; H[4]=(H[4]+e)|0; H[5]=(H[5]+f)|0; H[6]=(H[6]+g)|0; H[7]=(H[7]+h)|0;
+    }
+    return H.map(function(x){ return ('00000000'+(x>>>0).toString(16)).slice(-8); }).join('');
+  }
+  function r2s(v){ return (Math.round((Number(v)||0)*100)/100).toFixed(2); }
+  function invTotalOf(m){ var sub=Number(m.subtotal)||0, tax=m.exempt?0:(Number(m.normalBase)||0)*(Number(m.gstPct)||0)/100; return Math.round(sub+tax); }
+  function invNoKey(v){ return String(v==null?'':v).replace(/[^A-Za-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
+  // everything that matters on the invoice, in a fixed order: if any of it changes, the Document ID changes
+  function invCanon(m){
+    var cl=m.client||{};
+    return ['PFSS-INV-1',COMPANY.gstin,String(m.no||''),String(m.date||''),String(m.due||''),String(m.month||''),String(cl.name||''),String(cl.gstin||''),String(m.pos||''),m.exempt?'E':'N',r2s(m.gstPct),r2s(m.subtotal),r2s(m.normalBase),r2s(m.rcmBase),String(invTotalOf(m)),String(m.notes||'')]
+      .concat((m.items||[]).map(function(i){ return [String(i.description||''),r2s(i.qty),r2s(i.rate),r2s(i.amount),String(i.cat||'normal')].join('~'); })).join('|');
+  }
+  function invFingerprint(m){ var hex=sha256Hex(invCanon(m)).slice(0,12).toUpperCase(); return {hex:hex, id:'INV-'+invNoKey(m.no)+'-'+hex}; }
+  function invQrText(m, fp){ return 'PFSS-INV|'+String(m.no||'')+'|'+String(m.date||'')+'|'+invTotalOf(m)+'|'+COMPANY.gstin+'|'+fp.hex; }
+  function invIssued(m){ return !(m.status==='draft' || m.unsaved || m.sample); }
+  // the ID as printed: a very long invoice number is shortened in the middle, and the code at the end always stays
+  function invIdShown(fp){ return fp.id.length>38 ? fp.id.slice(0,18)+'...'+fp.id.slice(-17) : fp.id; }
+  // who is generating this document, for the stamp
+  function issuerLabel(){
+    var n=(me&&(me.name||me.email))||'the billing system', r=(me&&me.isOwner)?'Administrator':((me&&me.canChangePay)?'Accounts':((me&&me.canEdit)?'Manager':''));
+    return n+(r?' ('+r+')':'');
+  }
+  // the stamp above the signature on an invoice: who generated it, when, its Document ID and a QR code. Returns its height.
+  function drawInvoiceAuth(pb, x, y, w, m, C){
+    if(!invIssued(m)){
+      var dl=pb.wrap(m.sample?'A sample to show the layout. It is not an invoice, so it has no Document ID.':(m.unsaved?'Save the invoice first. The PDF made from the saved invoice carries a Document ID and a QR code.':'This copy has no Document ID. Once the invoice is issued, the PDF carries a Document ID and a QR code.'),w-20,7.8,false).slice(0,3), dh=26+dl.length*10;
+      pb.rect(x,y,w,dh,{stroke:C.line,lw:0.9});
+      pb.text(x+10,y+14,m.sample?'SAMPLE, NOT AN INVOICE':(m.unsaved?'PREVIEW, NOT SAVED':'DRAFT, NOT YET ISSUED'),8,{bold:true,color:C.mute});
+      dl.forEach(function(l,k){ pb.text(x+10,y+26+k*10,l,7.8,{color:C.mute}); });
+      return dh;
+    }
+    var fp=invFingerprint(m), qr=invQrText(m,fp), box=54, H=66, drew=false;
+    pb.rect(x,y,w,H,{stroke:C.goldDk,lw:0.9});
+    try{ drew=qrDraw(pb,x+w-box-6,y+6,box,qr,C.ink); }catch(e){ drew=false; }
+    var tw=w-18-(drew?box+8:0);
+    pb.text(x+9,y+13,'ELECTRONICALLY ISSUED AND AUTHENTICATED',7.2,{bold:true,color:C.goldDk});
+    pb.text(x+9,y+24,pdfFit(pb,'Billing system, by '+issuerLabel(),tw,7.8,false),7.8);
+    pb.text(x+9,y+34,pdfFit(pb,'Date: '+pdfStampDate(Date.now()),tw,7.8,false),7.8);
+    var idText='Document ID: '+invIdShown(fp), idFs=8; while(idFs>5.6 && pb.tw(idText,idFs,true)>tw) idFs-=0.2;
+    pb.text(x+9,y+46,pdfFit(pb,idText,tw,idFs,true),idFs,{bold:true});
+    pb.text(x+9,y+58,pdfFit(pb,'Scan the QR code or call '+COMPANY.phone+' to verify.',tw,6.6,false),6.6,{color:C.mute});
+    return H;
+  }
+  // the invoice as it should be when it is being issued: sending or issuing it makes a draft final
+  function invoiceModelForIssue(inv){ var m=invoiceModelFromSaved(inv); if(!m.status||m.status==='draft') m.status='sent'; return m; }
+  // ---- checking a Document ID against the invoices saved in the system ----
+  function verifyInvoiceText(text){
+    var t=String(text==null?'':text).trim(); if(!t) return {kind:'empty'};
+    var no=null, hex=null, mm;
+    if(t.slice(0,9).toUpperCase()==='PFSS-INV|'){ var p=t.split('|'); if(p.length>=6){ no=p[1]; hex=String(p[5]).trim().toUpperCase(); } }
+    else if((mm=/^INV-(.+)-([0-9A-Fa-f]{12})$/i.exec(t))){ no=mm[1]; hex=mm[2].toUpperCase(); }
+    if(!no || !hex || !/^[0-9A-F]{12}$/.test(hex)) return {kind:'badformat'};
+    var matches=invoices.filter(function(i){ return String(i.invoiceNo)===no || invNoKey(i.invoiceNo)===invNoKey(no) || (i.numberHistory||[]).some(function(h){ return invNoKey(h.no)===invNoKey(no); }); });
+    if(!matches.length && no.indexOf('...')>-1){   // a long invoice number was shortened when printed: find the invoice from its code
+      matches=invoices.filter(function(i){ var h=invFingerprint(invoiceModelFromSaved(i)).hex; return h===hex || (i.fingerprints||[]).some(function(x){ return x.hex===hex; }); });
+    }
+    if(!matches.length) return {kind:'nonumber', no:no};
+    var cur=matches.map(function(inv){ return {inv:inv, fp:invFingerprint(invoiceModelFromSaved(inv))}; }), k;
+    for(k=0;k<cur.length;k++) if(cur[k].fp.hex===hex) return {kind:'genuine', inv:cur[k].inv, fp:cur[k].fp};
+    for(k=0;k<cur.length;k++){ var h=(cur[k].inv.fingerprints||[]).filter(function(x){ return x.hex===hex; })[0]; if(h){ var rn=(cur[k].inv.numberHistory||[]).filter(function(x){ return invNoKey(x.no)===invNoKey(no); })[0]; return {kind:'changed', inv:cur[k].inv, fp:cur[k].fp, entry:h, renum:(rn && invNoKey(cur[k].inv.invoiceNo)!==invNoKey(no))?rn:null}; } }
+    return {kind:'nomatch', no:no, inv:matches[0]};
+  }
+  function verifyHtml(r){
+    var sum=function(inv,cap){ var m=invoiceModelFromSaved(inv); return (cap?'Invoice':'invoice')+' <b>'+escapeHtml(String(inv.invoiceNo))+'</b> dated '+escapeHtml(xFmt(inv.invoiceDate))+' to <b>'+escapeHtml(inv.clientName||(m.client&&m.client.name)||'')+'</b>, total <b>'+fmtMoney(invTotalOf(m))+'</b>'; };
+    var box=function(cls,title,body){ return '<div class="banner" style="margin:0;align-items:flex-start;'+(cls==='ok'?'background:var(--ok-soft);color:var(--ok);border-left-color:var(--ok)':(cls==='bad'?'background:var(--bad-soft);color:var(--bad);border-left-color:var(--bad)':''))+'"><div><b>'+title+'</b><div style="margin-top:.2rem">'+body+'</div></div></div>'; };
+    if(r.kind==='empty') return '';
+    if(r.kind==='badformat') return box('warn','That is not a Document ID.','A Document ID looks like <b>INV-101-7K3D9Q2M4X1B</b>, and the QR code gives text that starts with <b>PFSS-INV|</b>. Check it was copied completely.');
+    if(r.kind==='nonumber') return box('bad','No invoice with that number.','There is no invoice numbered <b>'+escapeHtml(r.no)+'</b> in this system, so this document was not issued from here.');
+    if(r.kind==='genuine'){
+      var d=r.inv.status==='draft';
+      return box(d?'warn':'ok',d?'Matches, but the invoice is now a draft.':'Genuine. This Document ID matches the invoice saved in the system.',sum(r.inv,true)+'. Nothing on the invoice has changed since this ID was made.'+(d?' It has since been moved back to Draft, so check why it was changed.':''));
+    }
+    if(r.kind==='changed' && r.renum) return box('warn','This ID was issued under an earlier number of this invoice.',sum(r.inv,true)+'. The invoice number was changed from <b>'+escapeHtml(r.renum.no)+'</b> to <b>'+escapeHtml(r.renum.to||String(r.inv.invoiceNo))+'</b>'+(Date.parse(r.renum.at)?' on '+escapeHtml(pdfStampDate(Date.parse(r.renum.at))):'')+'. A copy carrying the old number is an earlier version of this invoice, which now has the Document ID <b>'+escapeHtml(r.fp.id)+'</b>.');
+    if(r.kind==='changed') return box('bad','This ID was issued, but the invoice has been changed since.',sum(r.inv,true)+'. '+(Date.parse(r.entry.at)?'This Document ID was made on '+escapeHtml(pdfStampDate(Date.parse(r.entry.at)))+(r.entry.by?' by '+escapeHtml(r.entry.by):''):'This Document ID belongs to an earlier version of the invoice')+'. The invoice now has the Document ID <b>'+escapeHtml(r.fp.id)+'</b>, so a copy carrying the older ID is not the current invoice.');
+    return box('bad','Does not match.','This system never produced that Document ID for '+sum(r.inv)+'. The PDF may have been changed, or the ID was typed or copied wrongly. The current Document ID for that invoice is <b>'+escapeHtml(invFingerprint(invoiceModelFromSaved(r.inv)).id)+'</b>.');
+  }
+  function renderVerify(){ var el=document.getElementById('vfOut'); if(!el) return; el.innerHTML=verifyHtml(verifyInvoiceText(document.getElementById('vfInput').value)); }
+  function setupVerifyUI(){
+    var f=function(i){ return document.getElementById(i); };
+    f('btnVerify').addEventListener('click', function(){ if(!f('vfInput').value.trim()){ f('vfOut').innerHTML=''; toast('Type or paste a Document ID first.'); return; } renderVerify(); });
+    f('vfInput').addEventListener('keydown', function(ev){ if(ev.key==='Enter'){ ev.preventDefault(); f('btnVerify').click(); } });
+  }
+
+  /* ---------- extra duty: more than one duty on the same day (1.5 or 2) ---------- */
+  var DUTY_STEPS=[1.5,2];   // the choices after Paid Leave when a day cell is clicked on the Attendance screen
+  var XD_WARN=10;           // the pay cycle warns when someone has more extra duties than this in a month
+  function dutyOk(v){ v=Number(v); return v>1 && v<=3 && Math.round(v*100)%25===0; }
+  // an extra duty only counts on a day that was worked (present, or not marked, which counts as present)
+  function dutyClean(duty, days){
+    var out={}; Object.keys(duty||{}).forEach(function(k){ var st=(days||{})[k]||'P'; if(st==='P' && dutyOk(duty[k])) out[k]=Number(duty[k]); });
+    return out;
+  }
+  function attBody(empId, ym, days, duty){ var b={empId:empId, ym:ym, days:days}, d=dutyClean(duty,days); if(Object.keys(d).length) b.duty=d; return b; }
+  function dutyNum(n){ return String(Math.round((Number(n)||0)*100)/100); }
+  function dutyLabel(v){ return Number(v)===2?'Double duty (2 duties)':dutyNum(v)+' duties'; }
+  // the payslip line for the pay of extra duties
+  function dutyPayLabel(n){ n=Number(n)||0; return 'Extra duty ('+dutyNum(n)+(n<=1?' duty)':' duties)'); }
+
+  /* ---------- Sundays and holidays: a person's weekly off day, and the company holidays ---------- */
+  var DOW_NAMES=['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  function holMap(ym){ return (((state.holidays||{})[ym])||{}).days||{}; }
+  function dowOf(ym, d){ var p=ym.split('-'); return new Date(Number(p[0]), Number(p[1])-1, Number(d)).getDay(); }
+  // '' for an ordinary working day; 'weekly' on the person's weekly off; 'holiday' on a company holiday that is a day off for them
+  function offKind(e, ym, d){
+    var w=e && e.weeklyOff;
+    if(w!=null && String(w)!=='' && Number(w)===dowOf(ym,d)) return 'weekly';
+    if(e && e.holidayOff && holMap(ym)[String(d)]!=null) return 'holiday';
+    return '';
+  }
+  function offName(e, ym, d){
+    var k=offKind(e,ym,d);
+    return k==='weekly' ? DOW_NAMES[dowOf(ym,d)]+' (weekly off)' : (k==='holiday' ? 'Holiday: '+(holMap(ym)[String(d)]||'Holiday') : '');
+  }
+  function holidayMultOf(){ var m=Number(state.settings&&state.settings.holidayMult); return m>0?m:1; }
+  // the tooltip of a day cell
+  function dayTitle(dayN, st, dv, off){
+    if(!off) return 'Day '+dayN+': '+(dv>1?dutyLabel(dv):st);
+    if(dv>1) return 'Day '+dayN+': '+off+', worked. Holiday pay and '+dutyNum(dv-1)+' extra '+(dv-1<=1?'duty':'duties');
+    return 'Day '+dayN+': '+off+(st==='P'?', paid day off':', '+st);
+  }
+  function holidayPayLabel(n, mult){ n=Number(n)||0; return 'Holiday work ('+dutyNum(n)+(n<=1?' day':' days')+(Number(mult)&&Number(mult)!==1?' at '+dutyNum(mult)+' times':'')+')'; }
+  async function saveHolidays(ym, days){
+    state.holidays=state.holidays||{}; state.holidays[ym]={ym:ym, days:days};
+    if(db){ try{ await db.doc('holidays/'+ym.replace('-','')).set({ym:ym, days:days}); }catch(e){ toast('Could not save the holidays.'); return false; } }
+    await invalidateRun(ym);   // which days are holidays can change the pay, so the month's payroll is sent back to draft
+    return true;
+  }
+  // adds (or renames) a holiday; returns an error message or ''
+  async function holAdd(ym, date, name){
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date||'')) return 'Choose the date of the holiday.';
+    if(date.slice(0,7)!==ym) return 'Choose a date in '+xMonthLabel(ym)+', the month shown.';
+    if(cycClosed(ym)) return 'This month is closed. Reopen it in the pay cycle to change holidays.';
+    var days=Object.assign({}, holMap(ym)); days[String(Number(date.slice(8)))]=String(name||'').trim().slice(0,40)||'Holiday';
+    return (await saveHolidays(ym,days))?'':'Could not save the holiday.';
+  }
+  async function holRemove(ym, day){
+    if(cycClosed(ym)){ toast('This month is closed. Reopen it in the pay cycle to change holidays.'); return; }
+    var days=Object.assign({}, holMap(ym)); delete days[String(day)]; await saveHolidays(ym,days);
+  }
+  function holListHtml(ym){
+    var days=holMap(ym), keys=Object.keys(days).map(Number).sort(function(a,b){ return a-b; });
+    if(!keys.length) return '<span class="muted">No company holidays added for '+escapeHtml(xMonthLabel(ym))+'.</span>';
+    return keys.map(function(k){ return '<span class="tag info" style="display:inline-flex;align-items:center;gap:.4rem">'+k+' '+xMonthShort(ym)+': '+escapeHtml(days[String(k)])+' <button class="btn small ghost" data-holdel="'+k+'" style="min-height:22px;padding:0 6px">Remove</button></span>'; }).join(' ');
+  }
+  function xMonthShort(ym){ return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][Number(ym.slice(5,7))-1]; }
+  function renderHolidays(){
+    var box=document.getElementById('holList'); if(!box) return;
+    var ym=document.getElementById('attMonth').value||thisMonth();
+    document.getElementById('holMonthLabel').textContent=xMonthLabel(ym); box.innerHTML=holListHtml(ym);
+  }
+  // the weekly off and holiday setting for everyone shown on the Attendance screen
+  var attShown=[];
+  function offSummary(list){
+    var wk={}, hol=0; list.forEach(function(e){ var w=(e.weeklyOff!=null && String(e.weeklyOff)!=='')?DOW_NAMES[Number(e.weeklyOff)]:'none'; wk[w]=(wk[w]||0)+1; if(e.holidayOff) hol++; });
+    var parts=Object.keys(wk).map(function(k){ return wk[k]+' with '+(k==='none'?'no weekly off':k+' off'); });
+    return 'Now, of the '+list.length+' people shown: '+parts.join(', ')+'; '+hol+' get company holidays as paid days off.';
+  }
+  function renderOffBox(list){
+    var box=document.getElementById('offBox'); if(!box) return;
+    box.style.display=(canPay() && list.length)?'':'none'; if(!canPay() || !list.length) return;
+    document.getElementById('offNow').textContent=offSummary(list);
+    document.getElementById('btnOffApply').textContent='Apply to the '+list.length+' '+(list.length===1?'person':'people')+' shown';
+  }
+  async function applyOffToShown(weekly, holidayOff){
+    if(!canPay()) return 'Only Accounts or an administrator can change this.';
+    var list=state.employees.filter(function(e){ return attShown.indexOf(e.id)>=0; }), n=0;
+    for(var i=0;i<list.length;i++){
+      var e=list[i], was=(e.weeklyOff!=null)?String(e.weeklyOff):'';
+      if(was===String(weekly) && !!e.holidayOff===!!holidayOff) continue;
+      if(db){ try{ await db.doc('employees/'+e.id).update({weeklyOff:String(weekly), holidayOff:!!holidayOff}); }catch(err){ return 'Could not save for '+(e.name||'an employee')+'. '+((err&&err.message)||''); } }
+      e.weeklyOff=String(weekly); e.holidayOff=!!holidayOff; n++;
+    }
+    var ym=document.getElementById('attMonth').value||thisMonth(); if(!cycClosed(ym)) await invalidateRun(ym);
+    return {changed:n, total:list.length};
+  }
+  function setupHolidaysUI(){
+    var f=function(i){ return document.getElementById(i); }; if(!f('btnHolAdd')) return;
+    f('btnHolAdd').addEventListener('click', async function(){
+      var ym=f('attMonth').value||thisMonth(), err=f('holErr'); err.textContent='';
+      var msg=await holAdd(ym, f('holDate').value, f('holName').value);
+      if(msg){ err.textContent=msg; return; }
+      f('holName').value=''; renderHolidays(); renderAttendance(); toast('Holiday saved.');
+    });
+    f('btnOffApply').addEventListener('click', async function(){
+      var w=f('offWeekly').value, h=f('offHoliday').checked, n=attShown.length;
+      if(!confirm('Set the weekly off to '+(w===''?'none':DOW_NAMES[Number(w)])+' and company holidays '+(h?'as paid days off':'as working days')+' for '+n+' '+(n===1?'person':'people')+'?')) return;
+      var r=await applyOffToShown(w,h);
+      if(typeof r==='string'){ toast(r); return; }
+      toast('Saved for '+r.changed+' of '+r.total+' people. Recalculate the month\'s payroll if you have already calculated it.'); renderAttendance();
+    });
+    f('holList').addEventListener('click', async function(ev){
+      var b=ev.target.closest&&ev.target.closest('[data-holdel]'); if(!b) return;
+      await holRemove(f('attMonth').value||thisMonth(), b.dataset.holdel); renderHolidays(); renderAttendance();
+    });
+  }
+
   // ---------- ATTENDANCE ----------
   // ---------- ATTENDANCE CSV IMPORT (from the Attendance app) ----------
   function parseCsv(text){
@@ -3909,7 +4383,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
             }
           }
           var key = empId+'_'+ym.replace('-','');
-          var body = {empId:empId, ym:ym, days:days};
+          var body = attBody(empId, ym, days, existing.duty);
           state.attendance[key]=body;
           if(db){ try{ await db.doc('attendance/'+key).set(body); }catch(e){} }
           await invalidateRun(ym, state.employees.find(function(x){ return x.id===empId; }));
@@ -3948,12 +4422,14 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     }catch(e){ return {days:{}}; }
   }
 
-  async function setAttendanceDay(empId, ym, day, status){
+  async function setAttendanceDay(empId, ym, day, status, duty){
     var key = empId+'_'+ym.replace('-','');
     var cur = await getAttendanceDoc(empId, ym);
     var days = Object.assign({}, cur.days||{});
     days[String(day)] = status;
-    var body = {empId:empId, ym:ym, days:days};
+    var dm = Object.assign({}, cur.duty||{});
+    if(duty && status==='P') dm[String(day)]=duty; else delete dm[String(day)];
+    var body = attBody(empId, ym, days, dm);
     state.attendance[key]=body;
     if(db){
       try{ await db.doc('attendance/'+key).set(body); }catch(e){ toast('Could not save attendance.'); }
@@ -3968,6 +4444,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var active = state.employees.filter(function(e){return employedInMonth(e,ym) && (!siteF || e.site===siteF);})
       .sort(function(a,b){return (a.name||'').localeCompare(b.name||'');});
 
+    renderHolidays(); attShown=active.map(function(e){ return e.id; }); renderOffBox(active);
     var container=document.getElementById('attContainer');
     if(!active.length){ container.innerHTML='<p class="muted">No active employees to show.</p>'; return; }
 
@@ -3975,29 +4452,41 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     for(var i=0;i<active.length;i++){
       var e=active[i];
       var doc = await getAttendanceDoc(e.id, ym);
-      var days=doc.days||{};
+      var days=doc.days||{}, duty=doc.duty||{};
       var cells='';
       for(var d=1; d<=dim; d++){
         var ds0 = ym+'-'+String(d).padStart(2,'0');
         if((e.doj && ds0<e.doj) || (e.dol && ds0>e.dol)){ cells += '<span class="daycell X" title="Not employed on this day">'+d+'</span>'; continue; }
-        var st = days[String(d)] || 'P';
-        cells += '<span class="daycell '+st+'" data-emp="'+e.id+'" data-day="'+d+'" title="Day '+d+': '+st+'">'+d+'</span>';
+        var st = days[String(d)] || 'P', dv=(st==='P' && dutyOk(duty[String(d)]))?Number(duty[String(d)]):1, offN=offName(e,ym,d), offA=offN?' data-off="'+escapeHtml(offN)+'"':'';
+        var holN=(!offN && holMap(ym)[String(d)]!=null)?holMap(ym)[String(d)]:'', holC=holN?' hol':'', holT=holN?' (company holiday: '+holN+', not a paid day off for this person)':'';
+        if(dv>1) cells += '<span class="daycell D'+(offN?' off':'')+holC+'" data-emp="'+e.id+'" data-day="'+d+'" data-duty="'+dv+'"'+offA+' title="'+escapeHtml(dayTitle(d,st,dv,offN)+holT)+'">'+d+'</span>';
+        else cells += '<span class="daycell '+st+(offN?' off':'')+holC+'" data-emp="'+e.id+'" data-day="'+d+'"'+offA+' title="'+escapeHtml(dayTitle(d,st,1,offN)+holT)+'">'+d+'</span>';
       }
       html += '<tr><td>'+escapeHtml(e.name)+'</td><td>'+escapeHtml(e.site||'—')+'</td><td><div class="daygrid">'+cells+'</div></td></tr>';
     }
     html += '</tbody></table>';
     container.innerHTML = html;
 
+    // click order: Present, Absent, Half-day, Paid Leave, 1.5 duties, 2 duties, and back to Present
+    var order={P:'A', A:'H', H:'L', L:'D'+DUTY_STEPS[0]};
+    DUTY_STEPS.forEach(function(v,k){ order['D'+v]=(k<DUTY_STEPS.length-1)?'D'+DUTY_STEPS[k+1]:'P'; });
+    // on a person's weekly off or a holiday: paid day off, worked (holiday pay and one extra duty), half a day worked, absent, and back
+    var orderOff={P:'D2', D2:'D1.5', 'D1.5':'A'};
     container.querySelectorAll('.daycell').forEach(function(cell){
       cell.addEventListener('click', async function(){
         if(cell.classList.contains('X')) return;
         if(cycClosed(ym)){ toast('This month is closed. Reopen it in the pay cycle to change attendance.'); return; }
-        var cur = cell.classList.contains('P')?'P':cell.classList.contains('A')?'A':cell.classList.contains('H')?'H':cell.classList.contains('L')?'L':'P';
-        var order = {P:'A', A:'H', H:'L', L:'P'};
-        var next = order[cur] || 'P';
-        cell.classList.remove('P','A','H','L');
-        cell.classList.add(next);
-        await setAttendanceDay(cell.dataset.emp, ym, cell.dataset.day, next);
+        var cur = cell.dataset.duty ? 'D'+cell.dataset.duty : (cell.classList.contains('A')?'A':cell.classList.contains('H')?'H':cell.classList.contains('L')?'L':'P');
+        var offLbl=cell.dataset.off||'', next = (offLbl ? orderOff[cur] : order[cur]) || 'P', dayN=cell.dataset.day;
+        var holTip=cell.classList.contains('hol')?(cell.title.indexOf(' (company holiday')>0?cell.title.slice(cell.title.indexOf(' (company holiday')):''):'';
+        cell.classList.remove('P','A','H','L','D'); cell.removeAttribute('data-duty');
+        if(next.charAt(0)==='D'){
+          var dv=Number(next.slice(1)); cell.classList.add('D'); cell.setAttribute('data-duty',String(dv)); cell.title=dayTitle(dayN,'P',dv,offLbl)+holTip;
+          await setAttendanceDay(cell.dataset.emp, ym, dayN, 'P', dv);
+        } else {
+          cell.classList.add(next); cell.title=dayTitle(dayN,next,1,offLbl)+holTip;
+          await setAttendanceDay(cell.dataset.emp, ym, dayN, next);
+        }
       });
     });
   }
@@ -4015,16 +4504,17 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var dim=daysInMonth(ym);
     var doc = await getAttendanceDoc(e.id, ym);
     var days=doc.days||{};
-    var lop=0, present=0, notEmployed=0, dayInfo=[], T0=null, TL=null, same=true;
+    var lop=0, present=0, notEmployed=0, dayInfo=[], T0=null, TL=null, same=true, dutyMap=doc.duty||{}, extraDuty=0, holidayDuty=0, dutyPay=0, holidayPay=0, dutyBasic=0, hmult=holidayMultOf();
     for(var d=1; d<=dim; d++){
       var ds = ym+'-'+String(d).padStart(2,'0');
       if((e.doj && ds<e.doj) || (e.dol && ds>e.dol)){ notEmployed+=1; continue; }
       var dst = days[String(d)]||'P', f=1;
       if(dst==='A'){ lop+=1; f=0; }
       else if(dst==='H'){ lop+=0.5; f=0.5; }
+      var xd=(dst==='P' && dutyOk(dutyMap[String(d)]))?Number(dutyMap[String(d)])-1:0, onOff=(xd>0 && offKind(e,ym,d))?true:false; if(onOff) holidayDuty+=xd; else extraDuty+=xd;   // extra duties are paid as extra days; work on a weekly off or holiday is holiday work
       var Td=payTermsOn(e, ds);
       if(T0===null) T0=Td; else if(Td!==T0) same=false;
-      TL=Td; dayInfo.push({ds:ds, f:f, T:Td});
+      TL=Td; dayInfo.push({ds:ds, f:f, x:xd, off:onOff, T:Td});
     }
     present = dim - lop - notEmployed;
     var Tm = TL || payTermsOn(e, ym+'-'+String(dim).padStart(2,'0'));
@@ -4044,6 +4534,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         stdBasic=bA*ratio; stdDa=dA*ratio; stdExtra=extraM*ratio;
         basic=stdA*ratio; bshare=grossM>0?stdA/grossM:1;
       }
+      if(extraDuty>0 || holidayDuty>0){ var perDayX=(Tm.wageType==='daily')?(Number(Tm.wageAmount)||0):(Number(Tm.wageAmount)||0)/dim; dutyPay=extraDuty*perDayX; holidayPay=holidayDuty*perDayX*hmult; dutyBasic=(dutyPay+holidayPay)*bshare; }
     } else {
       // the pay changed during the month: each day is paid at the pay in force on that day
       gross=0; basic=0;
@@ -4054,6 +4545,12 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
           var bB=Number(T.basicAmt)||0, dD=Number(T.daAmt)||0, A=Math.round(bB+dD), xh=Math.max(0,(Number(T.dutyHrs)||8)-8), exM=xh>0?Math.round(A*xh/8):0, gM=A+exM, rt=gM>0?c/gM:0;
           stdBasic+=bB*rt; stdDa+=dD*rt; stdExtra+=exM*rt; basic+=A*rt; struct=true; stdA=A; stdDuty=Number(T.dutyHrs)||8; bshare=gM>0?A/gM:1;
         } else basic+=c*empBasicPct(e,st,T)/100;
+        if(di.x>0){
+          var cx=((T.wageType==='daily')?amt:amt/dim)*di.x*(di.off?hmult:1), shareX=empBasicPct(e,st,T)/100;
+          if(T.payStd && (Number(T.basicAmt)||0)>0){ var A2=Math.round((Number(T.basicAmt)||0)+(Number(T.daAmt)||0)), xh2=Math.max(0,(Number(T.dutyHrs)||8)-8), g2=A2+(xh2>0?Math.round(A2*xh2/8):0); shareX=g2>0?A2/g2:1; }
+          if(di.off) holidayPay+=cx; else dutyPay+=cx;
+          dutyBasic+=cx*shareX;
+        }
       });
       gross=Math.max(0,gross);
       var parts=[], prev=null;
@@ -4074,9 +4571,10 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var baseGross = gross, ar = arrearsDue(e, ym), arrears = ar.amount;
     var adds = addLinesOf(ex), addPay = 0, addStat = 0;
     adds.forEach(function(a){ addPay += Number(a.amount); if(a.stat) addStat += Number(a.amount); });
-    gross = baseGross + otPay + nightPay + arrears + addPay;
+    gross = baseGross + dutyPay + holidayPay + otPay + nightPay + arrears + addPay;
     var statGross = gross - (addPay - addStat);   // the pay that counts for ESI and professional tax
     if(arrears) basic += arrears*bshare;
+    basic += dutyBasic;   // PF is worked out on the Basic part of the extra duty pay too
     var pf=0, esi=0, pt=0, pfEr=0, esiEr=0, pfInfo=null;
     if(e.pfApplicable){
       pfInfo = pfBreakdown(basic, !!e.pfFull, null, ym); pf = pfInfo.ee; pfEr = pfInfo.er;
@@ -4088,7 +4586,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     pt = ptForState(e.state, statGross);
     var advance = (typeof suggestedAdvanceDeduction==='function') ? suggestedAdvanceDeduction(e.id) : 0;
     var net = gross - pf - esi - pt - advance - otherDed;
-    return {present:present, dim:dim, gross:gross, baseGross:baseGross, basic:basic, pf:pf, esi:esi, pt:pt, advance:advance, net:net,
+    return {present:present, extraDuty:extraDuty, dutyPay:dutyPay, holidayDuty:holidayDuty, holidayPay:holidayPay, holidayMult:hmult, billDays:present+((st.billExtraDuty===false)?0:extraDuty+holidayDuty), dim:dim, gross:gross, baseGross:baseGross, basic:basic, pf:pf, esi:esi, pt:pt, advance:advance, net:net,
       otHrs:otHrs, nights:nights, otPay:otPay, nightPay:nightPay, otherDed:otherDed, pfEr:pfEr, esiEr:esiEr,
       struct:struct, basicPart:stdBasic, daPart:stdDa, extraPart:stdExtra, dutyHrs:stdDuty,
       arrears:arrears, arrearsNote:ar.note, revNote:revNote, esiWages:statGross,
@@ -4547,6 +5045,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         basicPay:x.r.struct?Math.round(x.r.basicPart):0, daPay:x.r.struct?Math.round(x.r.daPart):0,
         extraPay:x.r.struct?Math.max(0,Math.round(x.r.baseGross)-Math.round(x.r.basicPart)-Math.round(x.r.daPart)):0,
         arrears:Math.round(x.r.arrears||0), arrearsNote:x.r.arrearsNote||'', revNote:x.r.revNote||'',
+        extraDuty:x.r.extraDuty||0, dutyPay:Math.round(x.r.dutyPay||0), holidayDuty:x.r.holidayDuty||0, holidayPay:Math.round(x.r.holidayPay||0), holidayMult:x.r.holidayMult||1,
         addPay:Math.round(x.r.addPay||0), addLines:(x.r.addLines||[]).map(function(a){ return {type:a.type, amount:Math.round(a.amount*100)/100, note:a.note||''}; }),
         esiWages:Math.round(x.r.esiWages||0), pfWages:Math.round(x.r.pfWages||0), epsEr:Math.round(x.r.epsEr||0), epfEr:Math.round(x.r.epfEr||0), edliWages:Math.round(x.r.edliWages||0), edliEr:Math.round(x.r.edliEr||0)};
     });
@@ -4623,23 +5122,38 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     await downloadPayslipPdf(found, run, ym);
   }
 
+  // why a person cannot go in the bank transfer file ('' when they can)
+  function bankIssueOf(r){
+    var acct=String(r.bankAcc||'').replace(/\s/g,''), ifsc=String(r.ifsc||'').toUpperCase().replace(/\s/g,'');
+    if(!/^\d{9,18}$/.test(acct)) return 'bank account number is missing or invalid';
+    if(!/^[A-Z]{4}0[A-Z0-9]{6}$/.test(ifsc)) return 'IFSC code is missing or invalid';
+    if(!((r.net||0)>0)) return 'net pay is zero or less';
+    return '';
+  }
+  function bankSkipped(rows){ return (rows||[]).map(function(r){ return {name:r.name, empCode:r.empCode, why:bankIssueOf(r), net:r.net}; }).filter(function(x){ return x.why; }); }
   async function exportCsv(ym){
     ym = ym || document.getElementById('payMonth').value || thisMonth();
     var run = await getRun(ym);
     if(!run || run.status!=='approved'){ toast('This month\'s payroll must be approved before the bank file can be downloaded.'); return; }
     var rows=[['Employee ID','Name','Site','Bank Account','IFSC','Days Present','Gross','PF','ESI','PT','Advance','Net Pay']];
     run.rows.forEach(function(r){
+      if(bankIssueOf(r)) return;   // a bank would reject the whole file for one bad line, so these people are left out and listed on screen
       rows.push([r.empCode||'', r.name, r.site||'', r.bankAcc||'', r.ifsc||'', r.present, r.gross, r.pf, r.esi, r.pt, (r.advance||0), r.net]);
     });
     var csv = rows.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
+    var saved=false;
     if(downloadsCap){
-      try{ await downloadsCap.save({filename:'payroll-'+ym+'.csv', data:csv}); return; }catch(e){}
+      try{ await downloadsCap.save({filename:'payroll-'+ym+'.csv', data:csv}); saved=true; }catch(e){}
     }
-    var blob=new Blob([csv],{type:'text/csv'});
-    var url=URL.createObjectURL(blob);
-    var a=document.createElement('a'); a.href=url; a.download='payroll-'+ym+'.csv';
-    document.body.appendChild(a); a.click(); a.remove();
-    URL.revokeObjectURL(url);
+    if(!saved){
+      var blob=new Blob([csv],{type:'text/csv'});
+      var url=URL.createObjectURL(blob);
+      var a=document.createElement('a'); a.href=url; a.download='payroll-'+ym+'.csv';
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    }
+    var sk=bankSkipped(run.rows);
+    if(sk.length) toast(sk.length+' '+(sk.length===1?'person is':'people are')+' not in the bank file: '+sk.slice(0,3).map(function(x){ return x.name; }).join(', ')+(sk.length>3?' and '+(sk.length-3)+' more':'')+'. Pay '+(sk.length===1?'them':'them')+' another way. The list is on the Payslips and bank file step.');
   }
 
   // ---------- SETTINGS ----------
@@ -5085,6 +5599,14 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         renderInvoicesTable();
         renderInvoiceStats();
       }, function(err){ toast('Could not load invoices: '+err.code); });
+      db.collection('emailTemplates').onSnapshot(function(snap){
+        var o={}; snap.docs.forEach(function(d){ var x=d.data()||{}; if(d.id==='attachSentence' && x.text) o.attachSentence=String(x.text); });
+        mailTemplates=o;
+      }, function(){});
+      db.collection('invoiceCounters').onSnapshot(function(snap){
+        var o={}; snap.docs.forEach(function(d){ var x=d.data()||{}; if(d.id==='config') o.config={prefix:x.prefix, pad:x.pad}; else if(x.fy) o[x.fy]={fy:x.fy, next:x.next}; });
+        invCounters=o;
+      }, function(){});
     }catch(e){ toast('Invoices unavailable.'); }
   }
 
@@ -5104,13 +5626,169 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     renderContracts(); renderAttention();
   }
 
-  function nextInvoiceNo(){
-    var max=0;
-    invoices.forEach(function(i){
-      var m=/^INV-(\d+)$/.exec(i.invoiceNo||'');
-      if(m){ var n=parseInt(m[1],10); if(n>max) max=n; }
+  /* ---------- invoice numbers: PFSS/26-27/0001, with a new series every financial year (April to March) ---------- */
+  var invCounters={};   // config: {prefix, pad}; for each financial year {fy, next}
+  var invNoEdited=false;
+  function fyCodeOf(d){
+    var t=String(d||'').slice(0,10), y=Number(t.slice(0,4)), m=Number(t.slice(5,7));
+    if(!y||!m){ var n=new Date(); y=n.getFullYear(); m=n.getMonth()+1; }
+    var a=m>=4?y:y-1;
+    return String(a%100).padStart(2,'0')+'-'+String((a+1)%100).padStart(2,'0');
+  }
+  function fyLabel(fy){ var a=Number(fy.slice(0,2)); return (a>=70?'19':'20')+fy.slice(0,2)+'-'+fy.slice(3); }
+  function invNumCfg(){
+    var c=invCounters.config||{}, prefix=String(c.prefix||'PFSS').replace(/[^A-Za-z0-9]/g,'').slice(0,6)||'PFSS', pad=Number(c.pad);
+    if(!(pad>=3 && pad<=5)) pad=4;
+    return {prefix:prefix, pad:pad};
+  }
+  function invSeriesPrefix(fy){ return invNumCfg().prefix+'/'+fy+'/'; }
+  function invSeq(no, fy){ var p=invSeriesPrefix(fy), t=String(no||'').trim(); if(t.indexOf(p)!==0) return 0; var rest=t.slice(p.length); return /^\d+$/.test(rest)?parseInt(rest,10):0; }
+  function invCounterNext(fy){ var c=invCounters[fy]; return (c && Number(c.next)>0)?Number(c.next):1; }
+  function invHighest(fy, ignoreId){ var max=0; invoices.forEach(function(i){ if(ignoreId && i.id===ignoreId) return; var q=invSeq(i.invoiceNo,fy); if(q>max) max=q; }); return max; }
+  function invFormat(fy, n){ return invSeriesPrefix(fy)+String(n).padStart(invNumCfg().pad,'0'); }
+  // the number to suggest for an invoice with this date: after the highest used in that financial year, and never below the "next number" that was set
+  function nextInvoiceNo(dateStr, ignoreId){ var fy=fyCodeOf(dateStr); return invFormat(fy, Math.max(invCounterNext(fy), invHighest(fy,ignoreId)+1)); }
+  // '' when the number can be used, otherwise what is wrong with it (CGST Rule 46: up to 16 characters, letters, digits, - and /, not used twice)
+  function invNoProblem(no, id){
+    var t=String(no==null?'':no).trim();
+    if(!t) return 'Enter an invoice number.';
+    if(t.length>16) return 'An invoice number can have at most 16 characters under GST. This one has '+t.length+'.';
+    if(!/^[A-Za-z0-9\/-]+$/.test(t)) return 'Use only letters, numbers, - and / in an invoice number.';
+    if(/^[\/-]/.test(t)) return 'An invoice number cannot start with / or -.';
+    var dup=invoices.filter(function(i){ return i.id!==id && String(i.invoiceNo||'').trim().toUpperCase()===t.toUpperCase(); })[0];
+    if(dup) return 'Invoice '+dup.invoiceNo+' already exists ('+(dup.clientName||'client')+', '+xFmt(dup.invoiceDate)+'). A number cannot be used twice.';
+    return '';
+  }
+  function invFormatProblem(prefix, pad){
+    if(!/^[A-Za-z0-9]{1,6}$/.test(String(prefix||''))) return 'The prefix can have 1 to 6 letters or numbers.';
+    pad=Number(pad); if(!(pad>=3 && pad<=5)) return 'Choose 3, 4 or 5 digits for the running number.';
+    var len=String(prefix).length+1+5+1+pad; if(len>16) return 'This format would be '+len+' characters long, and GST allows 16. Use a shorter prefix or fewer digits.';
+    return '';
+  }
+  async function invSetCounter(fy, next){
+    invCounters[fy]={fy:fy, next:next};
+    if(db){ try{ await db.doc('invoiceCounters/'+fy.replace('-','')).set({fy:fy, next:next}); }catch(e){ return false; } }
+    return true;
+  }
+  async function invSetConfig(prefix, pad){
+    invCounters.config={prefix:prefix, pad:Number(pad)};
+    if(db){ try{ await db.doc('invoiceCounters/config').set({prefix:prefix, pad:Number(pad)}); }catch(e){ return false; } }
+    return true;
+  }
+  // after an invoice is saved with a number of the series, the next one starts after it (a deleted invoice's number is not handed out again)
+  async function invBumpCounter(no, dateStr){ var fy=fyCodeOf(dateStr), q=invSeq(no,fy); if(q>0 && q+1>invCounterNext(fy)) await invSetCounter(fy,q+1); }
+  function invWasIssued(i){ return !!(i && ((i.status && i.status!=='draft') || i.emailedAt)); }
+  function invByDate(a,b){ return String(a.invoiceDate||'').localeCompare(String(b.invoiceDate||'')) || String(a.invoiceNo||'').localeCompare(String(b.invoiceNo||''),undefined,{numeric:true}); }
+  // invoices whose number is not yet in the series of their own financial year
+  function renumCandidates(){ return invoices.filter(function(i){ return invSeq(i.invoiceNo, fyCodeOf(i.invoiceDate))===0; }).sort(invByDate); }
+  // the new numbers for the chosen invoices: by financial year, in date order, after the highest number already used there
+  function renumPlan(ids){
+    var chosen=invoices.filter(function(i){ return ids.indexOf(i.id)>=0; }), byFy={}, out={};
+    chosen.forEach(function(i){ var fy=fyCodeOf(i.invoiceDate); (byFy[fy]=byFy[fy]||[]).push(i); });
+    Object.keys(byFy).forEach(function(fy){
+      var max=0; invoices.forEach(function(i){ if(ids.indexOf(i.id)>=0) return; var q=invSeq(i.invoiceNo,fy); if(q>max) max=q; });
+      var start=Math.max(max+1, invCounterNext(fy));
+      byFy[fy].sort(invByDate).forEach(function(i,k){ out[i.id]=invFormat(fy,start+k); });
     });
-    return 'INV-'+String(max+1).padStart(4,'0');
+    return out;
+  }
+  async function renumApply(ids){
+    var plan=renumPlan(ids), keys=Object.keys(plan), who=(me&&(me.name||me.email))||'', now=new Date().toISOString(), top={}, done=0;
+    keys.sort(function(a,b){ return invByDate(invoices.find(function(x){return x.id===a;})||{}, invoices.find(function(x){return x.id===b;})||{}); });
+    for(var k=0;k<keys.length;k++){
+      var id=keys[k], inv=invoices.find(function(x){ return x.id===id; }), no=plan[id]; if(!inv) continue;
+      var hist=(inv.fingerprints||[]).slice();
+      try{
+        var fo=invFingerprint(invoiceModelFromSaved(inv)); if(!hist.some(function(h){ return h.hex===fo.hex; })) hist.push({hex:fo.hex, at:'', by:''});
+        var fn=invFingerprint(invoiceModelFromSaved(Object.assign({}, inv, {invoiceNo:no}))); if(!hist.some(function(h){ return h.hex===fn.hex; })) hist.push({hex:fn.hex, at:now, by:who});
+      }catch(e){}
+      var upd={invoiceNo:no, fingerprints:hist.slice(-25), numberHistory:(inv.numberHistory||[]).concat([{no:inv.invoiceNo, to:no, at:now, by:who}]).slice(-20)};
+      if(db){ try{ await db.doc('invoices/'+id).update(upd); }catch(e){ return {done:done, total:keys.length, error:'Could not save the number of invoice '+inv.invoiceNo+'. The ones before it were renumbered.'}; } }
+      var fy=fyCodeOf(inv.invoiceDate); Object.assign(inv, upd); done++; top[fy]=Math.max(top[fy]||0, invSeq(no,fy));
+    }
+    for(var f in top) await invBumpCounter(invFormat(f,top[f]), '20'+f.slice(0,2)+'-06-01');
+    return {done:done, total:keys.length};
+  }
+  function invNoHintRefresh(){
+    var h=document.getElementById('invNoHint'); if(!h) return;
+    var id=document.getElementById('invId').value, v=document.getElementById('invNo').value, old=id?invoices.find(function(x){ return x.id===id; }):null;
+    var changed=!old || String(old.invoiceNo)!==String(v).trim(), prob=changed?invNoProblem(v,id):'';
+    if(prob){ h.style.color='var(--bad)'; h.textContent=prob; return; }
+    h.style.color=''; var hist=(old&&old.numberHistory)||[];
+    h.textContent=hist.length?'Earlier numbers of this invoice: '+hist.map(function(x){ return x.no; }).join(', ')+'.':(old?'Changing the number of an invoice that was already sent needs care: the client has the old one.':'Like PFSS/26-27/0001, a new series every financial year (April to March). Up to 16 characters.');
+  }
+
+  /* ---------- the "Invoice numbers" window: the format, the next number, and renumbering ---------- */
+  function invFyOptions(){
+    var set={}, cur=fyCodeOf(''), a=Number(cur.slice(0,2)); set[cur]=1; set[String((a+1)%100).padStart(2,'0')+'-'+String((a+2)%100).padStart(2,'0')]=1;
+    invoices.forEach(function(i){ set[fyCodeOf(i.invoiceDate)]=1; });
+    return Object.keys(set).sort(function(x,y){ return (Number(x.slice(0,2))<70?100:0)+Number(x.slice(0,2))-((Number(y.slice(0,2))<70?100:0)+Number(y.slice(0,2))); });
+  }
+  function invNumRefresh(){
+    var f=function(i){ return document.getElementById(i); }, fy=f('invNumFy').value, pre=f('invPrefix').value.trim(), pad=f('invPad').value, prob=invFormatProblem(pre,pad);
+    f('invExample').textContent=prob?'':pre+'/'+fy+'/'+'1'.padStart(Number(pad),'0')+'  ('+(pre.length+1+5+1+Number(pad))+' characters)';
+    f('invNumErr').textContent=prob;
+    var hi=invHighest(fy);
+    f('invNumInfo').textContent='Highest used in '+fyLabel(fy)+': '+(hi?invFormat(fy,hi):'none yet')+'. The next invoice dated in this year gets '+invFormat(fy,Math.max(invCounterNext(fy),hi+1))+'.';
+  }
+  function renumTicked(){ return Array.prototype.map.call(document.querySelectorAll('#renumBox [data-rn]:checked'), function(x){ return x.dataset.rn; }); }
+  function renumRefresh(){
+    var f=function(i){ return document.getElementById(i); }, ids=renumTicked(), plan=renumPlan(ids);
+    document.querySelectorAll('#renumBox [data-rnnew]').forEach(function(td){ td.textContent=plan[td.dataset.rnnew]||'(stays as it is)'; });
+    var n=ids.length, iss=ids.filter(function(id){ return invWasIssued(invoices.find(function(x){ return x.id===id; })); }).length, b=f('btnRenumApply');
+    b.style.display=''; b.disabled=!n; b.textContent=n?'Renumber '+n+' invoice'+(n>1?'s':''):'Tick the invoices to renumber';
+    f('renumNote').textContent=iss?iss+' of the ticked '+(iss>1?'invoices were':'invoice was')+' already issued, so '+(iss>1?'their clients have':'its client has')+' the old '+(iss>1?'numbers':'number')+'.':'';
+  }
+  function renderRenumList(){
+    var box=document.getElementById('renumBox'), cands=renumCandidates();
+    if(!cands.length){ box.innerHTML='<p class="muted" style="margin:0">All invoices already follow the current format.</p>'; document.getElementById('btnRenumApply').style.display='none'; document.getElementById('renumNote').textContent=''; return; }
+    var h='<div class="scrollx"><table><thead><tr><th></th><th>Current number</th><th>Client</th><th>Invoice date</th><th>Status</th><th>New number</th></tr></thead><tbody>';
+    cands.forEach(function(i){ var iss=invWasIssued(i); h+='<tr><td><input type="checkbox" data-rn="'+i.id+'"'+(iss?'':' checked')+' style="width:auto;min-height:0" aria-label="Renumber '+escapeHtml(i.invoiceNo||'')+'"></td><td><b>'+escapeHtml(i.invoiceNo||'')+'</b></td><td>'+escapeHtml(i.clientName||'')+'</td><td>'+escapeHtml(xFmt(i.invoiceDate))+'</td><td>'+(iss?xTag('Issued','warn'):xTag('Draft','info'))+'</td><td data-rnnew="'+i.id+'"></td></tr>'; });
+    box.innerHTML=h+'</tbody></table></div>'; renumRefresh();
+  }
+  function renderInvNumModal(){
+    var f=function(i){ return document.getElementById(i); }, c=invNumCfg(), cur=fyCodeOf('');
+    f('invPrefix').value=c.prefix; f('invPad').value=String(c.pad); f('invNumErr').textContent='';
+    f('invNumFy').innerHTML=invFyOptions().map(function(fy){ return '<option value="'+fy+'">'+fyLabel(fy)+'</option>'; }).join(''); f('invNumFy').value=cur;
+    f('invNextNum').value=Math.max(invCounterNext(cur), invHighest(cur)+1); invNumRefresh(); renderRenumList();
+  }
+  async function invNumSave(){
+    var f=function(i){ return document.getElementById(i); }, err=f('invNumErr'); err.textContent='';
+    if(!canPay()){ err.textContent='Only Accounts or an administrator can change invoice numbers.'; return; }
+    var pre=f('invPrefix').value.trim(), pad=f('invPad').value, fy=f('invNumFy').value, nx=Math.floor(Number(f('invNextNum').value)), prob=invFormatProblem(pre,pad);
+    if(prob){ err.textContent=prob; return; }
+    if(!(nx>=1)){ err.textContent='Enter the next number: 1 or more.'; return; }
+    var oldCfg=invCounters.config; invCounters.config={prefix:pre, pad:Number(pad)};
+    var hi=invHighest(fy);
+    if(nx<hi+1){ invCounters.config=oldCfg; err.textContent='Invoice '+invFormat(fy,hi)+' already exists, so the next number cannot be lower than '+(hi+1)+'.'; return; }
+    invCounters.config=oldCfg;
+    var cfgNow=invNumCfg(), ok1=true;
+    if(cfgNow.prefix!==pre || cfgNow.pad!==Number(pad)) ok1=await invSetConfig(pre,pad);
+    var ok2=await invSetCounter(fy,nx);
+    if(!ok1 || !ok2){ err.textContent='Could not save. Please try again.'; return; }
+    toast('Invoice numbering saved.'); invNumRefresh(); renderRenumList();
+  }
+  async function renumApplyClick(){
+    var ids=renumTicked(); if(!ids.length) return;
+    var iss=ids.filter(function(id){ return invWasIssued(invoices.find(function(x){ return x.id===id; })); }).length;
+    if(!confirm('Renumber '+ids.length+' invoice'+(ids.length>1?'s':'')+' as shown in the list? The old numbers are kept in each invoice\'s history.'+(iss?'\n\n'+iss+' of them '+(iss>1?'were':'was')+' already issued: the clients have the old numbers, the Document IDs on copies already sent still verify as earlier versions, and an invoice already in a GST return must be corrected there.':''))) return;
+    var r=await renumApply(ids);
+    toast(r.error?r.error:'Renumbered '+r.done+' invoice'+(r.done===1?'':'s')+'.');
+    renderRenumList(); invNumRefresh(); renderInvoicesTable();
+  }
+  function setupInvNumUI(){
+    var f=function(i){ return document.getElementById(i); }; if(!f('btnInvNumbers')) return;
+    f('btnInvNumbers').addEventListener('click', function(){
+      if(!canPay()){ toast('Only Accounts or an administrator can change invoice numbers.'); return; }
+      renderInvNumModal(); f('invNumModalBg').classList.add('show');
+    });
+    f('invNumClose').addEventListener('click', function(){ f('invNumModalBg').classList.remove('show'); });
+    f('invNumModalBg').addEventListener('click', function(ev){ if(ev.target===f('invNumModalBg')) f('invNumModalBg').classList.remove('show'); });
+    f('invPrefix').addEventListener('input', invNumRefresh); f('invPad').addEventListener('change', invNumRefresh);
+    f('invNumFy').addEventListener('change', function(){ var fy=f('invNumFy').value; f('invNextNum').value=Math.max(invCounterNext(fy), invHighest(fy)+1); invNumRefresh(); });
+    f('btnInvNumSave').addEventListener('click', invNumSave);
+    f('renumBox').addEventListener('change', function(ev){ if(ev.target.matches && ev.target.matches('[data-rn]')) renumRefresh(); });
+    f('btnRenumApply').addEventListener('click', renumApplyClick);
   }
 
   function renderClientDropdowns(){
@@ -5244,6 +5922,10 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 
   function setupInvoiceUI(){
     document.getElementById('btnAddInvoice').addEventListener('click', function(){ openInvoiceModal(null); });
+    document.getElementById('invNo').addEventListener('input', function(){ invNoEdited=true; invNoHintRefresh(); });
+    document.getElementById('invDate').addEventListener('change', function(){ if(!invNoEdited && !document.getElementById('invId').value){ document.getElementById('invNo').value=nextInvoiceNo(document.getElementById('invDate').value); invNoHintRefresh(); } });
+    document.getElementById('btnInvNoNext').addEventListener('click', function(){ var id=document.getElementById('invId').value; document.getElementById('invNo').value=nextInvoiceNo(document.getElementById('invDate').value,id); invNoEdited=false; invNoHintRefresh(); });
+    setupInvNumUI();
     document.getElementById('invModalClose').addEventListener('click', closeInvoiceModal);
     document.getElementById('btnSaveInvoice').addEventListener('click', saveInvoice);
     document.getElementById('btnDeleteInvoice').addEventListener('click', deleteInvoice);
@@ -5366,11 +6048,13 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var inv = id ? invoices.find(function(x){return x.id===id;}) : null;
     document.getElementById('invModalTitle').textContent = inv? 'Edit invoice' : 'New invoice';
     document.getElementById('invId').value = id||'';
-    document.getElementById('invNo').value = inv? inv.invoiceNo : nextInvoiceNo();
+    document.getElementById('invNo').value = inv? inv.invoiceNo : '';
     renderClientDropdowns();
     document.getElementById('invClient').value = inv? inv.clientId : (clients[0]? clients[0].id : '');
     document.getElementById('invMonth').value = inv? inv.month : thisMonth();
     document.getElementById('invDate').value = inv? inv.invoiceDate : new Date().toISOString().slice(0,10);
+    invNoEdited=false; if(!inv) document.getElementById('invNo').value=nextInvoiceNo(document.getElementById('invDate').value);
+    document.getElementById('invNo').readOnly=!!(inv && !canPay()); invNoHintRefresh();
     document.getElementById('invDue').value = inv? inv.dueDate : '';
     document.getElementById('invStatus').value = inv? inv.status : 'draft';
     document.getElementById('invGstPct').value = inv? inv.gstPct : ((state.settings.costing && state.settings.costing.gstPct) || 18);
@@ -5395,7 +6079,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var preview = renderInvoicePreview();
     if(!preview.items.length || !preview.items.some(function(i){return i.description;})){ toast('Add at least one line item.'); return; }
     var data = {
-      invoiceNo: document.getElementById('invNo').value,
+      invoiceNo: String(document.getElementById('invNo').value||'').trim(),
       clientId: clientId,
       clientName: client.name,
       month: document.getElementById('invMonth').value,
@@ -5416,10 +6100,24 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       rcmBase: Math.round(preview.rcmBase), rcmTax: Math.round(preview.rcmTax),
       tdsPct: preview.tdsPct, tdsAmt: Math.round(preview.tdsAmt), netReceivable: Math.round(preview.receivable)
     };
+    var oldNo=id?invoices.find(function(x){ return x.id===id; }):null, numChanged=!oldNo || String(oldNo.invoiceNo)!==data.invoiceNo;
+    if(numChanged){
+      var prob=invNoProblem(data.invoiceNo,id); if(prob){ toast(prob); invNoHintRefresh(); document.getElementById('invNo').focus(); return; }
+      if(oldNo && !canPay()){ toast('Only Accounts or an administrator can change the number of a saved invoice.'); return; }
+      if(oldNo && invWasIssued(oldNo) && !confirm('Invoice '+oldNo.invoiceNo+' was already issued. If you change its number to '+data.invoiceNo+', the copy the client has still shows the old number, its Document ID no longer matches, and if it is in a GST return the return must be corrected too.\n\nChange the number anyway?')) return;
+    }
+    try{
+      var oldInv=id?invoices.find(function(x){ return x.id===id; }):null, hist=((oldInv&&oldInv.fingerprints)||[]).slice(), fpNow=invFingerprint(invoiceModelFromSaved(data));
+      if(oldInv){ var fpOld=invFingerprint(invoiceModelFromSaved(oldInv)); if(!hist.some(function(x){ return x.hex===fpOld.hex; })) hist.push({hex:fpOld.hex, at:'', by:''}); }
+      if(!hist.some(function(x){ return x.hex===fpNow.hex; })) hist.push({hex:fpNow.hex, at:new Date().toISOString(), by:(me&&(me.name||me.email))||''});
+      data.fingerprints=hist.slice(-25);
+      if(oldInv && String(oldInv.invoiceNo)!==data.invoiceNo) data.numberHistory=(oldInv.numberHistory||[]).concat([{no:oldInv.invoiceNo, to:data.invoiceNo, at:new Date().toISOString(), by:(me&&(me.name||me.email))||''}]).slice(-20);
+    }catch(e){}
     if(!db){ toast('Storage unavailable — cannot save.'); return; }
     try{
       if(id){ await db.doc('invoices/'+id).update(data); }
       else{ await db.collection('invoices').add(data); }
+      if(numChanged) await invBumpCounter(data.invoiceNo, data.invoiceDate);
       toast('Invoice saved.');
       closeInvoiceModal();
     }catch(e){ toast('Save failed: '+(e.code||e.message||'error')); }
@@ -6314,11 +7012,11 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var unbilled=emps.filter(function(e){ return posRoles.indexOf(e.role||'')<0; }).length;
     if((k.billingBasis||'rate')==='rate'){
       (k.positions||[]).forEach(function(p){
-        var md=0; emps.forEach(function(e,i){ if((e.role||'')===p.role) md+=prs[i].present; });
+        var md=0; emps.forEach(function(e,i){ if((e.role||'')===p.role) md+=prs[i].billDays; });
         var monthly=Number(p.rate)||0;
         var exact=null, rr=null;
         if(!monthly && rc && rc.roles){ rr=findRcRole(rc,p.role,8);
-          if(rr){ monthly=computeRole(rc,rr).totalCost; exact=0; emps.forEach(function(e,i){ if((e.role||'')===p.role){ var rE=findRcRole(rc,e.role,e.dutyHrs)||rr; exact+=employeeBilling(rc,rE,prs[i].present,dim,e).scamt; } }); } }
+          if(rr){ monthly=computeRole(rc,rr).totalCost; exact=0; emps.forEach(function(e,i){ if((e.role||'')===p.role){ var rE=findRcRole(rc,e.role,e.dutyHrs)||rr; exact+=employeeBilling(rc,rE,prs[i].billDays,dim,e).scamt; } }); } }
         if(!monthly){ warns.push('No rate for '+p.role+'. Set a rate on the contract or add the role to its rate card.'); return; }
         if(!md){ warns.push('No attendance for '+p.role+'.'); return; }
         var c=catOf(p.role);
@@ -6403,6 +7101,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       if(line) out.push(line); return out.length?out:['']; };
     api.addImage=function(bytes,w,h){ extra.push({b:bytes,w:w,h:h}); return extra.length-1; };
     api.imageX=function(idx,x,y,w,h){ cur.push('q '+w.toFixed(2)+' 0 0 '+h.toFixed(2)+' '+x.toFixed(2)+' '+(H-y-h).toFixed(2)+' cm /Im'+(idx+2)+' Do Q'); };
+    api.meta={title:'Public Force Security Services document', author:'Public Force Security Services', creator:'Public Force HR, payroll and billing system', producer:'Public Force HR, payroll and billing system', subject:'', keywords:''};
     api.build=function(){
       var parts=[], offs=[], len=0, n=pages.length;
       function push(x){ var b=(typeof x==='string')?pdfStrBytes(x):x; parts.push(b); len+=b.length; }
@@ -6424,14 +7123,22 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         obj(base+2*p,'<</Length '+stream.length+'>>\nstream\n'+stream+'\nendstream');
         obj(base+1+2*p,'<</Type/Page/Parent 2 0 R/MediaBox [0 0 '+dims[p][0]+' '+dims[p][1]+']/Resources<</Font<</F1 3 0 R/F2 4 0 R/F3 5 0 R>>/XObject<<'+xo+'>>>>/Contents '+(base+2*p)+' 0 R>>');
       }
-      var total=base+2*n, xref=len; push('xref\n0 '+total+'\n0000000000 65535 f \n');
+      var infoNum=base+2*n; obj(infoNum,pdfInfoDict(api.meta));
+      var total=infoNum+1, xref=len; push('xref\n0 '+total+'\n0000000000 65535 f \n');
       for(var k=1;k<total;k++) push(('0000000000'+offs[k]).slice(-10)+' 00000 n \n');
-      push('trailer\n<</Size '+total+'/Root 1 0 R>>\nstartxref\n'+xref+'\n%%EOF');
+      push('trailer\n<</Size '+total+'/Root 1 0 R/Info '+infoNum+' 0 R>>\nstartxref\n'+xref+'\n%%EOF');
       return new Blob(parts,{type:'application/pdf'});
     };
     return api;
   }
 
+  // the properties shown in a PDF reader under File, Properties
+  function pdfInfoStr(v){ return '('+pdfAscii(String(v==null?'':v)).replace(/\\/g,'\\\\').replace(/\(/g,'\\(').replace(/\)/g,'\\)')+')'; }
+  function pdfInfoDict(m){
+    var d=new Date(Date.now()+19800000), z=function(n){ return ('0'+n).slice(-2); };
+    var cd='D:'+d.getUTCFullYear()+z(d.getUTCMonth()+1)+z(d.getUTCDate())+z(d.getUTCHours())+z(d.getUTCMinutes())+z(d.getUTCSeconds())+"+05'30'";
+    return '<</Title '+pdfInfoStr(m.title)+'/Author '+pdfInfoStr(m.author)+'/Subject '+pdfInfoStr(m.subject)+'/Keywords '+pdfInfoStr(m.keywords)+'/Creator '+pdfInfoStr(m.creator)+'/Producer '+pdfInfoStr(m.producer)+'/CreationDate '+pdfInfoStr(cd)+'>>';
+  }
   function pdfWords(n){
     n=Math.round(n); if(n===0) return 'Zero';
     var ones=['','One','Two','Three','Four','Five','Six','Seven','Eight','Nine','Ten','Eleven','Twelve','Thirteen','Fourteen','Fifteen','Sixteen','Seventeen','Eighteen','Nineteen'];
@@ -6514,28 +7221,42 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var ly2=y; pb.text(ML,ly2+10,'Amount in words',8.2,{color:C.mute}); ly2+=22; wl.forEach(function(l){ pb.text(ML,ly2,l,8.8,{bold:true}); ly2+=11; });
     if(rcmLines.length){ ly2+=6; var hh=rcmLines.length*10.5+14; pb.rect(ML,ly2,nw,hh,{fill:C.paper}); rcmLines.forEach(function(l,i){ pb.text(ML+8,ly2+12+i*10.5,l,8.2,{color:C.ink}); }); ly2+=hh; }
     y=Math.max(ty+30,ly2)+16;
-    // payment, notes, terms
+    // payment, notes and terms on the left; the authentication stamp and then the signature on the right
     var bank=[]; [['Account name',inv.acctName],['Bank',inv.bankName],['Account no.',inv.acctNo],['IFSC',inv.ifsc],['Branch',inv.branch],['UPI',inv.upi]].forEach(function(r){ if(r[1]) bank.push(r); });
-    var terms=pb.wrap(inv.terms||'Payment is due by the date shown on this invoice. Subject to Bengaluru jurisdiction. This is a computer-generated invoice.',CW-250,8.2,false);
-    var noteLines=m.notes? pb.wrap(m.notes,CW-250,8.4,false):[];
-    var need=Math.max(14+bank.length*11+ (noteLines.length? 22+noteLines.length*10.5:0) + 22+terms.length*10.5, 78);
-    if(y+need>LIMIT){ y=head(); }
+    var leftW=CW-264;
+    var terms=pb.wrap(inv.terms||'Payment is due by the date shown on this invoice. Subject to Bengaluru jurisdiction. This is a computer-generated invoice.',leftW,8.2,false);
+    var noteLines=m.notes? pb.wrap(m.notes,leftW,8.4,false):[];
+    var sg=(state.settings&&state.settings.signature)||{};
+    if(pb._sigIdx===undefined){ pb._sigIdx=(sg.b64 && sg.w && sg.h)? pb.addImage(pdfB64Bytes(sg.b64), sg.w, sg.h) : -1; }
+    var hasSig=pb._sigIdx>=0, authH=invIssued(m)?66:62, sigBlock=hasSig?96:82, rightH=authH+6+sigBlock;
+    var leftNeed=14+bank.length*11+ (noteLines.length? 22+noteLines.length*10.5:0) + 22+terms.length*10.5;
+    var need=Math.max(leftNeed, rightH);
+    if(y+need+4>LIMIT){ y=head(); }
     var cy=y;
     if(bank.length){ pb.text(ML,cy+8,'Bank details',8.6,{bold:true,color:C.goldDk}); cy+=20; bank.forEach(function(r){ pb.text(ML,cy,r[0]+':',8.6,{color:C.mute}); pb.text(ML+76,cy,r[1],8.6,{bold:true}); cy+=11; }); cy+=8; }
     if(noteLines.length){ pb.text(ML,cy+8,'Notes',8.6,{bold:true,color:C.goldDk}); cy+=20; noteLines.forEach(function(l){ pb.text(ML,cy,l,8.4,{color:C.mute}); cy+=10.5; }); cy+=8; }
     pb.text(ML,cy+8,'Terms',8.6,{bold:true,color:C.goldDk}); cy+=20; terms.forEach(function(l){ pb.text(ML,cy,l,8.2,{color:C.mute}); cy+=10.5; });
-    pb.text(MR,y+10,'For '+COMPANY.tradeName,9,{bold:true,align:'right'});
-    pb.line(MR-170,y+62,MR,y+62,0.6,C.ink);
-    pb.text(MR,y+74,'Authorised signatory',8.6,{align:'right',color:C.mute});
-    pb.text(MR,y+85,pdfSignatory().name+', '+pdfSignatory().role,8.6,{align:'right',color:C.mute});
+    var ah=drawInvoiceAuth(pb,MR-250,y,250,m,C), sy=y+ah+6;
+    pb.text(MR,sy+10,'For '+COMPANY.tradeName,9,{bold:true,align:'right'});
+    var lineY=sy+(hasSig?68:56);
+    if(hasSig){ var hh=46, ww=Math.min(160, sg.w*hh/sg.h); pb.imageX(pb._sigIdx,MR-ww-14,sy+17,ww,hh); }
+    pb.line(MR-170,lineY,MR,lineY,0.6,C.ink);
+    pb.text(MR,lineY+12,'Authorised signatory',8.6,{align:'right',color:C.mute});
+    pb.text(MR,lineY+23,pdfSignatory().name+', '+pdfSignatory().role,8.6,{align:'right',color:C.mute});
   }
-  function buildInvoicePdf(m){ var pb=pdfNew(false); drawInvoice(pb,m); pdfFoot(pb,'Computer-generated invoice'); return pb.build(); }
+  function buildInvoicePdf(m){
+    var pb=pdfNew(false); drawInvoice(pb,m);
+    var fp=invIssued(m)?invFingerprint(m):null;
+    pb.meta.title='Tax Invoice '+m.no; pb.meta.subject=fp?'Document ID '+fp.id:(m.sample?'Sample, not an invoice':'Draft, not issued'); pb.meta.keywords='invoice, '+(m.client&&m.client.name||'');
+    pdfFoot(pb, fp?'Computer-generated invoice  |  Document ID '+invIdShown(fp):(m.sample?'Sample invoice, not issued':'Draft invoice, not issued')); return pb.build();
+  }
   function invoiceModelFromModal(){
     var client=clients.find(function(c){return c.id===document.getElementById('invClient').value;})||{name:''};
     var p=renderInvoicePreview();
     return {no:document.getElementById('invNo').value, date:document.getElementById('invDate').value, due:document.getElementById('invDue').value, month:document.getElementById('invMonth').value,
       notes:document.getElementById('invNotes').value.trim(), client:client, items:p.allItems.filter(function(i){return i.description||i.amount;}),
-      subtotal:p.subtotal, normalBase:p.normalBase, rcmBase:p.rcmBase, gstPct:p.gstPct, inter:p.inter, pos:p.pos, posCode:p.posCode, exempt:!!client.gstExempt};
+      subtotal:p.subtotal, normalBase:p.normalBase, rcmBase:p.rcmBase, gstPct:p.gstPct, inter:p.inter, pos:p.pos, posCode:p.posCode, exempt:!!client.gstExempt,
+      status:document.getElementById('invStatus').value, unsaved:true};
   }
   function invoiceModelFromSaved(inv){
     var client=clients.find(function(c){return c.id===inv.clientId;})||{name:inv.clientName||''};
@@ -6545,17 +7266,17 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var normalBase=items.filter(function(i){return i.cat!=='rcm';}).reduce(function(s,i){return s+i.amount;},0);
     var sp=supplyType(client);
     return {no:inv.invoiceNo, date:inv.invoiceDate, due:inv.dueDate, month:inv.month, notes:inv.notes||'', client:client, items:items,
-      subtotal:subtotal, normalBase:normalBase, rcmBase:subtotal-normalBase, gstPct:Number(inv.gstPct)||0, inter:sp.inter, pos:sp.pos, posCode:sp.code, exempt:!!client.gstExempt};
+      subtotal:subtotal, normalBase:normalBase, rcmBase:subtotal-normalBase, gstPct:Number(inv.gstPct)||0, inter:sp.inter, pos:sp.pos, posCode:sp.code, exempt:!!client.gstExempt, status:inv.status||''};
   }
   async function saveInvoicePdf(model){
     var blob;
     try{ blob=buildInvoicePdf(model); }catch(e){ toast('Could not build the PDF.'); return; }
-    var fname=String(model.no||'invoice').replace(/[^A-Za-z0-9_-]/g,'_')+'.pdf';
+    var fname='Invoice-'+String(model.no||'invoice').replace(/[^A-Za-z0-9_-]/g,'_')+'.pdf';
     if(downloadsCap){ try{ await downloadsCap.save({filename:fname, data:blob}); return; }catch(err){ if(err && err.code==='declined') return; } }
     var url=URL.createObjectURL(blob), a=document.createElement('a'); a.href=url; a.download=fname; document.body.appendChild(a); a.click(); a.remove(); URL.revokeObjectURL(url);
   }
   async function downloadInvoiceFile(){
-    var m=invoiceModelFromModal();
+    var m=invoiceModelFromModal(); (function(){ var sv=invoices.find(function(x){ return x.id===document.getElementById('invId').value; }); if(sv && invFingerprint(invoiceModelFromSaved(sv)).hex===invFingerprint(m).hex){ m.unsaved=false; m.status=sv.status||m.status; } })();
     if(!m.items.length){ toast('Add at least one line item first.'); return; }
     await saveInvoicePdf(m);
   }
@@ -6611,7 +7332,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       saveInvoicePdf({no:'SAMPLE', date:xToday(), due:xAddDays(xToday(),30), month:thisMonth(), notes:'Sample invoice to preview the letterhead.',
         client:{name:'Sample Client Pvt Ltd', address:'Client address line, Bengaluru - 560001, Karnataka', gstin:'29AAAAA0000A1Z5', contact:'Accounts team'},
         items:[{description:'Security Guard: 60 man-days of 30 (2 posts contracted)', qty:60, rate:700, amount:42000, cat:'rcm'},{description:'Housekeeping: 30 man-days of 30 (1 post contracted)', qty:30, rate:533.33, amount:15999.9, cat:'normal'}],
-        subtotal:57999.9, normalBase:15999.9, rcmBase:42000, gstPct:18, inter:false, pos:'Karnataka', posCode:'29', exempt:false});
+        subtotal:57999.9, normalBase:15999.9, rcmBase:42000, gstPct:18, inter:false, pos:'Karnataka', posCode:'29', exempt:false, sample:true});
     });
   }
 
@@ -6701,11 +7422,13 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     return pb.build();
   }
 
-  // who signs the documents: the name and designation saved in Settings, Payslip signature. A saved "Proprietor" (or nothing) shows as "Operations Head".
+  // who signs the documents: the name and designation saved in Settings. Until one is saved (or while the old default, the registered name, is still saved) it is Sharath R, Accounts Head.
   function pdfSignatory(){
-    var sg=(state.settings&&state.settings.signature)||{}, role=String(sg.designation||'').trim();
-    if(!role || /^proprietor$/i.test(role)) role='Operations Head';
-    return {name:String(sg.name||'').trim()||COMPANY.legalName, role:role};
+    var sg=(state.settings&&state.settings.signature)||{}, name=String(sg.name||'').trim(), role=String(sg.designation||'').trim();
+    if(!(Number(sg.v)>=2) && (!name || name===COMPANY.legalName)) return {name:DEFAULT_SIGNATORY.name, role:DEFAULT_SIGNATORY.role};
+    if(!name) name=DEFAULT_SIGNATORY.name;
+    if(!role || /^proprietor$/i.test(role)) role=(name===DEFAULT_SIGNATORY.name)?DEFAULT_SIGNATORY.role:'Authorised signatory';
+    return {name:name, role:role};
   }
   // "Prepared for" and the date, shown under the title of a rate card made for one client
   function pdfMetaBand(pb,ML,CW,MR,y,meta,C){
@@ -6924,13 +7647,15 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var half=(CW-20)/2, lx=ML, rx=ML+half+20;
     function head2(x,t){ pb.rect(x,y,half,20,{fill:C.ink}); pb.text(x+8,y+13.5,t,8.6,{bold:true,color:C.white}); pb.text(x+half-8,y+13.5,'Amount (Rs.)',8.6,{bold:true,color:C.white,align:'right'}); }
     head2(lx,'Earnings'); head2(rx,'Deductions');
-    var ot=r.otPay||0, nt=r.nightPay||0, ar=r.arrears||0, ap=r.addPay||0, addE=(r.addLines||[]).map(function(a){ return [addPayLabel(a),a.amount]; }), earn;
+    var ot=r.otPay||0, nt=r.nightPay||0, ar=r.arrears||0, ap=r.addPay||0, dp=r.dutyPay||0, dl=dutyPayLabel(r.extraDuty), hp=r.holidayPay||0, hl=holidayPayLabel(r.holidayDuty,r.holidayMult), addE=(r.addLines||[]).map(function(a){ return [addPayLabel(a),a.amount]; }), earn;
     if(r.struct){
       earn=[['Basic',r.basicPay||0],['Dearness allowance (D.A.)',r.daPay||0]];
       if(r.extraPay) earn.push(['Extra '+Math.max(0,(r.dutyHrs||8)-8)+' hrs ('+(r.dutyHrs||8)+'-hour duty)',r.extraPay]);
+      if(dp) earn.push([dl,dp]);
+      if(hp) earn.push([hl,hp]);
       if(ot) earn.push(['Overtime ('+(r.otHrs||0)+' hrs)',ot]); if(nt) earn.push(['Night shift allowance ('+(r.nights||0)+')',nt]); if(ar) earn.push(['Arrears (wage revision)',ar]); addE.forEach(function(a){ earn.push(a); });
     }
-    else if(ot||nt||ar||ap){ earn=[['Pay for days worked',(r.gross||0)-ot-nt-ar-ap]]; if(ot) earn.push(['Overtime ('+(r.otHrs||0)+' hrs)',ot]); if(nt) earn.push(['Night shift allowance ('+(r.nights||0)+')',nt]); if(ar) earn.push(['Arrears (wage revision)',ar]); addE.forEach(function(a){ earn.push(a); }); }
+    else if(ot||nt||ar||ap||dp||hp){ earn=[['Pay for days worked',(r.gross||0)-ot-nt-ar-ap-dp-hp]]; if(dp) earn.push([dl,dp]); if(hp) earn.push([hl,hp]); if(ot) earn.push(['Overtime ('+(r.otHrs||0)+' hrs)',ot]); if(nt) earn.push(['Night shift allowance ('+(r.nights||0)+')',nt]); if(ar) earn.push(['Arrears (wage revision)',ar]); addE.forEach(function(a){ earn.push(a); }); }
     else earn=[['Gross pay',r.gross||0]];
     var ded=[['Provident fund (PF)',r.pf||0],['ESI',r.esi||0],['Professional tax',r.pt||0],['Salary advance',r.advance||0]];
     if(r.otherDed) ded.push(['Other deduction',r.otherDed]);
@@ -6964,7 +7689,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     }
     payslipSignature(pb,y,ML,MR,pb._sigIdx,sg);
   }
-  function buildPayslipPdf(r,run,ym){ var pb=pdfNew(false); drawPayslip(pb,r,run,ym); pdfFoot(pb,'Computer-generated payslip'); return pb.build(); }
+  function buildPayslipPdf(r,run,ym){ var pb=pdfNew(false); drawPayslip(pb,r,run,ym); pb.meta.title='Payslip '+(r.name||'')+' '+ym; pb.meta.subject='Ref PS-'+ym+'-'+(r.empCode||r.empId||'')+'-'+pdfRef(r,run,ym); pdfFoot(pb,'Computer-generated payslip'); return pb.build(); }
   function buildAllPayslipsPdf(run,ym){ var pb=pdfNew(false); (run.rows||[]).forEach(function(r){ drawPayslip(pb,r,run,ym); }); pdfFoot(pb,'Computer-generated payslip',true); return pb.build(); }
 
   /* ---------- payroll register (all employees for the month) ---------- */
@@ -7355,8 +8080,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   function renderSignatureSettings(){
     if(sigSetDirty || !document.getElementById('sigName')) return;
     var v=(state.settings&&state.settings.signature)||{};
-    document.getElementById('sigName').value=v.name||COMPANY.legalName;
-    document.getElementById('sigDesig').value=(v.designation && !/^proprietor$/i.test(v.designation))?v.designation:'Operations Head';
+    document.getElementById('sigName').value=pdfSignatory().name;
+    document.getElementById('sigDesig').value=pdfSignatory().role;
     document.getElementById('sigStamp').checked=v.stamp!==false;
     sigDraft=null; sigPreviewShow(v.b64||'');
   }
@@ -7380,7 +8105,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   }
   function currentSignatureSettings(){
     var cur=(state.settings&&state.settings.signature)||{}, base=sigDraft||cur;
-    return {name:document.getElementById('sigName').value.trim()||COMPANY.legalName, designation:document.getElementById('sigDesig').value.trim()||'Operations Head',
+    return {v:2, name:document.getElementById('sigName').value.trim()||DEFAULT_SIGNATORY.name, designation:document.getElementById('sigDesig').value.trim()||DEFAULT_SIGNATORY.role,
       stamp:document.getElementById('sigStamp').checked, b64:base.b64||'', w:base.w||0, h:base.h||0};
   }
   function setupSignatureUI(){
@@ -7438,15 +8163,17 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     return hits.find(function(r){ return (Number(r.dutyHrs)||8)===8; })||hits[0];
   }
   // Day-by-day marks for one employee: P present, A absent, H half day, L leave, - not employed that day.
-  function attendanceMarks(e, ym, days){
-    var dim=daysInMonth(ym), marks=[], lop=0, out=0;
+  // duty (optional) holds days with more than one duty, such as {'5':2}. extra is the number of duties above one a day, over the month.
+  function attendanceMarks(e, ym, days, duty){
+    var dim=daysInMonth(ym), marks=[], dutyArr=[], offArr=[], lop=0, out=0, extra=0, hx=0, wo=0; duty=duty||{};
     for(var d=1; d<=dim; d++){
       var ds=ym+'-'+String(d).padStart(2,'0');
-      if((e.doj && ds<e.doj) || (e.dol && ds>e.dol)){ marks.push('-'); out++; continue; }
+      if((e.doj && ds<e.doj) || (e.dol && ds>e.dol)){ marks.push('-'); dutyArr.push(1); offArr.push(false); out++; continue; }
       var st=days[String(d)]||'P'; marks.push(st);
+      var dv=(st==='P' && dutyOk(duty[String(d)]))?Number(duty[String(d)]):1; dutyArr.push(dv); extra+=dv-1; var offH=offKind(e,ym,d); offArr.push(offH); if(offH && st==='P') wo++; if(dv>1 && offH) hx+=dv-1;
       if(st==='A') lop+=1; else if(st==='H') lop+=0.5;
     }
-    return {dim:dim, marks:marks, pay:dim-lop-out, lop:lop, out:out};
+    return {dim:dim, marks:marks, duty:dutyArr, off:offArr, wo:wo, extra:extra, hx:hx, pay:dim-lop-out, payB:dim-lop-out+((state.settings&&state.settings.billExtraDuty===false)?0:extra), lop:lop, out:out};
   }
   // One employee's share of the rate card for the days worked (the columns of the wage register).
   function employeeBilling(card, rr, pay, dim, e){
@@ -7476,9 +8203,9 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var advBy={}; if(run && run.rows) run.rows.forEach(function(r){ advBy[r.empId]=Number(r.advance)||0; });
     var rows=[];
     for(var i=0;i<emps.length;i++){
-      var e=emps[i], doc=await getAttendanceDoc(e.id, ym), att=attendanceMarks(e,ym,(doc&&doc.days)||{});
+      var e=emps[i], doc=await getAttendanceDoc(e.id, ym), att=attendanceMarks(e,ym,(doc&&doc.days)||{},(doc&&doc.duty)||{});
       var rr=rc?findRcRole(rc,e.role,e.dutyHrs):null, b=null;
-      if(rr){ b=employeeBilling(rc,rr,att.pay,dim,e); b.adv=advBy[e.id]||0; b.canteen=0; b.unifd=0;
+      if(rr){ b=employeeBilling(rc,rr,att.payB,dim,e); b.adv=advBy[e.id]||0; b.canteen=0; b.unifd=0;
         b.totald=b.pf12+b.esic075+b.pt+b.canteen+b.adv+b.unifd; b.net=b.gross-b.totald; }
       else if(rc){ warns.push((e.name||'Employee')+' ('+(e.role||'no role')+') has no matching role on the rate card, so is left out of the wage register.'); }
       rows.push({e:e, att:att, b:b, short:roleShort(e.role), role:e.role||'', col:(rr&&rc&&rc.roles)?rc.roles.indexOf(rr):-1});
@@ -7532,7 +8259,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var rowH=14.5, groups=[], cur=null;
     data.rows.forEach(function(r){ if(!r.b) return; if(!cur||cur.col!==r.col){ cur={col:r.col,rows:[]}; groups.push(cur); } cur.rows.push(r); });
     var keys=['pdays','basic','da','subA','extra','subB','pf','esic','medical','bonus','leave','natHol','uniform','training','subC','relieve','subD','service','gst','billing','pf12','esic075','pt','canteen','adv','unifd','totald','net'];
-    function sums(list){ var t={}; keys.forEach(function(k){ t[k]=0; }); list.forEach(function(r){ keys.forEach(function(k){ t[k]+= (k==='pdays'? r.att.pay : (r.b[k]||0)); }); }); return t; }
+    function sums(list){ var t={}; keys.forEach(function(k){ t[k]=0; }); list.forEach(function(r){ keys.forEach(function(k){ t[k]+= (k==='pdays'? r.att.payB : (r.b[k]||0)); }); }); return t; }
     function totalRow(label,t,dark){
       if(y+rowH+4>LIMIT){ y=pdfHead(pb,true); colHead(); }
       pb.rect(ML,y,tableW,rowH+1.5,{fill:dark?C.ink:C.paper});
@@ -7546,7 +8273,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         if(y+rowH>LIMIT){ y=pdfHead(pb,true); colHead(); }
         n++; var b=r.b;
         put(0,String(n),y+10); put(1,r.e.empCode||'',y+10); put(2,(r.e.name||'').toUpperCase(),y+10); put(3,r.short,y+10);
-        put(4,String(data.dim),y+10); put(5,r.att.pay.toFixed(1),y+10);
+        put(4,String(data.dim),y+10); put(5,r.att.payB.toFixed(1),y+10);
         keys.slice(1).forEach(function(k){ put(ci(k),String(Math.round(b[k]||0)),y+10,(k==='net'||k==='billing')); });
         y+=rowH; pb.line(ML,y,ML+tableW,y,0.3,C.line);
       });
@@ -7604,7 +8331,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var rowH=14.5, groups=[], cur=null;
     data.rows.forEach(function(r){ if(!r.b) return; if(!cur||cur.role!==r.role){ cur={role:r.role,rows:[]}; groups.push(cur); } cur.rows.push(r); });
     var keys=['pdays','basic','da','special','extra','washing','gross','pf13','esic325','bonus','uniform','subb','ctc','sc','gst','billing','pf12','esic075','pt','canteen','adv','unifd','totald','net'];
-    function sums(list){ var t={}; keys.forEach(function(k){ t[k]=0; }); list.forEach(function(r){ keys.forEach(function(k){ t[k]+= (k==='pdays'? r.att.pay : (r.b[k]||0)); }); }); return t; }
+    function sums(list){ var t={}; keys.forEach(function(k){ t[k]=0; }); list.forEach(function(r){ keys.forEach(function(k){ t[k]+= (k==='pdays'? r.att.payB : (r.b[k]||0)); }); }); return t; }
     function totalRow(label,t,dark){
       if(y+rowH+4>LIMIT){ y=pdfHead(pb,true); colHead(); }
       pb.rect(ML,y,tableW,rowH+1.5,{fill:dark?C.ink:C.paper});
@@ -7618,7 +8345,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         if(y+rowH>LIMIT){ y=pdfHead(pb,true); colHead(); }
         n++; var b=r.b;
         put(0,String(n),y+10); put(1,r.e.empCode||'',y+10); put(2,(r.e.name||'').toUpperCase(),y+10); put(3,r.short,y+10);
-        put(4,String(data.dim),y+10); put(5,r.att.pay.toFixed(1),y+10);
+        put(4,String(data.dim),y+10); put(5,r.att.payB.toFixed(1),y+10);
         keys.slice(1).forEach(function(k){ put(ci(k),String(Math.round(b[k]||0)),y+10,(k==='net'||k==='billing')); });
         y+=rowH; pb.line(ML,y,ML+tableW,y,0.3,C.line);
       });
@@ -7633,42 +8360,76 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     pb.text(pb.W-24,y+44,'Authorised signatory (with seal)',7.6,{color:C.mute,align:'right'}); pb.line(pb.W-24-190,y+38,pb.W-24,y+38,0.5,C.ink);
   }
 
+  // the number written in the Present, W/O, O/T and Total columns: a whole number, or with .5 for a half (the PDF font has no half sign)
+  function sheetNum(n){ n=Math.round((Number(n)||0)*100)/100; return String(n); }
   function drawAttendanceSheet(pb, data){
-    var C=PDFC, ML=36, y=pdfHead(pb,true), CWt=pb.W-72, LIMIT=pb.H-78, dim=data.dim;
+    var C=PDFC, ML=36, y=pdfHead(pb,true), CWt=pb.W-72, LIMIT=pb.H-78, dim=data.dim, showX=!(state.settings && state.settings.billExtraDuty===false);
+    var RED='#B2372D', BLUE='#1F4E9A';
     pb.text(ML,y+8,'ATTENDANCE SHEET',14,{bold:true}); pb.text(pb.W-36,y+8,xMonthLabel(data.ym),11,{bold:true,align:'right',color:C.goldDk});
     y+=20; pb.text(ML,y+8,'Unit name: ',8.8,{color:C.mute}); pb.text(ML+50,y+8,data.site,9.4,{bold:true});
     if(data.client&&data.client.name) pb.text(ML+300,y+8,'Client: '+data.client.name,8.8,{color:C.mute});
     y+=18;
-    var fixed=18+44+26+108+36, dw=Math.floor((CWt-fixed)/dim*10)/10, x0=ML, hh=20, rh=17;
-    var X={sl:x0, id:x0+18, desig:x0+62, name:x0+88, d0:x0+196, tot:x0+196+dw*dim};
+    var SW=[30,24,24,30], fixed=18+44+26+108+SW[0]+SW[1]+SW[2]+SW[3], dw=Math.floor((CWt-fixed)/dim*10)/10, x0=ML, hh=27, rh=17, holD=holMap(data.ym);
+    var X={sl:x0, id:x0+18, desig:x0+62, name:x0+88, d0:x0+196, pres:x0+196+dw*dim}; X.wo=X.pres+SW[0]; X.ot=X.wo+SW[1]; X.tot=X.ot+SW[2];
+    // each day's heading: a company holiday reads HOL, a weekly off reads the weekday (SUN), both in red
+    var dayKind=[]; for(var q=0;q<dim;q++) dayKind.push(holD[String(q+1)]!=null ? 'HOL' : (data.rows.some(function(r){ return r.att.off && r.att.off[q]==='weekly'; }) ? DOW_NAMES[dowOf(data.ym,q+1)].slice(0,3).toUpperCase() : ''));
     function thead(){
       pb.rect(ML,y,CWt,hh,{fill:C.ink});
-      pb.text(X.sl+9,y+13,'Sr',7,{bold:true,color:C.white,align:'center'}); pb.text(X.id+3,y+13,'ID No',7,{bold:true,color:C.white});
-      pb.text(X.desig+13,y+13,'Desig',7,{bold:true,color:C.white,align:'center'}); pb.text(X.name+3,y+13,'Name',7,{bold:true,color:C.white});
-      for(var d=1; d<=dim; d++) pb.text(X.d0+dw*(d-1)+dw/2,y+13,String(d),6.8,{bold:true,color:C.white,align:'center'});
-      pb.text(X.tot+18,y+13,'Total',7,{bold:true,color:C.white,align:'center'});
+      pb.text(X.sl+9,y+17,'Sr',7,{bold:true,color:C.white,align:'center'}); pb.text(X.id+3,y+17,'ID No',7,{bold:true,color:C.white});
+      pb.text(X.desig+13,y+17,'Desig',7,{bold:true,color:C.white,align:'center'}); pb.text(X.name+3,y+17,'Name',7,{bold:true,color:C.white});
+      for(var d=1; d<=dim; d++){
+        var k=dayKind[d-1], dx=X.d0+dw*(d-1);
+        if(k){ pb.rect(dx,y,dw,hh,{fill:RED}); pb.text(dx+dw/2,y+10,k,5,{bold:true,color:C.white,align:'center'}); pb.text(dx+dw/2,y+21,String(d),6.8,{bold:true,color:C.white,align:'center'}); }
+        else pb.text(dx+dw/2,y+17,String(d),6.8,{bold:true,color:C.white,align:'center'});
+      }
+      [['Present',X.pres,SW[0]],['W/O',X.wo,SW[1]],['O/T',X.ot,SW[2]],['Total',X.tot,SW[3]]].forEach(function(c){ pb.text(c[1]+c[2]/2,y+17,c[0],6.6,{bold:true,color:C.white,align:'center'}); });
       y+=hh;
     }
     thead();
-    var total=0, n=0;
+    var T={pres:0,wo:0,ot:0,all:0}, n=0;
     data.rows.forEach(function(r){
       if(y+rh>LIMIT){ y=pdfHead(pb,true); thead(); }
       n++;
       pb.text(X.sl+9,y+11.5,String(n),7.6,{align:'center',color:C.mute}); pb.text(X.id+3,y+11.5,r.e.empCode||'',7.4);
       pb.text(X.desig+13,y+11.5,r.short,7.4,{align:'center'}); pb.text(X.name+3,y+11.5,pdfFit(pb,r.e.name||'',102,8,true),8,{bold:true});
-      r.att.marks.forEach(function(m,i){
-        var col=m==='A'?'#B2372D':m==='H'?'#B07A10':m==='-'?'#9A9A92':m==='L'?'#2F6E3F':C.ink;
-        pb.text(X.d0+dw*i+dw/2,y+11.5,m,7.4,{align:'center',color:col,bold:m!=='P'&&m!=='-'});
+      var att=r.att;
+      att.marks.forEach(function(m,i){
+        var cl=X.d0+dw*i, cx=cl+dw/2, dv=(showX && m==='P' && att.duty && att.duty[i]>1)?att.duty[i]:1, offH=!!(att.off && att.off[i]);
+        if(m==='-'){ pb.text(cx,y+11.5,'-',7.4,{align:'center',color:'#9A9A92'}); return; }
+        if(offH || dayKind[i]==='HOL') pb.rect(cl,y,dw,rh,{fill:'#F5D3CE'});
+        if(m==='P'){
+          if(offH){   // a day off: blank when not worked, P when worked, 4 when half a day was worked
+            if(dv>=2) pb.text(cx,y+11.5,'P',7.6,{align:'center',color:RED,bold:true});
+            else if(dv>1) pb.text(cx,y+11.5,'4',7.6,{align:'center',color:RED,bold:true});
+            return;
+          }
+          if(dv===1){ pb.text(cx,y+11.5,'P',7.4,{align:'center',color:C.ink}); return; }
+          if(dv===2){ pb.text(cx,y+7.4,'P',6,{align:'center',color:BLUE,bold:true}); pb.text(cx,y+14.8,'P',6.4,{align:'center',color:BLUE,bold:true}); }
+          else if(dv===1.5){ pb.text(cx,y+7.4,'4',6,{align:'center',color:BLUE,bold:true}); pb.text(cx,y+14.8,'P',6.4,{align:'center',color:BLUE,bold:true}); }
+          else pb.text(cx,y+11.5,dutyNum(dv),6.6,{align:'center',color:BLUE,bold:true});
+          return;
+        }
+        var col=m==='A'?RED:m==='H'?'#B07A10':m==='L'?'#2F6E3F':C.ink;
+        pb.text(cx,y+11.5,m,7.4,{align:'center',color:col,bold:true});
       });
-      var shown=(Math.round(r.att.pay*10)/10); total+=r.att.pay;
-      pb.text(X.tot+18,y+11.5,(shown%1?shown.toFixed(1):String(shown)),8,{bold:true,align:'center'});
+      var wo=att.wo||0, ot=showX?(att.extra||0):0, pres=att.pay-wo, all=pres+wo+ot;
+      T.pres+=pres; T.wo+=wo; T.ot+=ot; T.all+=all;
+      pb.text(X.pres+SW[0]/2,y+11.5,sheetNum(pres),7.8,{align:'center'}); pb.text(X.wo+SW[1]/2,y+11.5,sheetNum(wo),7.8,{align:'center'});
+      pb.text(X.ot+SW[2]/2,y+11.5,ot?sheetNum(ot):'-',7.8,{align:'center',color:ot?BLUE:C.mute,bold:!!ot}); pb.text(X.tot+SW[3]/2,y+11.5,sheetNum(all),8.2,{bold:true,align:'center'});
       y+=rh; pb.line(ML,y,ML+CWt,y,0.3,C.line);
     });
     if(y+rh>LIMIT){ y=pdfHead(pb,true); thead(); }
     pb.rect(ML,y,CWt,rh+1,{fill:C.paper}); pb.text(X.name+3,y+11.8,'Total',8.2,{bold:true});
-    var tt=Math.round(total*10)/10; pb.text(X.tot+18,y+11.8,(tt%1?tt.toFixed(1):String(tt)),8.4,{bold:true,align:'center'});
+    pb.text(X.pres+SW[0]/2,y+11.8,sheetNum(T.pres),8,{bold:true,align:'center'}); pb.text(X.wo+SW[1]/2,y+11.8,sheetNum(T.wo),8,{bold:true,align:'center'});
+    pb.text(X.ot+SW[2]/2,y+11.8,T.ot?sheetNum(T.ot):'-',8,{bold:true,align:'center'}); pb.text(X.tot+SW[3]/2,y+11.8,sheetNum(T.all),8.4,{bold:true,align:'center'});
     y+=rh+10;
-    pb.text(ML,y+6,'P = present   A = absent   H = half day   L = leave   - = not employed on that day',7,{color:C.mute});
+    var hol=holMap(data.ym), hk=Object.keys(hol).map(Number).sort(function(a,b){ return a-b; });
+    var keyLines=['P = present   PP = two duties   4 over P = one and a half duties (the 4 is an extra half day)   A = absent   H = half day   L = paid leave   - = not employed on that day',
+      'Red days are weekly offs and holidays: blank = not worked (paid), P = worked (an extra duty), 4 = worked half a day.   Present + W/O + O/T = Total.   W/O = paid weekly offs and holidays   O/T = extra duties'+(showX?'':' (not billed, so not shown)')];
+    keyLines.splice(1,0,'HOL = company holiday, shaded for everyone.   SUN (or another weekday) = weekly off.   A red heading and a shaded column mark these days.');
+    if(hk.length) keyLines.push('Holidays: '+hk.map(function(k){ return k+' '+xMonthShort(data.ym)+' '+hol[String(k)]; }).join(', '));
+    keyLines.forEach(function(t,i){ pb.text(ML,y+6+i*9.5,t,6.9,{color:(t.indexOf('Holidays: ')===0)?RED:C.mute,bold:(t.indexOf('Holidays: ')===0)}); });
+    y+=keyLines.length*9.5-9.5;
     if(y+70>LIMIT){ y=pdfHead(pb,true); }
     y+=14; var sy=y+34;
     [['Prepared by',ML],['Checked by Area Officer',ML+CWt/3+8],['Client authorised signatory (with seal)',ML+2*CWt/3+16]].forEach(function(s){ pb.line(s[1],sy,s[1]+CWt/3-30,sy,0.5,C.ink); pb.text(s[1],sy+11,s[0],7.6,{color:C.mute}); });
@@ -7804,6 +8565,15 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   }
   function cycClosed(ym){ return !!cycDoc(ym).closed; }
   function cycEmps(ym){ return state.employees.filter(function(e){ return employedInMonth(e,ym) && empGroupId(e,ym)===payScope; }).sort(compareByEmpCode); }
+  // the errors that were pushed through for the calculation now on screen (null when there are none)
+  function cycOverride(ym){ var c=cycDoc(ym), r=cycRun(ym), o=c.override; return (o && c.validated && r && r.calculatedAt && o.stamp===r.calculatedAt)?o:null; }
+  function overrideBannerHtml(ym, withList){
+    var o=cycOverride(ym); if(!o) return '';
+    var d=new Date(o.at), when=d.toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'})+', '+d.toLocaleTimeString('en-IN',{hour:'numeric',minute:'2-digit'});
+    var h='<div class="banner" style="border-color:#B07A10;background:var(--warn-soft,#FFF4DA)"><b>Pushed through with '+o.n+' error'+(o.n>1?'s':'')+' that '+(o.n>1?'were':'was')+' not fixed.</b> By '+escapeHtml(o.byLabel||'someone')+' on '+escapeHtml(when)+'. Reason: '+escapeHtml(o.reason||'')+'.';
+    if(withList && o.items && o.items.length){ h+='<ul style="margin:.4rem 0 0 1.1rem">'+o.items.slice(0,12).map(function(i){ return '<li>'+escapeHtml(i.name||'')+': '+escapeHtml(i.msg||'')+'</li>'; }).join('')+(o.items.length>12?'<li>and '+(o.items.length-12)+' more</li>':'')+'</ul>'; }
+    return h+'</div>';
+  }
   function cycValidatedOk(ym){ var c=cycDoc(ym), r=cycRun(ym); return !!(c.validated && r && r.calculatedAt && c.validatedStamp===r.calculatedAt); }
   function cycDone(id,ym){
     var c=cycDoc(ym), r=cycRun(ym);
@@ -7839,7 +8609,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     cycAttCache={};
     var c=cycles[key];
     if(!c || c.closed) return;
-    if(c.reviewed || c.validated) patchCycleKey(key,{reviewed:false,validated:false,issues:null},'Attendance or employee data changed, so the review and validation must be done again');
+    if(c.reviewed || c.validated) patchCycleKey(key,{reviewed:false,validated:false,issues:null,override:null},'Attendance or employee data changed, so the review and validation must be done again');
   }
   function cycleReset(ym){ cycleResetKey(cycKey(ym)); }
   function subscribeCycleData(){
@@ -7857,6 +8627,10 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       db.collection('payrollRuns').onSnapshot(function(snap){
         var o={}; snap.docs.forEach(function(d){ o[d.id]=d.data(); runCache[d.id]=d.data(); });
         allRuns=o; cycRefresh();
+      }, function(){});
+      db.collection('holidays').onSnapshot(function(snap){
+        var o={}; snap.docs.forEach(function(d){ var x=d.data(); if(x && x.ym) o[x.ym]={ym:x.ym, days:x.days||{}}; });
+        state.holidays=o; var tb=document.getElementById('tab-attendance'); if(tb && tb.style.display!=='none') renderAttendance();
       }, function(){});
       db.collection('payslipLog').onSnapshot(function(snap){
         var o={}; snap.docs.forEach(function(d){ var x=d.data(); if(x && x.empId && x.ym && x.channel==='whatsapp') o[x.empId+'|'+x.ym]=x; });
@@ -7915,7 +8689,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     if(cycAttCache[ym]) return cycAttCache[ym];
     var emps=cycEmps(ym), out={};
     for(var i=0;i<emps.length;i+=10){
-      await Promise.all(emps.slice(i,i+10).map(async function(e){ var doc=await getAttendanceDoc(e.id,ym); out[e.id]=attendanceMarks(e,ym,(doc&&doc.days)||{}); }));
+      await Promise.all(emps.slice(i,i+10).map(async function(e){ var doc=await getAttendanceDoc(e.id,ym); out[e.id]=attendanceMarks(e,ym,(doc&&doc.days)||{},(doc&&doc.duty)||{}); }));
     }
     cycAttCache[ym]=out; return out;
   }
@@ -7937,6 +8711,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       var basicEarned=r.struct ? ((r.basicPay||0)+(r.daPay||0)) : ((r.gross||0)-(r.otPay||0)-(r.nightPay||0)-(r.addPay||0))*empBasicPct(e,st)/100;
       if(e.pfApplicable && st.pfCeilingEnabled && basicEarned>pfCeilNow()) add('warn','Basic pay is above the PF wage ceiling. PF is limited to '+fmtMoney(pfCeilNow()*(st.pfRate||12)/100)+'.');
       if((r.otHrs||0)>(st.otWarnHours||50)) add('warn','Overtime of '+r.otHrs+' hours is unusually high.');
+      if(((r.extraDuty||0)+(r.holidayDuty||0))>XD_WARN) add('warn','Extra duty and holiday work of '+dutyNum((r.extraDuty||0)+(r.holidayDuty||0))+' duties in the month is unusually high. Please check the days marked.');
       var acct=String(e.bankAcc||'').replace(/\s/g,''); if(acct) (seen[acct]=seen[acct]||[]).push(r.name);
     });
     Object.keys(seen).forEach(function(k){ if(seen[k].length>1) out.push({lv:'warn',id:null,name:seen[k].join(', '),msg:'These employees share one bank account number.'}); });
@@ -7965,7 +8740,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var ym=cycMonth(), D=daysInMonth(ym), emps=cycEmps(ym), closed=cycClosed(ym), c=cycDoc(ym);
     var h='';
     if(closed) h+='<div class="banner">This month is closed, so attendance and shifts are locked.</div>';
-    h+='<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><p class="muted" style="margin:0;max-width:64ch">'+escapeHtml(xMonthLabel(ym))+' has '+D+' days. Mark each day present, absent, half day or leave in the daily attendance. Then enter overtime hours, night shifts and any other deduction here.</p><button class="btn ghost" data-cyc="openAtt">Open daily attendance</button></div></div>';
+    h+='<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><p class="muted" style="margin:0;max-width:64ch">'+escapeHtml(xMonthLabel(ym))+' has '+D+' days. Mark each day present, absent, half day or leave in the daily attendance, and mark 1.5 or 2 duties for a day when someone worked extra. Then enter overtime hours, night shifts and any other deduction here.</p><button class="btn ghost" data-cyc="openAtt">Open daily attendance</button></div></div>';
     if(!emps.length) return h+'<div class="card"><p class="muted" style="margin:0">No employees were working in '+escapeHtml(xMonthLabel(ym))+'.</p></div>';
     h+='<div class="card"><div class="scrollx"><table><thead><tr><th>Employee</th><th class="right">OT hours</th><th class="right">Night shifts</th><th class="right">Other deduction (\u20b9)</th><th class="right">Additional pay</th><th>Note</th></tr></thead><tbody>';
     emps.forEach(function(e){
@@ -7982,17 +8757,17 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var ym=cycMonth(), c=cycDoc(ym), closed=cycClosed(ym);
     if(!c.attConfirmed) return cycGate([['attendance','Confirm attendance and shifts']]);
     var att=await cycLoadAtt(ym), emps=cycEmps(ym);
-    var rows=emps.filter(function(e){ var a=att[e.id]||{marks:[]}, x=exOf(e.id,ym), cnt=cycMarkCounts(a); return cnt.A||cnt.H||cnt.L||x.ot||x.night||x.otherDed||x.note||addLinesOf(x).length||(typeof suggestedAdvanceDeduction==='function'&&suggestedAdvanceDeduction(e.id)>0); });
+    var rows=emps.filter(function(e){ var a=att[e.id]||{marks:[]}, x=exOf(e.id,ym), cnt=cycMarkCounts(a); return cnt.A||cnt.H||cnt.L||cnt.X||cnt.HW||x.ot||x.night||x.otherDed||x.note||addLinesOf(x).length||(typeof suggestedAdvanceDeduction==='function'&&suggestedAdvanceDeduction(e.id)>0); });
     var h='';
     if(closed) h+='<div class="banner">This month is closed, so the review is locked.</div>';
     else if(c.reviewed) h+='<div class="banner">Review confirmed. You can continue to calculate payroll.</div>';
     h+='<div class="card"><p class="muted" style="margin:0 0 .8rem;max-width:70ch">These employees have absences, half days, leave, overtime, night shifts, advances or deductions this month. Check them, add a note where something needs explaining, then confirm.</p>';
     if(!rows.length) h+='<p class="muted" style="margin:0"><b>No exceptions this month.</b> Everyone worked a regular month.</p>';
     else{
-      h+='<div class="scrollx"><table><thead><tr><th>Employee</th><th class="right">Absent</th><th class="right">Half days</th><th class="right">Leave</th><th class="right">OT hours</th><th class="right">Night shifts</th><th class="right">Advance</th><th class="right">Other deduction</th><th>Note</th></tr></thead><tbody>';
+      h+='<div class="scrollx"><table><thead><tr><th>Employee</th><th class="right">Absent</th><th class="right">Half days</th><th class="right">Leave</th><th class="right">Extra duty</th><th class="right">Holiday work</th><th class="right">OT hours</th><th class="right">Night shifts</th><th class="right">Advance</th><th class="right">Other deduction</th><th>Note</th></tr></thead><tbody>';
       rows.forEach(function(e){
         var cnt=cycMarkCounts(att[e.id]||{marks:[]}), x=exOf(e.id,ym), adv=(typeof suggestedAdvanceDeduction==='function')?suggestedAdvanceDeduction(e.id):0;
-        h+='<tr><td><b>'+escapeHtml(e.name)+'</b><div class="muted">'+escapeHtml(e.site||'')+'</div></td><td class="right">'+cnt.A+'</td><td class="right">'+cnt.H+'</td><td class="right">'+cnt.L+'</td><td class="right">'+((x.ot||0)>(state.settings.otWarnHours||50)?xTag(String(x.ot),'warn'):(x.ot||0))+'</td><td class="right">'+(x.night||0)+'</td><td class="right">'+fmtMoney(adv||0)+'</td><td class="right">'+fmtMoney(x.otherDed||0)+'</td><td><input type="text" data-extra="note" data-id="'+e.id+'" value="'+escapeHtml(x.note||'')+'" placeholder="Add a note" style="min-width:160px"'+(closed?' disabled':'')+'></td></tr>';
+        h+='<tr><td><b>'+escapeHtml(e.name)+'</b><div class="muted">'+escapeHtml(e.site||'')+'</div></td><td class="right">'+cnt.A+'</td><td class="right">'+cnt.H+'</td><td class="right">'+cnt.L+'</td><td class="right">'+(cnt.X?dutyNum(cnt.X):0)+'</td><td class="right">'+(cnt.HW?dutyNum(cnt.HW):0)+'</td><td class="right">'+((x.ot||0)>(state.settings.otWarnHours||50)?xTag(String(x.ot),'warn'):(x.ot||0))+'</td><td class="right">'+(x.night||0)+'</td><td class="right">'+fmtMoney(adv||0)+'</td><td class="right">'+fmtMoney(x.otherDed||0)+'</td><td><input type="text" data-extra="note" data-id="'+e.id+'" value="'+escapeHtml(x.note||'')+'" placeholder="Add a note" style="min-width:160px"'+(closed?' disabled':'')+'></td></tr>';
       });
       h+='</tbody></table></div>';
     }
@@ -8000,7 +8775,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     if(!closed) h+='<div class="card"><button class="btn" data-cyc="confirmReview"'+(c.reviewed?' disabled':'')+'>'+(c.reviewed?'Review confirmed':'Confirm review')+'</button></div>';
     return h;
   };
-  function cycMarkCounts(a){ var n={A:0,H:0,L:0}; (a.marks||[]).forEach(function(m){ if(n[m]!==undefined) n[m]++; }); return n; }
+  function cycMarkCounts(a){ var n={A:0,H:0,L:0,X:0,HW:0}; (a.marks||[]).forEach(function(m){ if(n[m]!==undefined) n[m]++; }); n.HW=Number(a.hx)||0; n.X=(Number(a.extra)||0)-n.HW; return n; }
 
   CYC_PAGES.calculate=async function(){
     var ym=cycMonth(), c=cycDoc(ym), r=cycRun(ym), miss=[], closed=cycClosed(ym);
@@ -8021,15 +8796,23 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     if(!(r&&r.rows&&r.rows.length)) return cycGate([['calculate','Calculate monthly payroll']]);
     var t=cycTotals(r.rows), h='';
     h+='<div class="card"><div class="stat-grid"><div class="stat"><b>'+fmtMoney(t.pf)+'</b><span>PF from employees</span></div><div class="stat"><b>'+fmtMoney(t.pfEr)+'</b><span>PF by employer</span></div><div class="stat"><b>'+fmtMoney(t.esi)+'</b><span>ESI from employees</span></div><div class="stat"><b>'+fmtMoney(t.esiEr)+'</b><span>ESI by employer</span></div></div></div>';
-    h+='<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><p class="muted" style="margin:0;max-width:64ch">The checks cover UAN, ESIC number, bank details, negative pay and unusual values. Errors must be fixed. Warnings can be accepted.</p>'+(closed?'':'<button class="btn" data-cyc="runChecks">'+(c.issues?'Run checks again':'Run checks')+'</button>')+'</div></div>';
+    h+='<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><p class="muted" style="margin:0;max-width:64ch">The checks cover UAN, ESIC number, bank details, negative pay and unusual values. Errors should be fixed. If you must carry on now, Accounts or an administrator can push the payroll through with a reason. Warnings can be accepted.</p>'+(closed?'':'<button class="btn" data-cyc="runChecks">'+(c.issues?'Run checks again':'Run checks')+'</button>')+'</div></div>';
     if(!c.issues) return h+'<div class="card"><p class="muted" style="margin:0"><b>Checks not run yet.</b> Run the checks before sending this payroll for approval.</p></div>';
     var errs=c.issues.filter(function(i){return i.lv==='error';}), warns=c.issues.filter(function(i){return i.lv==='warn';});
-    if(cycValidatedOk(ym)) h+='<div class="banner"><b>Validated.</b> '+(warns.length?warns.length+' warning'+(warns.length>1?'s':'')+' accepted. ':'No issues found. ')+'This payroll can go for approval.</div>';
-    else if(errs.length) h+='<div class="banner" style="border-color:var(--bad)"><b>'+errs.length+' error'+(errs.length>1?'s':'')+' to fix.</b> Update the employee record, recalculate, then run the checks again.</div>';
+    var pushedO=cycOverride(ym);
+    if(pushedO){ h+=overrideBannerHtml(ym,false)+'<div class="banner">This payroll can go for approval. The approver will see these errors and the reason.'+((canPay()&&!closed&&pushStateOk(ym))?' <button class="btn small ghost" data-cyc="undoPush">Withdraw the push-through</button>':'')+'</div>'; }
+    else if(cycValidatedOk(ym)) h+='<div class="banner"><b>Validated.</b> '+(warns.length?warns.length+' warning'+(warns.length>1?'s':'')+' accepted. ':'No issues found. ')+'This payroll can go for approval.</div>';
+    else if(errs.length){
+      h+='<div class="banner" style="border-color:var(--bad)"><b>'+errs.length+' error'+(errs.length>1?'s':'')+' to fix.</b> Update the employee record, recalculate, then run the checks again.</div>';
+      if(!closed){
+        if(canPay()) h+='<div class="card"><h2>Push through with the errors</h2><p class="muted">Use this only when you must carry on now, for example when a UAN, an ESIC number or a bank account will be added later. The errors stay on record, the approver is told which they are and why, and people whose bank details are missing are left out of the bank file. PF and ESIC files also leave out people whose UAN or ESIC number is missing.</p><label class="muted" for="pushReason">Reason (required)</label><textarea id="pushReason" rows="2" style="width:100%" maxlength="300" placeholder="For example: the UAN of the new joiners will be added before the PF return"></textarea><label class="chk" style="display:flex;gap:.5rem;align-items:center;margin-top:.5rem"><input type="checkbox" id="pushAck" style="width:auto;min-height:0"> I know that these '+errs.length+' error'+(errs.length>1?'s are':' is')+' not fixed.</label><div class="row" style="margin-top:.7rem"><button class="btn" data-cyc="pushThrough">Push through with '+errs.length+' error'+(errs.length>1?'s':'')+'</button></div></div>';
+        else h+='<div class="card"><p class="muted" style="margin:0">Only Accounts or an administrator can push a payroll through with errors.</p></div>';
+      }
+    }
     else h+='<div class="banner"><b>The payroll was recalculated after these checks.</b> Run the checks again.</div>';
     if(c.issues.length){
       h+='<div class="card"><div class="scrollx"><table><thead><tr><th>Level</th><th>Employee</th><th>Issue</th><th></th></tr></thead><tbody>';
-      errs.concat(warns).forEach(function(i){ h+='<tr><td>'+xTag(i.lv==='error'?'Error':'Warning',i.lv==='error'?'bad':'warn')+'</td><td><b>'+escapeHtml(i.name)+'</b></td><td>'+escapeHtml(i.msg)+'</td><td>'+((i.id&&!closed)?'<button class="btn small ghost" data-cyc="fixEmp" data-id="'+i.id+'">Fix</button>':'')+'</td></tr>'; });
+      errs.concat(warns).forEach(function(i){ h+='<tr><td>'+(i.lv==='error'?(pushedO?xTag('Pushed through','warn'):xTag('Error','bad')):xTag('Warning','warn'))+'</td><td><b>'+escapeHtml(i.name)+'</b></td><td>'+escapeHtml(i.msg)+'</td><td>'+((i.id&&!closed)?'<button class="btn small ghost" data-cyc="fixEmp" data-id="'+i.id+'">Fix</button>':'')+'</td></tr>'; });
       h+='</tbody></table></div></div>';
     }
     return h;
@@ -8043,6 +8826,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var t=cycTotals(r.rows), st=cycStatus(ym), ident=await myIdentity(), amApprover=isApproverId(ident.id);
     var h='<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">'+escapeHtml(xMonthLabel(ym))+' payroll summary</h2>'+xTag(st[0],st[1])+'</div><div class="stat-grid" style="margin-top:.8rem"><div class="stat"><b>'+t.n+'</b><span>Employees</span></div><div class="stat"><b>'+fmtMoney(t.gross)+'</b><span>Gross pay</span></div><div class="stat"><b>'+fmtMoney(t.gross-t.net)+'</b><span>Deductions</span></div><div class="stat"><b>'+fmtMoney(t.net)+'</b><span>Net pay</span></div><div class="stat"><b>'+fmtMoney(t.cost)+'</b><span>Cost to company</span></div></div></div>';
     if(r.status==='rejected' && r.remark) h+='<div class="banner"><b>Last rejection:</b> '+escapeHtml(r.remark)+'</div>';
+    h+=overrideBannerHtml(ym,true);
     if(appr) h+='<div class="banner">Approved'+(r.approvedByLabel?' by '+escapeHtml(r.approvedByLabel):'')+'. Continue to payslips and the bank file.</div>';
     else if(!sub){
       h+='<div class="card"><h2>Send for approval</h2><p class="muted">An approver checks the totals and approves the payroll or sends it back. The person who submits it cannot approve it.</p><button class="btn" data-cyc="submit">Submit for approval</button></div>';
@@ -8063,6 +8847,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var h=closed?'<div class="banner">'+escapeHtml(xMonthLabel(ym))+' is closed. Attendance and payroll are locked.'+(canReopen?' <button class="btn small ghost" data-cyc="reopen">Reopen month</button>':'')+'</div>'
       :'<div class="card"><h2>Payslips and bank file</h2><p class="muted">Download what you need below. When everything has been paid and checked, close the month. Closing locks attendance and payroll for '+escapeHtml(xMonthLabel(ym))+'.</p><button class="btn" data-cyc="close">Close '+escapeHtml(xMonthLabel(ym))+'</button></div>';
     h+='<div class="card"><h2>Downloads</h2><div class="row"><button class="btn" data-cyc="allSlips">All payslips (one PDF)</button><button class="btn ghost" data-cyc="bank">Bank transfer file (CSV)</button><button class="btn ghost" data-cyc="register">Payroll register (PDF)</button></div></div>';
+    var bsk=bankSkipped(r.rows);
+    if(bsk.length) h+='<div class="banner" style="border-color:#B07A10;background:var(--warn-soft,#FFF4DA)"><b>'+bsk.length+' '+(bsk.length===1?'person is':'people are')+' left out of the bank transfer file.</b> Pay them another way, or correct the bank details in the employee record before the next payroll.<ul style="margin:.4rem 0 0 1.1rem">'+bsk.map(function(x){ return '<li>'+escapeHtml(x.name||'')+(x.empCode?' ('+escapeHtml(x.empCode)+')':'')+': '+escapeHtml(x.why)+(x.net>0?', net pay '+fmtMoney(x.net):'')+'</li>'; }).join('')+'</ul></div>';
     h+=waCardHtml(ym, await waInfo());
     h+='<div class="card"><div class="scrollx"><table><thead><tr><th>ID</th><th>Employee</th><th>Site</th><th class="right">Gross</th><th class="right">Deductions</th><th class="right">Net pay</th><th></th></tr></thead><tbody>';
     r.rows.forEach(function(x){ h+='<tr><td>'+escapeHtml(x.empCode||'')+'</td><td>'+escapeHtml(x.name)+'</td><td>'+escapeHtml(x.site||'')+'</td><td class="right">'+fmtMoney(x.gross)+'</td><td class="right">'+fmtMoney(x.gross-x.net)+'</td><td class="right"><b>'+fmtMoney(x.net)+'</b></td><td><button class="btn small ghost" data-cyc="slip" data-id="'+x.empId+'">Payslip</button></td></tr>'; });
@@ -8170,7 +8956,30 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   async function cycRunChecks(){
     var ym=cycMonth(), r=cycRun(ym); if(!r||!r.rows) return;
     var issues=cycChecks(ym), errs=issues.filter(function(i){return i.lv==='error';}).length, warns=issues.length-errs;
-    await patchCycle(ym,{issues:issues, validated:errs===0, validatedStamp:r.calculatedAt}, errs? 'Checks run: '+errs+' error'+(errs>1?'s':'')+' to fix' : 'Checks run: validated'+(warns?' with '+warns+' warning'+(warns>1?'s':'')+' accepted':''));
+    await patchCycle(ym,{issues:issues, validated:errs===0, validatedStamp:r.calculatedAt, override:null}, errs? 'Checks run: '+errs+' error'+(errs>1?'s':'')+' to fix' : 'Checks run: validated'+(warns?' with '+warns+' warning'+(warns>1?'s':'')+' accepted':''));
+  }
+  function pushStateOk(ym){ var r=cycRun(ym); return !!(r && r.status!=='submitted' && r.status!=='approved'); }
+  async function cycPushThrough(){
+    var ym=cycMonth(), r=cycRun(ym), c=cycDoc(ym);
+    if(!canPay()){ toast('Only Accounts or an administrator can push a payroll through with errors.'); return; }
+    if(cycClosed(ym)){ toast('This month is closed.'); return; }
+    if(!r || !r.rows || !c.issues || c.validatedStamp!==r.calculatedAt){ toast('Run the checks first.'); return; }
+    if(!pushStateOk(ym)){ toast('This payroll has already been sent for approval.'); return; }
+    var errs=c.issues.filter(function(i){ return i.lv==='error'; });
+    if(!errs.length){ toast('There are no errors to push through.'); return; }
+    var rs=document.getElementById('pushReason'), reason=String((rs&&rs.value)||'').trim();
+    if(reason.length<8){ toast('Write the reason in a few words (at least 8 characters).'); return; }
+    var ak=document.getElementById('pushAck'); if(!(ak&&ak.checked)){ toast('Tick the box to confirm that you know the errors are not fixed.'); return; }
+    var ident=await myIdentity();
+    var o={stamp:r.calculatedAt, at:Date.now(), by:ident.id, byLabel:ident.label, reason:reason.slice(0,300), n:errs.length, items:errs.slice(0,200).map(function(i){ return {id:i.id, name:i.name, msg:i.msg}; })};
+    await patchCycle(ym,{validated:true, validatedStamp:r.calculatedAt, override:o}, 'Validation passed with '+errs.length+' error'+(errs.length>1?'s':'')+' pushed through by '+ident.label+'. Reason: '+o.reason);
+    toast('Pushed through. The approver will see the list of errors and your reason.');
+  }
+  async function cycUndoPush(){
+    var ym=cycMonth();
+    if(!canPay()){ toast('Only Accounts or an administrator can do this.'); return; }
+    if(cycClosed(ym) || !pushStateOk(ym)){ toast('This payroll has already been sent for approval.'); return; }
+    await patchCycle(ym,{validated:false, override:null}, 'Push-through withdrawn, so the checks must be run again');
   }
   async function cycAllPayslips(){
     var ym=cycMonth(), r=cycRun(ym);
@@ -8188,6 +8997,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       case 'confirmReview': await patchCycle(ym,{reviewed:true},'Overtime, leave and absence review confirmed'); break;
       case 'calc': await cycCalculate(); break;
       case 'runChecks': await cycRunChecks(); break;
+      case 'pushThrough': await cycPushThrough(); break;
+      case 'undoPush': await cycUndoPush(); break;
       case 'submit': await submitRun(ym); cycRefresh(true); break;
       case 'approve': await approveRun(ym); cycRefresh(true); break;
       case 'reject': { var rm=document.getElementById('cycRemark'), txt=rm?rm.value.trim():''; if(!txt){ toast('Enter a reason for rejecting.'); break; } await rejectRun(ym,txt); cycRefresh(true); break; }
@@ -8244,6 +9055,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     document.getElementById('setNightAllow').value=s.nightAllowance==null?150:s.nightAllowance;
     document.getElementById('setEsiEr').value=s.esiErRate==null?3.25:s.esiErRate;
     document.getElementById('setOtWarn').value=s.otWarnHours==null?50:s.otWarnHours;
+    document.getElementById('setBillExtra').checked=s.billExtraDuty!==false;
+    document.getElementById('setHolidayMult').value=s.holidayMult>0?s.holidayMult:1;
   }
   function setupCycleSettings(){
     var b=document.getElementById('btnSaveCycSettings'); if(!b) return;
@@ -8253,6 +9066,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       s.nightAllowance=Math.max(0,Number(document.getElementById('setNightAllow').value)||0);
       s.esiErRate=Number(document.getElementById('setEsiEr').value)||0;
       s.otWarnHours=Number(document.getElementById('setOtWarn').value)||50;
+      s.billExtraDuty=document.getElementById('setBillExtra').checked;
+      s.holidayMult=Number(document.getElementById('setHolidayMult').value)>0?Number(document.getElementById('setHolidayMult').value):1;
       if(!db){ toast('Storage unavailable.'); return; }
       try{ await db.doc('settings/config').set(s); toast('Saved. Recalculate payroll to apply.'); }catch(e){ toast('Could not save: '+(e&&e.code||'')); }
     });

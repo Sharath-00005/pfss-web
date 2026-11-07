@@ -579,3 +579,178 @@ A payslip shows pay and deductions, and the bank details of the employee. Send i
 - **Only numbers on the allowed list.** The number is still in test mode in the Meta app. Finish adding your own number.
 - **Payment problem.** Add a payment method to the WhatsApp Business account in Meta Business settings.
 - **Could not deliver.** That number is probably not on WhatsApp. Use Open chat, or email the payslip.
+
+
+## Authorised signatory, and authenticated invoices
+
+### Who signs: Sharath R, Accounts Head
+Every invoice, payslip, payroll register and letter now names **Sharath R, Accounts Head** as the authorised signatory. Anything saved earlier with the old default (the registered name, "Satish Kumar K", with "Operations Head" or "Proprietor") is replaced automatically, so nothing needs saving for the new name to appear. To change it later, go to **Settings, Authorised signatory, signature and stamps**, type a name and designation, and click Save. A name saved there is kept as typed.
+
+The registered (legal) name **Satish Kumar K** is still shown in the supplier block of the invoice, because that is the name on the GST registration (GSTIN 29AQEPK6324M1ZG). The invoice must show the supplier as registered, so change that only if the registration itself changes.
+
+### The authentication stamp on an invoice
+Every issued invoice PDF carries, above the signature:
+- **"Electronically issued and authenticated"**, the billing system, the person who generated it (for example Sharath R (Accounts)) and the date and time in IST.
+- A **Document ID** such as `INV-101-7K3D9Q2M4X1B`, which is a fingerprint of the invoice: number, dates, client and its GSTIN, every line, the rates, GST and the notes. If any of those change, the ID changes.
+- A **QR code** holding the invoice number, date, total, the company GSTIN and the code.
+- The Document ID again in the footer of every page, and in the PDF's own properties (File, Properties in a PDF reader), where the creator is shown as the Public Force billing system.
+
+A **draft** invoice, or a copy made from the editing window with changes that are not saved yet, says "Draft, not yet issued" or "Preview, not saved" and carries no Document ID. Sending an invoice by email makes a draft final. The sample letterhead says it is a sample. A downloaded invoice is now named `Invoice-101.pdf`.
+
+If a **signature image** is saved in Settings, it is printed above the signatory's name on invoices and payslips.
+
+### Verify an invoice
+In **Invoicing**, the card **Verify an invoice** takes a Document ID, or the text a QR scanner reads from the code, and checks it against the invoices saved in the system:
+- **Genuine:** it matches the invoice as saved now, and nothing has changed since it was issued.
+- **Issued, but changed since:** the ID belongs to an earlier version. Saving an invoice keeps a short history of its Document IDs, with who saved it and when.
+- **Does not match** or **no invoice with that number:** the document was not produced by this system, or has been altered, or the ID was copied wrongly.
+Clients cannot check by themselves, because the tool needs a sign-in. A client can phone the office with the ID.
+
+### The GST signature rule (please ask your CA)
+Rule 46 of the CGST Rules asks for the **signature or digital signature** of the supplier or an authorised representative on a tax invoice. It does not ask for it on an official **e-invoice** (with an IRN from the government portal), which is compulsory above Rs 5 crore turnover. The authentication here proves the invoice came from your system and has not been changed. It is **not** a government e-invoice and **not** a digital signature, so the invoice still shows the authorised signatory's name, and the safest course is to sign it: on paper, or with a Digital Signature Certificate. Some commentary says that a remark such as "computer generated, no signature required" does not make an invoice valid for the buyer's input tax credit, and that a scanned signature is not a digital signature. For that reason the invoice does not say "no signature required". Ask your CA whether a signature image is enough for your clients, or whether to get a Digital Signature Certificate.
+
+
+## Extra duty: 1.5 or 2 duties on the same day
+
+### Marking it
+On the **Attendance** screen, click a day cell to cycle through: Present, Absent (unpaid), Half-day, Paid Leave, **1.5 duties**, **2 duties**, and back to Present. A day with an extra duty shows as a violet cell with a small "x2" or "x1.5" in the corner, and the hover text says "Double duty (2 duties)" or "1.5 duties". An extra duty can only be on a day that was worked: changing the day to Absent, Half-day or Leave clears it, and a duty marked before the person joined or after they left is ignored. A closed month cannot be changed. Importing attendance from the Attendance app keeps the duties already marked.
+
+### How it is paid
+Each extra duty is paid as **one extra day at the normal daily rate**: 2 duties on a day is one extra day, 1.5 duties is half an extra day. The daily rate is the monthly wage divided by the days in the month (for a daily wage, the wage for one day; for the 12-hour pay structure, the whole monthly pay divided by the days). If the wage rose in the month, each extra duty is paid at the rate of its own day.
+- **Payslip:** a separate line, such as "Extra duty (1.5 duties)", under "Pay for days worked" (or after Basic, D.A. and the extra hours on the pay structure).
+- **Payroll table:** the note under the gross reads, for example, "Wage for 28.5 of 30 days 16,111 + extra duty 1.5 848". Days present stays as before (the regular days). The Payroll table now refreshes whenever you open the tab.
+- **PF:** the Basic and D.A. part of the extra duty pay counts for PF, up to the PF ceiling.
+- **ESI:** who is covered still depends on the wage (a wage of 20,500 stays covered even when extra duties take the month over 21,000), and the ESI is worked out on everything paid.
+- **Professional tax:** follows the total paid.
+- **Pay cycle:** the review step has an **Extra duty** column, and an employee whose only exception is an extra duty is listed there. The checks warn when someone has more than 10 extra duties in a month.
+
+Extra duty is paid at the normal day rate, as asked. Overtime by the hour (paid at 2 times the hourly rate) is still entered as OT hours in the pay cycle. Work beyond normal hours can count as overtime under labour rules, so please ask your CA or labour consultant whether a double duty should be paid as overtime instead of a normal extra day.
+
+### Client billing
+Extra duties count as **days worked** in what you bill the client: the wage register, the totals on the attendance sheet, and the man-days on invoices made from a contract. The attendance sheet for the client shows the "2" or "1.5" on those days and explains it in the key. This is on by default. If you do not bill clients for extra duties, switch it off in **Settings, Overtime, night shifts and employer ESIC** (the box "Count extra duties ... in client billing") and save.
+
+
+## Sundays and holidays: paid day off, and holiday work
+
+### Setting it up
+- **For each person:** open the employee record and choose the **Weekly off day** (None, or Sunday to Saturday), and tick **Company holidays are paid days off for this person** if that applies. People who work every day, such as guards, are left on "None", and nothing changes for them. Only Accounts and the administrator can change these two fields on an existing employee, because they decide how work on those days is paid.
+- **Company holidays:** on the **Attendance** screen, in the box above the grid, pick the date, type the name (for example Deepavali) and press **Add holiday**. Each month has its own list. A closed month cannot be changed. A holiday is a day off only for the people who have the company holidays tick.
+
+### In the register
+A day that is a person's weekly off, or a company holiday for them, shows with **stripes**. It is paid as part of the wage, as before: you do nothing if they did not work. If they worked, click the day:
+1. first click, **worked**: the holiday stays paid and **one extra duty** is added (violet cell, "x2");
+2. second click, **half a day worked**: holiday pay and half an extra duty ("x1.5");
+3. third click, **absent**: the holiday is not paid;
+4. fourth click, back to a **paid day off**.
+
+The hover text on each day says what it means, for example "Sunday (weekly off), worked. Holiday pay and 1 extra duty". Ordinary days keep the cycle described in the extra duty section above.
+
+### How it is paid
+The holiday itself is already in the monthly wage (or in the daily wage count, as unmarked days are paid), so holiday pay plus an extra day makes **two days' pay for that day**. The payslip shows the extra day on its own line, such as "Holiday work (1 day)", apart from "Extra duty" on ordinary days. In **Settings, Overtime, night shifts and employer ESIC**, the box **A duty worked on a weekly off or holiday is paid at (times the daily rate)** is 1 by default (a normal day). Put 2 if holiday work is to be paid at double: the payslip then reads "Holiday work (1 day at 2 times)". The rate applies only to holiday work. PF, ESI eligibility, professional tax and the day-by-day rule when the wage rises in a month work exactly as for extra duty. The pay cycle review has a **Holiday work** column next to **Extra duty**, and the Payroll table note reads, for example, "Wage 15,500 + extra duty 1 500 + holiday work 1 500". In client billing, holiday work counts as days worked with extra duties, under the same Settings box.
+
+Whether holiday work must be paid at a higher rate depends on the law that applies to the establishment and on the contract, so please confirm the rate with your CA or labour consultant and set it in Settings.
+
+### After you change a holiday
+Adding or removing a holiday, or changing someone's weekly off, can change the pay of anyone who worked on that day. Recalculate payroll for the month afterwards. Adding or removing a company holiday sends that month's payroll back to draft, so it needs approval again.
+
+### Database
+Run `supabase/accounts_role.sql` again once (it is safe to run more than once). It now also stops anyone other than Accounts and the administrator from changing the weekly off day or company holidays on an existing employee. Holidays are saved in their own collection, which needs no new table.
+
+
+## The attendance sheet PDF, in the format of your paper register
+
+The attendance sheet for a client (from the Billing pack) now follows the paper register:
+- **P** is one duty on an ordinary day. **Two P's stacked** (one over the other) are two duties. A **4 over a P** is one and a half duties: the 4 is the extra half day.
+- **Red days** are weekly offs and holidays (the day number is red, and the day is shaded for the people it is a day off for). It is **blank** if the person did not work (the day is paid), **P** if they worked (an extra duty), and **4** if they worked half a day.
+- Columns on the right: **Present** (days paid that are not weekly offs or holidays), **W/O** (paid weekly offs and holidays), **O/T** (extra duties, including work on a day off) and **Total**, which is Present + W/O + O/T. The last row adds up each column. Halves are written as 10.5 (the PDF font has no half sign).
+- A key under the table explains the marks, and lists the company holidays of the month.
+- Someone who joined in the month has "-" before joining and only the days off after joining count in W/O. **A = absent** is unpaid. The red "L" on a paper sheet that is not counted in the total should be marked **Absent** in the register. In this system **L = paid leave**, which is paid, and is counted in Present.
+- If **Count extra duties ... in client billing** is switched off in Settings, the sheet shows ordinary days only, O/T shows "-", and the key says extra duties are not shown.
+
+For October 2026, the rows of the sample (examples folder) come to the same Present, W/O, O/T and Total as the paper register: 25, 6, 12, 43 for a person with 12 extra duties, 25, 6, 10.5, 41.5 with a half day, 23, 6, -, 29 with two absent days, and 16, 4, -, 20 for someone who joined on the 9th.
+
+
+## Holidays are visible for everyone, and one click sets weekly offs
+
+### On the Attendance screen
+- A **company holiday** is marked on its day for **everyone** in the grid: a gray cell with a red mark along the bottom, and the hover text "company holiday: Gandhi Jayanthi, not a paid day off for this person". This shows even when nobody's record has been set up.
+- For the people to whom it is a **paid day off** (their weekly off day, or a company holiday when their record has the holidays tick), the cell is **gray with stripes**. Clicking it works as described in the section on holidays above.
+- A small key above the holiday box shows what each kind of cell means.
+
+### One click for everyone shown
+For Accounts and the administrator, the box **Weekly off and company holidays for the people shown** sits under the holiday box. Choose the weekly off day, tick or untick **Company holidays are paid days off**, and press **Apply to the N people shown**. It sets it on everyone currently listed, so choose a site in the Site filter first to set one site only. The line above the button shows how things are now ("11 with no weekly off; 0 get company holidays as paid days off"). People whose record already has the same setting are not touched. You can still change one person in their employee record. If the month is already calculated, recalculate it afterwards.
+
+### On the attendance sheet PDF
+A company holiday has a **red heading that reads HOL** above the day number, and the whole column is shaded for every person. A weekly off has a red heading with the weekday, such as **SUN**. The holiday names are listed in red under the table, with a short key.
+
+
+## Version line in the menu
+At the bottom of the left menu a small line reads, for example, "Version: 6 Nov 2026, build 11". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+
+
+## Pushing a payroll through when there are errors
+
+On the **Validate PF, ESI and deductions** step, errors (a missing UAN, ESIC number or bank detail, a negative net pay) normally stop the payroll from going for approval. If you must carry on now, **Accounts or an administrator** can use the card **Push through with the errors**:
+1. Write the reason (at least 8 characters), for example "UAN of the new joiners will be added before the PF return".
+2. Tick the box that says you know the errors are not fixed.
+3. Press **Push through with N errors**.
+
+The errors stay on record and are shown in amber as **Pushed through**. The payroll can then be submitted, and the **approver sees a banner** on the approval step with the number of errors, who pushed them through, when, the reason, and the list of people and problems. The step is also written in the activity log. **Withdraw the push-through** puts things back (until the payroll is submitted). A push-through belongs to one calculation only: running the checks again, recalculating, or changing attendance or an employee's record withdraws it, and the checks must be passed or pushed through again. Other roles cannot push through.
+
+### What happens to the people with the errors
+- **Bank transfer file:** a bank rejects a whole upload for one bad line, so the file now leaves out anyone whose bank account number or IFSC is missing or invalid, or whose net pay is zero or less. After the download a message says who was left out, and the **Payslips and bank file** step keeps a yellow list with the reason and the net pay, so you can pay them another way.
+- **PF return file (ECR):** people without a 12-digit UAN were already left out and listed. **ESIC sheet:** people without an ESIC number too.
+- Payslips are made for everyone as usual.
+
+## Additional documents on invoice and billing pack emails
+
+In **Invoicing, Email**, under what to attach, **Additional documents (optional)** lets you add up to **10 files**, about **10 MB each and 15 MB in all**, to the invoice or the billing pack (for example the PF and ESIC challans, a work order, a signed attendance sheet). Allowed: **PDF, JPG, PNG, Word (.doc, .docx), Excel (.xls, .xlsx), CSV and text**. Programs, web pages, zip files and Word or Excel files with macros are refused.
+- A **photo** over about 0.6 MB is made smaller automatically (longest side 1800 pixels, saved as JPEG), so an 11 MB phone photo goes as under 1 MB.
+- When you add a file, its **content is checked against its name** (a PDF renamed .png, or a program renamed .txt, is refused at once). The email service checks it again.
+- Each file has a **Remove** button, the list shows the total, and the window starts empty each time. If sending fails, the files stay on the list.
+- The email log keeps the number of files and their names, and the invoice records the names under "emailed files".
+- Keep the whole email under about 15 MB: the client's own mail server may refuse a bigger one, even though the email service allows more (Resend accepts up to 40 MB, counted after encoding).
+
+### How the files travel, and the one-time setup
+The files used to go inside the request to the email service (the Cloudflare Worker), which has to hold them in memory and pass them on. On Cloudflare's **free plan a Worker gets only 10 ms of processing time and 128 MB of memory per request**, so even a few MB can fail with "Worker exceeded resource limits", and that is why only some files went through. Now the page puts each file in **private storage** (a bucket called email-attachments) just before sending, and the email service receives only a **short-lived link** (valid for 2 hours) which the mail provider uses to fetch the file. Big files never pass through the Worker.
+1. **Run `supabase/email_attachments.sql` once** in Supabase (SQL Editor, paste, Run). It makes the private bucket and lets administrators, managers and Accounts use it. It is safe to run again, and it is also part of `schema.sql` for a new setup.
+2. **Replace the code of the email Worker** with the new `worker/send-ratecard.js` and press Deploy (or `supabase/functions/send-ratecard/index.ts` if you use the Supabase Edge function). Nothing else changes; no new secret is needed.
+3. Upload the new `index.html`.
+
+- **Privacy:** the bucket is private. A file is reachable only through the link made for that email, which stops working after 2 hours, and the page deletes any file in the bucket that is more than 3 days old (each time the page is opened and someone opens the email window). To empty it sooner, open Storage, email-attachments in Supabase and delete the files.
+- **The service checks the link:** it accepts only links into this bucket (not another bucket, another site, or a folder), looks at the first bytes of each file to check its type and size, and refuses a file that is over 10 MB, or files over 15 MB in all.
+- **Until step 1 is done:** the page still sends up to **4 small files (3 MB each, 7 MB in all)** the older way, inside the request. A bigger lot stops with a message that says to run email_attachments.sql.
+- If a Worker still reports running out of time on a plain email with no extra files, the Worker is being asked to do too much for the free plan, and Cloudflare's paid Workers plan (a few dollars a month) removes the limit.
+
+## Invoice numbers: PFSS/26-27/0001
+
+### The format
+Every new invoice is numbered like **PFSS/26-27/0001, 0002, 0003**: the prefix, the **financial year** (April to March, worked out from the **invoice date**, so an invoice dated 2 April 2027 is PFSS/27-28/0001) and a running number that **starts again at 0001 every financial year**. The number is filled in for you and can be changed in the **Invoice #** box.
+
+GST (CGST Rule 46(b)) says a tax invoice number must be consecutive, **at most 16 characters**, use only **letters, numbers, - and /**, and be **unique for the financial year**. PFSS/26-27/0001 is 15 characters. The box stops at 16 characters and checks what you type as you type: a character that is not allowed, a number starting with / or - (the e-invoice portal does not accept that), and a number already used by another invoice (it names that invoice) are all refused, also when you press Save. Please confirm with your CA if you use more than one series.
+
+### Changing the number of an invoice
+- **New invoice:** type another number in the box, or press **Use the next number**. If you change the invoice date to another financial year, the suggestion follows it, unless you have typed a number yourself.
+- **Saved invoice:** Accounts and the administrator can change the number in the same box (for a manager the box is locked). A **draft** changes at once. An invoice that was **already issued** (sent, paid, or emailed) first shows a warning: the client still has the old number, the Document ID on that copy no longer matches, and an invoice already in a GST return has to be corrected in the return.
+- **History:** each invoice keeps its earlier numbers (shown under the box as "Earlier numbers of this invoice"), and the **Verify an invoice** check still recognises a Document ID printed under an earlier number and tells you the invoice was renumbered, and from what to what.
+- Document IDs now read like INV-PFSS-26-27-0001-7K3D9Q2M4X1B (the slashes become dashes), and downloaded invoices are named Invoice-PFSS_26-27_0001.pdf.
+
+### The "Invoice numbers" window (Invoicing page, Accounts and administrator)
+- **Prefix and digits:** the prefix (1 to 6 letters or numbers, PFSS to begin with) and 3, 4 or 5 digits. It checks that the whole number stays within 16 characters. A new prefix starts a new series.
+- **Next number:** choose the financial year and set the number the next invoice gets, for example 11 if invoices 1 to 10 were made outside the system. It cannot be lower than the highest number already used (the window tells you that number). Saving an invoice moves the next number on by itself, and **the number of a deleted invoice is not given out again**.
+- **Renumber existing invoices:** lists the invoices whose number is not yet in the series of their financial year (for example 101, 102, INV-0004). Tick the ones to renumber. They are numbered **in date order**, financial year by financial year, **after the highest number already used**, and the new numbers are shown before you apply. **Drafts are ticked, sent or paid invoices are not**, because the client has the old number. Ticked invoices stay consecutive, and the old numbers go into each invoice's history.
+
+### Things to know
+- Do not delete an invoice that was sent. GST wants consecutive numbers, and a deleted number leaves a gap.
+- The numbering settings are saved in their own records (collection invoiceCounters), so no database change is needed. They are part of the data backup and the restore.
+
+
+## The sentence about attached documents in the invoice email
+
+When you attach additional documents to an invoice or billing pack email (for example the PF and ESIC challans and payment receipts of last month), the **message** gets one sentence about them, after the bank details paragraph and before "Warm regards". The standard wording is: "We have also attached the PF and ESIC challans and payment receipts for October 2026, as proof that the contributions for our staff have been paid." (October if the invoice is for November: **the month before the invoice month**.)
+
+- **Change it for this email:** the sentence is in a box under the file list. Type in the box and the message changes at once. Untick **Mention the attached documents in the message** to leave it out. **Use the original wording** goes back to the standard sentence.
+- **Keep your own wording:** press **Keep this wording for every email**. It is saved and used from then on. The month name is saved as {month}, so it moves on by itself: wording saved with "October 2026" reads "September 2026" on an invoice for October. If the sentence has the file names in it, they are saved as {files} and follow the attached files.
+- **If you have typed in the message yourself**, your text is never changed behind your back. A note offers the button "Add it before Warm regards". After that, changes to the sentence update it in place while your own words stay.
+- With no files attached there is no sentence and the message is exactly the usual one. The payment reminder keeps the sentence too.
+- Anyone who can send email can change the wording for one email and keep it as the standard. It is saved in its own record (collection emailTemplates), so no database change is needed.
