@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-At the bottom of the left menu a small line reads, for example, "Version: 6 Nov 2026, build 10". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+At the bottom of the left menu a small line reads, for example, "Version: 6 Nov 2026, build 11". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -704,18 +704,23 @@ The errors stay on record and are shown in amber as **Pushed through**. The payr
 
 ## Additional documents on invoice and billing pack emails
 
-In **Invoicing, Email**, under what to attach, there is now **Additional documents (optional)**. Choose up to **4 files** to go with the invoice or the billing pack, for example a copy of the work order, a signed attendance sheet or a payment advice.
-- Allowed: **PDF, JPG, PNG, Word (.doc, .docx), Excel (.xls, .xlsx), CSV and text**. Programs, web pages, zip files and Word or Excel files with macros are refused.
-- Size: **about 3 MB for each file and 7 MB in all**. A **photo** over about 0.6 MB is made smaller automatically (longest side 1800 pixels, saved as JPEG), so an 11 MB phone photo goes as under 1 MB.
-- Each file has a **Remove** button, and the list shows the total. The files start empty every time the window is opened, and if the sending fails the files stay on the list so you can try again.
-- The email service checks every file again: the type must be allowed and the content must match the name (a PDF renamed .png is refused), names are cleaned, and two files with the same name never overwrite each other.
+In **Invoicing, Email**, under what to attach, **Additional documents (optional)** lets you add up to **10 files**, about **10 MB each and 15 MB in all**, to the invoice or the billing pack (for example the PF and ESIC challans, a work order, a signed attendance sheet). Allowed: **PDF, JPG, PNG, Word (.doc, .docx), Excel (.xls, .xlsx), CSV and text**. Programs, web pages, zip files and Word or Excel files with macros are refused.
+- A **photo** over about 0.6 MB is made smaller automatically (longest side 1800 pixels, saved as JPEG), so an 11 MB phone photo goes as under 1 MB.
+- When you add a file, its **content is checked against its name** (a PDF renamed .png, or a program renamed .txt, is refused at once). The email service checks it again.
+- Each file has a **Remove** button, the list shows the total, and the window starts empty each time. If sending fails, the files stay on the list.
 - The email log keeps the number of files and their names, and the invoice records the names under "emailed files".
+- Keep the whole email under about 15 MB: the client's own mail server may refuse a bigger one, even though the email service allows more (Resend accepts up to 40 MB, counted after encoding).
 
-### You must redeploy the email service
-The email service has changed. **Replace the code of the Worker** (`worker/send-ratecard.js`, in Cloudflare under the Worker's Edit code) and deploy it. Until you do, an email with an extra document is refused with a message saying the attachment is not a PDF, and emails with no extra document keep working. If you use the Supabase Edge function instead, replace `supabase/functions/send-ratecard/index.ts` and deploy it. Nothing else changes: no new secret or variable is needed.
+### How the files travel, and the one-time setup
+The files used to go inside the request to the email service (the Cloudflare Worker), which has to hold them in memory and pass them on. On Cloudflare's **free plan a Worker gets only 10 ms of processing time and 128 MB of memory per request**, so even a few MB can fail with "Worker exceeded resource limits", and that is why only some files went through. Now the page puts each file in **private storage** (a bucket called email-attachments) just before sending, and the email service receives only a **short-lived link** (valid for 2 hours) which the mail provider uses to fetch the file. Big files never pass through the Worker.
+1. **Run `supabase/email_attachments.sql` once** in Supabase (SQL Editor, paste, Run). It makes the private bucket and lets administrators, managers and Accounts use it. It is safe to run again, and it is also part of `schema.sql` for a new setup.
+2. **Replace the code of the email Worker** with the new `worker/send-ratecard.js` and press Deploy (or `supabase/functions/send-ratecard/index.ts` if you use the Supabase Edge function). Nothing else changes; no new secret is needed.
+3. Upload the new `index.html`.
 
-Large attachments make the Worker do more work. If sending fails with a message about the Worker running out of time or CPU on your Cloudflare plan, send fewer or smaller files.
-
+- **Privacy:** the bucket is private. A file is reachable only through the link made for that email, which stops working after 2 hours, and the page deletes any file in the bucket that is more than 3 days old (each time the page is opened and someone opens the email window). To empty it sooner, open Storage, email-attachments in Supabase and delete the files.
+- **The service checks the link:** it accepts only links into this bucket (not another bucket, another site, or a folder), looks at the first bytes of each file to check its type and size, and refuses a file that is over 10 MB, or files over 15 MB in all.
+- **Until step 1 is done:** the page still sends up to **4 small files (3 MB each, 7 MB in all)** the older way, inside the request. A bigger lot stops with a message that says to run email_attachments.sql.
+- If a Worker still reports running out of time on a plain email with no extra files, the Worker is being asked to do too much for the free plan, and Cloudflare's paid Workers plan (a few dollars a month) removes the limit.
 
 ## Invoice numbers: PFSS/26-27/0001
 

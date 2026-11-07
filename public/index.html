@@ -381,7 +381,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <button class="navbtn" id="tabs-settings" data-tab="settings">Settings</button>
     <div class="grp" id="railTitle">Pay cycle</div>
     <ul class="rail" id="workflowRail"></ul>
-    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 6 Nov 2026, build 10</div>
+    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 6 Nov 2026, build 11</div>
   </nav>
 
   <div class="main-col">
@@ -1379,7 +1379,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       </div>
       <div id="mailLineHint" class="muted" style="display:none;font-size:.82rem;margin-top:.3rem"></div>
       <div id="mailFileMsg" style="color:var(--bad);min-height:1.1em;font-size:.84rem" role="alert"></div>
-      <div class="muted" style="font-size:.78rem">For example a copy of the work order, a signed attendance sheet or a payment advice. Up to 4 files, about 3 MB each and 7 MB in all. Photos are made smaller automatically. PDF, JPG, PNG, Word, Excel, CSV and text files can be attached. The message gets a sentence about them, which you can change.</div>
+      <div class="muted" style="font-size:.78rem">For example a copy of the work order, a signed attendance sheet or a payment advice. Up to 10 files, about 10 MB each and 15 MB in all (a bigger email may be refused by the client's mail server). Photos are made smaller automatically. PDF, JPG, PNG, Word, Excel, CSV and text files can be attached. The message gets a sentence about them, which you can change.</div>
     </div>
     <div class="field"><label>Send from</label><select id="mailFrom"></select></div>
     <div class="row">
@@ -2517,8 +2517,22 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   }
   function invOverdue(inv){ var today=new Date().toISOString().slice(0,10); return !!(inv.status!=='paid' && inv.dueDate && inv.dueDate<today); }
   // extra documents that go with the invoice or the billing pack
-  var MAIL_EXTRA_MAX=4, MAIL_FILE_BYTES=3000000, MAIL_TOTAL_BYTES=7000000, MAIL_TOTAL_B64=9600000, MAIL_EXTS=['pdf','jpg','jpeg','png','doc','docx','xls','xlsx','csv','txt'];
-  var mailExtra=[];   // {name, size, b64}
+  var MAIL_EXTRA_MAX=10, MAIL_FILE_BYTES=10000000, MAIL_TOTAL_BYTES=15000000, MAIL_EXTS=['pdf','jpg','jpeg','png','doc','docx','xls','xlsx','csv','txt'];
+  // the older way (files sent inside the request) keeps its small limits: it is used only when the storage step has not been done yet
+  var MAIL_OLD_COUNT=4, MAIL_OLD_FILE=3000000, MAIL_OLD_TOTAL=7000000, MAIL_TOTAL_B64=9600000;
+  var MAIL_MIME={pdf:'application/pdf',jpg:'image/jpeg',jpeg:'image/jpeg',png:'image/png',doc:'application/msword',docx:'application/vnd.openxmlformats-officedocument.wordprocessingml.document',xls:'application/vnd.ms-excel',xlsx:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',csv:'text/csv',txt:'text/plain'};
+  var mailExtra=[];   // {name, size, blob, kind}
+  async function mailContentOk(blob, ext){
+    var buf; try{ buf=new Uint8Array(await blob.slice(0,2000).arrayBuffer()); }catch(e){ return true; }   // if it cannot be read here, the email service checks it again
+    var starts=function(sig){ for(var i=0;i<sig.length;i++) if(buf[i]!==sig[i]) return false; return true; };
+    if(ext==='pdf') return starts([0x25,0x50,0x44,0x46]);
+    if(ext==='png') return starts([0x89,0x50,0x4E,0x47]);
+    if(ext==='jpg'||ext==='jpeg') return starts([0xFF,0xD8,0xFF]);
+    if(ext==='docx'||ext==='xlsx') return starts([0x50,0x4B,0x03,0x04]);
+    if(ext==='doc'||ext==='xls') return starts([0xD0,0xCF,0x11,0xE0]);
+    for(var j=0;j<buf.length;j++){ var c=buf[j]; if(c<9 || (c>13 && c<32)) return false; }
+    return true;   // csv and text
+  }
   function mailFileExt(n){ var m=String(n||'').toLowerCase().match(/\.([a-z0-9]+)$/); return m?m[1]:''; }
   function mailSizeText(b){ return b>=1000000?(Math.round(b/100000)/10)+' MB':Math.max(1,Math.round(b/1000))+' KB'; }
   function mailExtraBytes(){ return mailExtra.reduce(function(t,x){ return t+x.size; },0); }
@@ -2605,12 +2619,57 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       if(!f.size){ msgs.push(f.name+' is empty.'); continue; }
       var blob=f, name=f.name;
       if((ext==='jpg'||ext==='jpeg'||ext==='png') && f.size>600000){ var sm=await mailShrinkImage(f); if(sm && sm.size<f.size){ blob=sm; name=name.replace(/\.[^.]+$/,'')+'.jpg'; } }
-      if(blob.size>MAIL_FILE_BYTES){ msgs.push(f.name+' is too large ('+mailSizeText(f.size)+'). The limit is about 3 MB for each file.'); continue; }
-      if(mailExtraBytes()+blob.size>MAIL_TOTAL_BYTES){ msgs.push(f.name+' was not added: the extra files would be over 7 MB in all.'); continue; }
-      var b64; try{ b64=await b64Of(blob); }catch(e){ msgs.push(f.name+' could not be read.'); continue; }
-      mailExtra.push({name:name, size:blob.size, b64:b64});
+      if(blob.size>MAIL_FILE_BYTES){ msgs.push(f.name+' is too large ('+mailSizeText(f.size)+'). The limit is about '+Math.round(MAIL_FILE_BYTES/1000000)+' MB for each file.'); continue; }
+      if(mailExtraBytes()+blob.size>MAIL_TOTAL_BYTES){ msgs.push(f.name+' was not added: the extra files would be over '+Math.round(MAIL_TOTAL_BYTES/1000000)+' MB in all.'); continue; }
+      if(!(await mailContentOk(blob, mailFileExt(name)))){ msgs.push(f.name+' is not really a '+mailFileExt(name).toUpperCase()+' file: its content does not match its name, so it was not added.'); continue; }
+      mailExtra.push({name:name, size:blob.size, blob:blob});
     }
     renderMailFiles(); mailDocsChanged(); return msgs;
+  }
+  function mailFitsOldWay(){ return mailExtra.length<=MAIL_OLD_COUNT && mailExtra.every(function(x){ return x.size<=MAIL_OLD_FILE; }) && mailExtraBytes()<=MAIL_OLD_TOTAL; }
+  // put one file in the private email-attachments storage and get a link that lasts two hours, for the email service to pass on
+  async function mailUploadOne(x){
+    var A=window.pfssAuth; if(!A){ var e0=new Error('Email works on your own site, not in this preview.'); e0.noStorage=true; throw e0; }
+    var tok=await A.token(); if(!tok){ var e1=new Error('Please sign in again.'); e1.status=401; throw e1; }
+    var base=String(A.url||'').replace(/\/+$/,'')+'/storage/v1', ext=mailFileExt(x.name), safe=x.name.replace(/[^A-Za-z0-9._-]+/g,'_').replace(/\.{2,}/g,'.').slice(-80);
+    var path=Date.now()+'-'+Math.random().toString(36).slice(2,8)+'-'+safe, hdr={apikey:A.anonKey, Authorization:'Bearer '+tok}, up, j;
+    try{ up=await fetch(base+'/object/email-attachments/'+encodeURIComponent(path),{method:'POST',headers:Object.assign({'Content-Type':MAIL_MIME[ext]||'application/octet-stream','x-upsert':'false'},hdr),body:x.blob}); }
+    catch(e){ var ne=new Error('Could not upload '+x.name+'. Please check the internet connection.'); ne.noStorage=true; ne.network=true; throw ne; }
+    if(!up.ok){ j={}; try{ j=await up.json(); }catch(e){} var ue=new Error('Could not upload '+x.name+(j.message?' ('+j.message+')':'')+'.'); ue.status=up.status; ue.noStorage=(up.status===404||up.status===400||up.status===403); throw ue; }
+    var sg=await fetch(base+'/object/sign/email-attachments/'+encodeURIComponent(path),{method:'POST',headers:Object.assign({'Content-Type':'application/json'},hdr),body:JSON.stringify({expiresIn:7200})});
+    j={}; try{ j=await sg.json(); }catch(e){}
+    var su=j.signedURL||j.signedUrl; if(!sg.ok || !su){ var se=new Error('Could not get a link for '+x.name+'.'); se.status=sg.status; se.noStorage=true; throw se; }
+    return {filename:x.name, url:(su.indexOf('http')===0?su:(su.indexOf('/storage/v1')===0?String(A.url).replace(/\/+$/,'')+su:base+su)), size:x.size};
+  }
+  // the extra files for the request: links to files in storage, or (only if storage is not set up and the files are small) the files themselves
+  async function mailPrepareExtras(btn){
+    var n=mailExtra.length; if(!n) return {};
+    var urls=[];
+    try{
+      for(var i=0;i<n;i++){ btn.textContent='Uploading file '+(i+1)+' of '+n+'...'; urls.push(await mailUploadOne(mailExtra[i])); }
+      return {extraUrls:urls};
+    }catch(e){
+      if(e && e.noStorage && mailFitsOldWay()){
+        btn.textContent='Preparing the files...';
+        var out=[]; for(var k=0;k<n;k++) out.push({filename:mailExtra[k].name, base64:await b64Of(mailExtra[k].blob)});
+        return {extra:out};
+      }
+      if(e && e.noStorage && !e.network) e.message=e.message+' The storage for email files may not be set up yet: ask the administrator to run email_attachments.sql in Supabase (see the README). Without it, up to '+MAIL_OLD_COUNT+' files of '+Math.round(MAIL_OLD_FILE/1000000)+' MB, '+Math.round(MAIL_OLD_TOTAL/1000000)+' MB in all, can be sent.';
+      throw e;
+    }
+  }
+  // files left in storage for more than three days are removed (best effort, once each time the page is opened)
+  var mailCleaned=false;
+  async function mailCleanupOld(){
+    if(mailCleaned) return; mailCleaned=true;
+    try{
+      var A=window.pfssAuth; if(!A) return; var tok=await A.token(); if(!tok) return;
+      var base=String(A.url||'').replace(/\/+$/,'')+'/storage/v1', hdr={apikey:A.anonKey, Authorization:'Bearer '+tok,'Content-Type':'application/json'};
+      var r=await fetch(base+'/object/list/email-attachments',{method:'POST',headers:hdr,body:JSON.stringify({prefix:'',limit:200,offset:0,sortBy:{column:'created_at',order:'asc'}})});
+      if(!r.ok) return; var rows=await r.json(), cut=Date.now()-3*86400000;
+      var old=(rows||[]).filter(function(o){ return o && o.name && Date.parse(o.created_at||'')<cut; }).map(function(o){ return o.name; });
+      if(old.length) await fetch(base+'/object/email-attachments',{method:'DELETE',headers:hdr,body:JSON.stringify({prefixes:old})});
+    }catch(e){}
   }
   function mailKind(){ var r=document.querySelector('input[name="mailKind"]:checked'); return r?r.value:'invoice'; }
   function mailAttach(){ var r=document.querySelector('input[name="mailAttach"]:checked'); return r?r.value:'inv'; }
@@ -2632,7 +2691,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   }
   async function openMailModal(inv){
     if(me && me.canEdit===false){ toast('Only administrators, Accounts and managers can send email.'); return; }
-    mailInv=inv; mailEdited=false;
+    mailInv=inv; mailEdited=false; mailCleanupOld();
     var el=function(x){ return document.getElementById(x); }, c=clients.find(function(x){ return x.id===inv.clientId; })||{}, k=contracts.find(function(x){ return x.id===inv.contractId; });
     el('mailTitle').textContent='Email invoice '+(inv.invoiceNo||'');
     document.querySelector('input[name="mailKind"][value="'+(invOverdue(inv)?'reminder':'invoice')+'"]').checked=true;
@@ -2675,12 +2734,11 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         var pb=pdfNew(false); drawInvoice(pb,invoiceModelForIssue(inv)); drawWageRegister(pb,data); drawAttendanceSheet(pb,data); pdfFoot(pb,'Computer-generated billing documents');
         blob=pb.build(); name='Billing-pack-'+pdfName(inv.invoiceNo)+'.pdf';
       } else { blob=buildInvoicePdf(invoiceModelForIssue(inv)); name='Invoice-'+pdfName(inv.invoiceNo)+'.pdf'; }
-      var mainB64=await b64Of(blob), nExtra=mailExtra.length, tot=mainB64.length;
-      mailExtra.forEach(function(x){ tot+=x.b64.length; });
-      if(tot>MAIL_TOTAL_B64) throw new Error('The '+(withPack?'billing pack':'invoice')+' and the extra files are too large together. Remove a file, or send without the extra files.');
+      var mainB64=await b64Of(blob), nExtra=mailExtra.length, prep=await mailPrepareExtras(btn);
+      if(prep.extra){ var tot=mainB64.length; prep.extra.forEach(function(x){ tot+=x.base64.length; }); if(tot>MAIL_TOTAL_B64) throw new Error('The '+(withPack?'billing pack':'invoice')+' and the extra files are too large together. Remove a file, or send without the extra files.'); }
       btn.textContent='Sending...';
       var payload={from:el('mailFrom').value,to:to,cc:el('mailCc').value.trim(),subject:el('mailSubject').value,message:el('mailMsg').value,keepCopy:el('mailCopy').checked,filename:name,pdfBase64:mainB64};
-      if(nExtra) payload.extra=mailExtra.map(function(x){ return {filename:x.name, base64:x.b64}; });
+      if(prep.extraUrls) payload.extraUrls=prep.extraUrls; if(prep.extra) payload.extra=prep.extra;
       await mailApi('POST',payload);
       var upd={emailedAt:Date.now(),emailedTo:to,emailKind:kind}; if(nExtra) upd.emailedFiles=mailExtra.map(function(x){ return x.name; }); if(inv.status==='draft') upd.status='sent';
       try{ if(db) await db.doc('invoices/'+inv.id).update(upd); }catch(e2){}
