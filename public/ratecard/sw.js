@@ -1,7 +1,7 @@
 // Keeps the app opening quickly and lets it open with no signal.
 // Files from this site are fetched fresh when online (so updates arrive) and kept as a fallback.
 // Signing in, saving, and emailing always need the internet.
-var CACHE = 'pfss-ratecard-v1';
+var CACHE = 'pfss-ratecard-v2';
 var SHELL = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png', './apple-touch-icon.png'];
 self.addEventListener('install', function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); }));
