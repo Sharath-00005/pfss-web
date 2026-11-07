@@ -381,7 +381,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <button class="navbtn" id="tabs-settings" data-tab="settings">Settings</button>
     <div class="grp" id="railTitle">Pay cycle</div>
     <ul class="rail" id="workflowRail"></ul>
-    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 6 Nov 2026, build 11</div>
+    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 7 Nov 2026, build 14</div>
   </nav>
 
   <div class="main-col">
@@ -597,7 +597,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <div class="card">
       <div class="row" style="justify-content:space-between">
         <h2>Client rate cards</h2>
-        <button class="btn" id="btnAddRc">+ New rate card</button>
+        <div class="row" style="gap:.5rem"><button class="btn ghost" id="btnRcRefreshWages" type="button" title="Use after the minimum wages table in Compliance has been updated">Update wages from the minimum wages table</button><button class="btn" id="btnAddRc">+ New rate card</button></div>
       </div>
       <p class="muted">For quoting new clients, not a recurring task — create one rate card per client/site when you first price the job, and reuse or copy it for future quotes. Shows cost-to-company per person, per month, based on state minimum wages plus statutory employer costs and your service margin.</p>
       <div class="scrollx">
@@ -1039,9 +1039,10 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <button class="close-x" id="rcModalClose">&times;</button>
     <h3 id="rcModalTitle">New rate card</h3>
     <input type="hidden" id="rcId">
+    <div class="banner" id="rcOldBanner" style="display:none;justify-content:space-between;align-items:center;gap:1rem"><div>This rate card uses an <b>old structure</b>. It keeps working for the invoices and registers already made with it. For new quotes, use the new structure.</div><button class="btn small" id="btnRcToKa" type="button">Make a copy in the new structure</button></div>
     <div class="row">
-      <div class="field"><label>Rate card format</label>
-        <select id="rcFormat"><option value="costsheet">Cost sheet (standard)</option><option value="wagebreakup">Wage break-up (14 lines)</option></select></div>
+      <div class="field" id="rcFormatBox"><label>Rate card structure</label>
+        <select id="rcFormat"><option value="ka">Karnataka structure, May 2026</option><option value="costsheet">Old: cost sheet</option><option value="wagebreakup">Old: wage break-up (14 lines)</option></select></div>
       <div class="field grow"><label>Rate card title *</label><input id="rcName" placeholder="e.g. Rate structure as per the Minimum Wages, Karnataka-Zone 2"></div>
       <div class="field"><label>State</label>
         <select id="rcState"><option>Karnataka</option><option>Tamil Nadu</option><option>Andhra Pradesh</option><option>Telangana</option><option>Kerala</option></select>
@@ -1065,14 +1066,27 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     </div>
     <div class="row rc-cs">
       <div class="field"><label>PF wage ceiling (₹)</label><input type="number" id="rcPfCeil" step="1"></div>
-      <div class="field"><label>Medical (₹, fixed)</label><input type="number" id="rcMedical" step="0.01"></div>
+      <div class="field rc-old-cs"><label>Medical (₹, fixed)</label><input type="number" id="rcMedical" step="0.01"></div>
       <div class="field"><label>Uniform (₹, fixed)</label><input type="number" id="rcUniform" step="0.01"></div>
-      <div class="field"><label>Training charges (₹, fixed)</label><input type="number" id="rcTraining" step="0.01"></div>
+      <div class="field rc-old-cs"><label>Training charges (₹, fixed)</label><input type="number" id="rcTraining" step="0.01"></div>
     </div>
-    <div class="row rc-cs">
+    <div class="row rc-old-cs">
       <div class="field"><label>Leave days per year</label><input type="number" id="rcLeaveDays" step="0.5"></div>
       <div class="field"><label>National holiday % (on Basic + D.A.)</label><input type="number" id="rcNatHol" step="0.01"></div>
       <div class="field"><label>Relieving charges %</label><input type="number" id="rcRelieve" step="0.01"></div>
+    </div>
+    <div class="row rc-ka">
+      <div class="field"><label>Employer EDLI & admin % (on Basic + VDA)</label><input type="number" id="rcEdli" step="0.01"></div>
+      <div class="field"><label>Bonus ceiling (₹): bonus is worked out on Basic up to this</label><input type="number" id="rcBonusCeil" step="1"></div>
+      <div class="field"><label>Leave with wages % (of Gross)</label><input type="number" id="rcLeavePct" step="0.01"></div>
+    </div>
+    <div class="card rc-ka" style="margin:.6rem 0;background:var(--bg)">
+      <div style="font-weight:700">Amounts for this customer (flat, per person per month)</div>
+      <div class="muted" style="font-size:.84rem;margin:.15rem 0 .5rem">Like the uniform cost, these can be different for each customer. They are billed as their own lines, after the statutory costs, so PF, ESI, bonus and leave are not worked out on them. The washing and special allowance lines appear in the table only when they have an amount. They are not added to the employee's pay in Payroll.</div>
+      <div class="row">
+        <div class="field"><label>Washing allowance (₹)</label><input type="number" id="rcWashing" step="0.01"></div>
+        <div class="field"><label>Special allowance (₹)</label><input type="number" id="rcSpecial" step="0.01"></div>
+      </div>
     </div>
     <div class="row">
       <div class="field"><label>Employee PF % (deducted from wages)</label><input type="number" id="rcEmpPf" step="0.01"></div>
@@ -1419,7 +1433,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 </div>
 
 <div class="modal-bg" id="packModalBg">
-  <div class="modal" style="max-width:560px">
+  <div class="modal" id="packModal" style="max-width:560px">
     <button class="close-x" id="packModalClose">&times;</button>
     <h3>Billing pack for the client</h3>
     <p class="muted" id="packInfo"></p>
@@ -1435,7 +1449,9 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       <button class="btn" id="btnPackAll">Download billing pack</button>
       <button class="btn ghost" id="btnPackReg">Wage register only</button>
       <button class="btn ghost" id="btnPackAtt">Attendance sheet only</button>
+      <button class="btn ghost" id="btnPackCheck" type="button">Check against payroll</button>
     </div>
+    <div id="packCheck" style="display:none;margin-top:.8rem"></div>
     <p class="muted" style="margin-top:.8rem">The pack is one PDF: the invoice, the wage register (per-employee breakdown by days worked) and the attendance sheet. Print it and add your seal and signature before sending.</p>
   </div>
 </div>
@@ -5274,10 +5290,254 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     return rows;
   }
 /*CS-END*/
+/*KA-BEGIN*/
+  // ---- The Karnataka rate structure, May 2026 (the "Customer billing structure (CTC breakup)" and the employee take-home pay) ----
+  // Every money line is rounded to the paisa, line by line, in the order of the table, so the lines add up exactly.
+  var KA_DEFAULTS = {pfPct:12, edliPct:1, esicPct:3.25, bonusPct:8.33, bonusCeiling:15000, leavePct:4.81, uniform:500, washing:0, special:0, servicePct:8, gstPct:18, pfCeiling:0, empPfPct:12, empEsicPct:0.75, hours:8, days:26};
+  function kaR2(x){ return Math.round((Number(x)||0)*100+1e-9)/100; }
+  // One column of the structure. f is the share of the month worked (1 = a full month), used for the wage register.
+  function computeKa(card, role, f){
+    f=(f==null)?1:f;
+    var N=function(x){ return Number(x)||0; }, r2=kaR2, st=state.settings||{};
+    var hours=N(card.hours)||8, duty=N(role.dutyHrs)||hours, xh=Math.max(0,duty-hours);
+    var basicM=N(role.basic), vdaM=N(role.vda), grossM=basicM+vdaM;
+    var basic=r2(basicM*f), da=r2(vdaM*f), gross=r2(basic+da);                              // A, B, C
+    var extra=xh>0?r2(gross*xh/hours):0, wages=r2(gross+extra);                              // extra hours (only for a longer duty) and the wages
+    var fullWages=grossM+(xh>0?grossM*xh/hours:0);
+    var ceil=N(card.pfCeiling), pfBaseM=(ceil>0)?Math.min(grossM,ceil):grossM, pfBase=r2(pfBaseM*f);
+    var pf=r2(pfBase*N(card.pfPct)/100), edli=r2(pfBase*N(card.edliPct)/100);                // D, E
+    var esicOn=fullWages<=(N(st.esiThreshold)||21000), esi=esicOn?r2(wages*N(card.esicPct)/100):0;   // F
+    var bonCeil=N(card.bonusCeiling), bonusBase=r2((bonCeil>0?Math.min(basicM,bonCeil):basicM)*f);
+    var bonus=r2(bonusBase*N(card.bonusPct)/100), leave=r2(wages*N(card.leavePct)/100);      // G, H
+    var statutory=r2(wages+pf+edli+esi+bonus+leave);                                         // I
+    var uniform=r2(N(card.uniform)*f), washing=r2(N(card.washing)*f), special=r2(N(card.special)*f);   // flat amounts for this customer
+    var tdc=r2(statutory+uniform+washing+special);                                           // K
+    var service=r2(tdc*N(card.servicePct)/100), ctc=r2(tdc+service);                         // L, M
+    var gst=r2(ctc*N(card.gstPct)/100), total=r2(ctc+gst);                                   // N, O
+    var epPct=card.empPfPct!=null?N(card.empPfPct):N(st.pfRate||12), eePct=card.empEsicPct!=null?N(card.empEsicPct):N(st.esiRate||0.75);
+    var empPf=r2(pfBase*epPct/100), empEsic=esicOn?r2(wages*eePct/100):0, pt=(wages>0)?ptForState(card.state,wages):0;
+    var net=r2(wages-empPf-empEsic-pt);
+    return { ka:true, basic:basic, da:da, gross:gross, xh:xh, extra:extra, wages:wages, pf:pf, edli:edli, esic:esi, esicOn:esicOn, bonus:bonus, leave:leave, statutory:statutory,
+      uniform:uniform, washing:washing, special:special, tdc:tdc, service:service, ctc:ctc, gst:gst, total:total,
+      empPf:empPf, empEsic:empEsic, pt:pt, net:net, inHand:net,
+      // names the invoices and the rate card list already use
+      totalCost:tdc, serviceCharge:service, grandTotal:ctc, gstAmt:gst, totalBill:total };
+  }
+/*KA-END*/
+/*KA-ROWS-BEGIN*/
+  // The lines of the structure, in the order of the table. Each line: [letter, label, basis text, function(role, result), style].
+  // The letters follow the lines that are shown (the washing and special allowance lines only appear when they have an amount).
+  function kaRows(card, roles){
+    var N=function(x){ return Number(x)||0; }, pct=function(x){ return (Math.round(N(x)*100)/100)+'%'; }, inr=function(x){ return '\u20b9'+Math.round(N(x)).toLocaleString('en-IN'); };
+    var comps=roles.map(function(r){ return computeKa(card,r,1); });
+    var anyExtra=comps.some(function(c){ return c.xh>0; }), anyPt=comps.some(function(c){ return c.pt>0; });
+    var hrs=N(card.hours)||8, xhL=0; roles.forEach(function(r){ xhL=Math.max(xhL,(N(r.dutyHrs)||hrs)-hrs); });
+    var order=['basic','da','gross'].concat(anyExtra?['extra','wages']:[]).concat(['pf','edli','esic','bonus','leave','statutory','uniform']).concat(N(card.washing)>0?['washing']:[]).concat(N(card.special)>0?['special']:[]).concat(['tdc','service','ctc','gst','total']);
+    var L={}; order.forEach(function(k,i){ L[k]=String.fromCharCode(65+i); });
+    var wk=anyExtra?'wages':'gross', rows=[];
+    function sec(t){ rows.push(['',t,'',null,'section']); }
+    function add(k,label,basis,fn,style){ rows.push([L[k],label,basis,fn,style||'']); }
+    sec('Wages');
+    add('basic','Basic Wage','Fixed',function(r,c){ return c.basic; });
+    add('da','Variable Dearness Allowance (VDA)','Cost of living',function(r,c){ return c.da; });
+    add('gross','Gross Minimum Wage (Subtotal '+L.basic+'+'+L.da+')','',function(r,c){ return c.gross; },'sub');
+    if(anyExtra){
+      add('extra','Extra '+xhL+' hrs (longer duty)','Same rate',function(r,c){ return c.extra; });
+      add('wages','Total Wages ('+L.gross+'+'+L.extra+')','',function(r,c){ return c.wages; },'sub');
+    }
+    sec('Statutory costs');
+    add('pf','Employer PF Contribution',N(card.pfCeiling)>0?pct(card.pfPct)+' on Basic+VDA up to '+inr(card.pfCeiling):pct(card.pfPct)+' on Full Basic+VDA',function(r,c){ return c.pf; });
+    add('edli','Employer EDLI & Admin',pct(card.edliPct)+' combined',function(r,c){ return c.edli; });
+    add('esic','Employer ESI Contribution',pct(card.esicPct)+' of Gross ('+L[wk]+')',function(r,c){ return c.esic; });
+    add('bonus','Statutory Bonus',pct(card.bonusPct)+(N(card.bonusCeiling)>0?' of Basic/Ceiling':' of Basic'),function(r,c){ return c.bonus; });
+    add('leave','Leave with Wages (Paid Leave)',pct(card.leavePct)+' of Gross',function(r,c){ return c.leave; });
+    add('statutory','Subtotal Statutory Cost ('+[L[wk],L.pf,L.edli,L.esic,L.bonus,L.leave].join('+')+')','',function(r,c){ return c.statutory; },'sub');
+    sec('Other costs and billing');
+    add('uniform','Uniform & Operational Overhead','Flat allowance',function(r,c){ return c.uniform; });
+    if(N(card.washing)>0) add('washing','Washing Allowance','Flat allowance',function(r,c){ return c.washing; });
+    if(N(card.special)>0) add('special','Special Allowance','Flat, as agreed',function(r,c){ return c.special; });
+    add('tdc','Total Direct Cost (TDC) (Subtotal '+[L.statutory,L.uniform].concat(N(card.washing)>0?[L.washing]:[]).concat(N(card.special)>0?[L.special]:[]).join('+')+')','',function(r,c){ return c.tdc; },'sub');
+    add('service','Agency Service Charge',pct(card.servicePct)+' of TDC ('+L.tdc+')',function(r,c){ return c.service; });
+    add('ctc','Subtotal Before GST (Total CTC) ('+L.tdc+'+'+L.service+')','',function(r,c){ return c.ctc; },'sub2');
+    add('gst','GST (Goods & Services Tax)',pct(card.gstPct)+' on Subtotal ('+L.ctc+')',function(r,c){ return c.gst; });
+    add('total','Total Monthly Invoice Amount (Final Billing per Head) ('+L.ctc+'+'+L.gst+')','',function(r,c){ return c.total; },'grand');
+    if(card.showEmp!==false){
+      var st=state.settings||{}, ep=card.empPfPct!=null?card.empPfPct:(st.pfRate||12), ee=card.empEsicPct!=null?card.empEsicPct:(st.esiRate||0.75);
+      sec('Employee take-home pay (net pay)');
+      rows.push(['','Gross wages ('+L[wk]+')','',function(r,c){ return c.wages; },'']);
+      rows.push(['','Employee PF',pct(ep)+(N(card.pfCeiling)>0?' on Basic+VDA up to '+inr(card.pfCeiling):' on Full Basic+VDA'),function(r,c){ return c.empPf; },'']);
+      rows.push(['','Employee ESI',pct(ee)+' of Gross',function(r,c){ return c.empEsic; },'']);
+      if(anyPt) rows.push(['','Professional Tax','',function(r,c){ return c.pt; },'']);
+      rows.push(['','Final Estimated Net Pay','',function(r,c){ return c.net; },'net']);
+    }
+    return rows;
+  }
+/*KA-ROWS-END*/
+/*KA-PDF-BEGIN*/
+  // The rate card as a PDF: the table of the structure, one column for each role (the same lines as on the screen).
+  function buildKaPdf(card,roles,computed,meta){
+    var land=roles.length>4, pb=pdfNew(land), ML=36, CW=pb.W-72, MR=ML+CW, LIMIT=pb.H-78, C=PDFC;
+    var y=pdfHead(pb), N=function(x){ return Number(x)||0; };
+    var skills=roles.map(function(r){ return r.skill; }).filter(function(v,i,a){ return v && a.indexOf(v)===i; });
+    var sk=skills.length===1?(SKILLS.filter(function(s){ return s[0]===skills[0]; })[0]||['',''])[1]:'';
+    var band=String(card.state||'Karnataka').toUpperCase()+' - ZONE '+(card.zone||'')+(sk?' - '+sk.toUpperCase():'');
+    pb.text(pb.W/2,y+16,'Monthly Wage Structure',15,{bold:true,align:'center'}); y+=24;
+    if(card.name) pb.wrap(card.name,CW,9.6,true).forEach(function(l){ pb.text(pb.W/2,y+10,l,9.6,{bold:true,align:'center',color:C.goldDk}); y+=13; });
+    y+=3; pb.rect(ML,y,CW,17,{fill:C.goldLt}); pb.text(pb.W/2,y+12,band,9,{bold:true,align:'center',color:C.goldDk}); y+=24;
+    y=pdfMetaBand(pb,ML,CW,MR,y,meta,C);
+    var n=roles.length, ltrW=18, basisW=118, aw=Math.min(100,(CW-ltrW-basisW-170)/n), partW=CW-ltrW-basisW-aw*n, xl=ML, xp=ML+ltrW, xb=xp+partW, xa=xb+basisW, rh=15.5;
+    var lines=roles.map(function(r){ return pb.wrap(r.roleName||'Role',aw-8,8.2,true); });
+    var nl=Math.max(2,Math.max.apply(null,lines.map(function(l){return l.length;}))), h1=nl*10+10;
+    pb.rect(ML,y,CW,h1,{fill:C.ink});
+    pb.text(xl+ltrW/2,y+h1/2+3,'Line',7.6,{bold:true,color:C.white,align:'center'}); pb.text(xp+6,y+h1/2+3,'Customer billing structure (CTC breakup)'+(card.place?' - '+card.place:''),8.6,{bold:true,color:C.white}); pb.text(xb+basisW/2,y+h1/2+3,'Calculation basis / rate',7.8,{bold:true,color:C.white,align:'center'});
+    roles.forEach(function(r,i){ lines[i].forEach(function(l,k){ pb.text(xa+i*aw+aw/2,y+10+k*10,l,8.2,{bold:true,color:C.white,align:'center'}); }); });
+    y+=h1;
+    pb.rect(ML,y,CW,17,{fill:C.paper});
+    pb.text(xp+6,y+12,card.revision||'Monthly amount per person (Rs.)',8.4,{bold:true,color:C.goldDk});
+    roles.forEach(function(r,i){ var d=N(r.dutyHrs)||N(card.hours)||8; pb.text(xa+i*aw+aw/2,y+12,d+' Hrs. Duty',8.2,{bold:true,align:'center'}); });
+    y+=17;
+    kaRows(card,roles).forEach(function(d){
+      if(y+rh>LIMIT){ y=pdfHead(pb); }
+      var st=d[4], col=C.ink, bold=!!st;
+      if(st==='section'){ pb.rect(ML,y,CW,12.5,{fill:C.goldLt}); pb.text(xp+6,y+9,d[1].toUpperCase(),7.4,{bold:true,color:C.goldDk}); y+=12.5; return; }
+      if(st==='sub') pb.rect(ML,y,CW,rh,{fill:C.goldLt});
+      if(st==='sub2') pb.rect(ML,y,CW,rh,{fill:C.paper});
+      if(st==='net') pb.rect(ML,y,CW,rh,{fill:C.paper});
+      if(st==='grand'){ pb.rect(ML,y,CW,rh,{fill:C.ink}); col=C.white; }
+      if(d[0]) pb.text(xl+ltrW/2,y+rh-5,d[0],8.4,{bold:true,color:col,align:'center'});
+      pb.text(xp+6,y+rh-5,pdfFit(pb,d[1],partW-10,8.6,bold),8.6,{bold:bold,color:col});
+      if(d[2]) pb.text(xb+basisW/2,y+rh-5,pdfFit(pb,d[2],basisW-6,7.6,false),7.6,{align:'center',color:col});
+      roles.forEach(function(r,i){ var v=d[3](r,computed[i]); pb.text(xa+(i+1)*aw-8,y+rh-5,(v===0)?'-':pdfMoney(v),8.6,{bold:bold,color:col,align:'right'}); });
+      y+=rh; pb.line(ML,y,MR,y,0.35,C.line);
+    });
+    y+=12;
+    var g=govCfg(), hrs=N(card.hours)||8, notes=['The Total Monthly Invoice Amount includes GST @ '+(N(card.gstPct))+'%.',
+      'Rates are based on the Minimum Wages notification of the Karnataka Government'+(g&&g.edition?' ('+g.edition+')':'')+'. Any change in minimum wages, VDA, statutory contributions and/or taxes will be charged as per law.',
+      'Wage calculation is considered for '+hrs+' working hours per day and '+(N(card.days)||26)+' working days per month.'+(roles.some(function(r){ return (N(r.dutyHrs)||hrs)>hrs; })?' The Extra hrs line applies to the longer duty shown above the column.':'')];
+    if(N(card.washing)>0||N(card.special)>0) notes.push('Uniform, washing and special allowance are flat amounts per person per month.');
+    if(y+notes.length*24+80>LIMIT){ y=pdfHead(pb); }
+    pb.text(ML,y+8,'Note:',8.8,{bold:true,color:C.goldDk}); y+=14;
+    notes.forEach(function(t,i){ pb.wrap((i+1)+'. '+t,CW,8.4,false).forEach(function(l){ pb.text(ML,y+8,l,8.4,{color:C.mute}); y+=11; }); });
+    pdfSign(pb,y+10,ML,MR,null,'Authorised signatory, '+pdfSignatory().name+', '+pdfSignatory().role);
+    pdfFoot(pb,'Computer-generated rate card');
+    return pb.build();
+  }
+
+  // The wage register for this structure: each person's share of the month (Pay Days), the lines of the structure, billing, and the employee's own side.
+  function drawWageRegisterKA(pb, data){
+    var C=PDFC, rc=data.rc, ML=24, y=pdfHead(pb,true), CWt=pb.W-48, LIMIT=pb.H-78, st=state.settings||{}, N=function(x){ return Number(x)||0; };
+    var p2=function(x){ return Math.round(N(x)*100)/100; }, m2=function(v){ return (Math.round(N(v)*100)/100).toFixed(2); };
+    var epf=(rc.empPfPct!=null?rc.empPfPct:(st.pfRate||12)), eesi=(rc.empEsicPct!=null?rc.empEsicPct:(st.esiRate||0.75));
+    var anyExtra=data.rows.some(function(r){ return r.b && r.b.extra>0; }), hasW=N(rc.washing)>0, hasS=N(rc.special)>0, hrs=N(rc.hours)||8;
+    var cols=[['sl','SI No',11,'c'],['id','ID NO',37,'l'],['name','Empl Name',52,'l'],['desig','Desig.',17,'c'],['tdays','Total Days',15,'r'],['pdays','Pay Days',17,'r'],['basic','Basic',27,'r'],['da','VDA',24,'r'],['gC','Gross Min. Wage',28,'r']];
+    if(anyExtra) cols=cols.concat([['extra','Extra hrs',25,'r'],['wages','Total Wages',28,'r']]);
+    cols=cols.concat([['pf','PF @ '+p2(rc.pfPct)+'%',25,'r'],['edli','EDLI & Admin @ '+p2(rc.edliPct)+'%',25,'r'],['esic','ESI @ '+p2(rc.esicPct)+'%',24,'r'],['bonus','Bonus @ '+p2(rc.bonusPct)+'%',25,'r'],['leave','Leave @ '+p2(rc.leavePct)+'%',25,'r'],['statutory','Statutory Cost',28,'r'],['uniform','Uniform',23,'r']]);
+    if(hasW) cols.push(['washing','Washing',23,'r']); if(hasS) cols.push(['special','Special',23,'r']);
+    cols=cols.concat([['tdc','Direct Cost',28,'r'],['service','Service Charge @ '+p2(rc.servicePct)+'%',27,'r'],['ctc','Total CTC',28,'r'],['gst','GST @ '+p2(rc.gstPct)+'%',26,'r'],['billing','Total Billing',29,'r'],
+      ['pf12','PF @ '+p2(epf)+'%',25,'r'],['esic075','ESI @ '+p2(eesi)+'%',24,'r'],['pt','PT',17,'r'],['adv','Advance',22,'r'],['totald','Total Deduction',26,'r'],['net','Net Pay',29,'r'],['sign','Signature',30,'l']]);
+    var tw=cols.reduce(function(s,c){return s+c[2];},0), scale=Math.min(1,CWt/tw);
+    cols=cols.map(function(c){ return [c[0],c[1],c[2]*scale,c[3]]; });
+    var xs=[], x=ML; cols.forEach(function(c){ xs.push(x); x+=c[2]; });
+    var tableW=x-ML, fs=5.3;
+    function ci(k){ return cols.findIndex(function(c){return c[0]===k;}); }
+    function put(i,txt,yy,bold,color){
+      var c=cols[i]; if(!c||txt===''||txt==null) return;
+      if(c[3]==='r') pb.text(xs[i]+c[2]-2,yy,txt,fs,{align:'right',bold:bold,color:color});
+      else if(c[3]==='c') pb.text(xs[i]+c[2]/2,yy,txt,fs,{align:'center',bold:bold,color:color});
+      else pb.text(xs[i]+2.2,yy,pdfFit(pb,txt,c[2]-3.5,fs,bold),fs,{bold:bold,color:color});
+    }
+    function colHead(){
+      var fsList=cols.map(function(c){ var widest=0; c[1].split(' ').forEach(function(w){ widest=Math.max(widest,pb.tw(w,1,true)); }); return Math.max(3.6,Math.min(5.0,(c[2]-2)/widest)); });
+      var lines=cols.map(function(c,i){ return pb.wrap(c[1],c[2]-2,fsList[i],true); }), hh=Math.max.apply(null,lines.map(function(l){return l.length;}))*6.0+8;
+      var groups=[['EARNED','basic',anyExtra?'wages':'gC'],['STATUTORY COSTS','pf','statutory'],['OTHER COSTS AND BILLING','uniform','billing'],['DEDUCTIONS FROM THE EMPLOYEE','pf12','net']];
+      var gy=y; pb.rect(ML,gy,tableW,10,{fill:C.paper});
+      groups.forEach(function(g){ var a=ci(g[1]), b=ci(g[2]); pb.text((xs[a]+xs[b]+cols[b][2])/2,gy+7.2,g[0],5.4,{align:'center',bold:true,color:C.goldDk}); });
+      y+=10; pb.rect(ML,y,tableW,hh,{fill:C.ink});
+      cols.forEach(function(c,i){ lines[i].forEach(function(l,k){ var cx=c[3]==='l'?xs[i]+2:xs[i]+c[2]/2; pb.text(cx,y+7.5+k*6.0,l,fsList[i],{bold:true,color:C.white,align:c[3]==='l'?'left':'center'}); }); });
+      y+=hh;
+    }
+    pb.text(ML,y+6,'Form XVII',9,{bold:true}); pb.text(ML,y+16,'Register of Wages',8,{color:C.mute}); pb.text(ML,y+25,'Prescribed Under Rule 78(1)(a) of The Contract Labour (R&A) Karnataka Rules, 1974',7.2,{color:C.mute});
+    pb.text(pb.W-24,y+6,'Wage Period for the month of '+xMonthLabel(data.ym).replace(' ',' - '),9,{bold:true,align:'right',color:C.goldDk});
+    y+=34;
+    var cl=data.client||{};
+    pb.text(ML,y+4,'Name and address of contractor:',6.8,{color:C.mute}); pb.text(ML+118,y+4,COMPANY.tradeName+', '+COMPANY.address,6.8,{bold:true}); y+=10;
+    pb.text(ML,y+4,'Name and address of establishment:',6.8,{color:C.mute}); pb.text(ML+118,y+4,pdfFit(pb,(cl.name||'')+(cl.address?', '+cl.address:''),CWt-120,6.8,true),6.8,{bold:true}); y+=14;
+    colHead();
+    var rowH=14.5, groups=[], cur=null;
+    data.rows.forEach(function(r){ if(!r.b) return; if(!cur||cur.col!==r.col){ cur={col:r.col,rows:[]}; groups.push(cur); } cur.rows.push(r); });
+    var keys=['pdays','basic','da','gC'].concat(anyExtra?['extra','wages']:[]).concat(['pf','edli','esic','bonus','leave','statutory','uniform']).concat(hasW?['washing']:[]).concat(hasS?['special']:[]).concat(['tdc','service','ctc','gst','billing','pf12','esic075','pt','adv','totald','net']);
+    function sums(list){ var t={}; keys.forEach(function(k){ t[k]=0; }); list.forEach(function(r){ keys.forEach(function(k){ t[k]+= (k==='pdays'? r.att.payB : (r.b[k]||0)); }); }); return t; }
+    function totalRow(label,t,dark){
+      if(y+rowH+4>LIMIT){ y=pdfHead(pb,true); colHead(); }
+      pb.rect(ML,y,tableW,rowH+1.5,{fill:dark?C.ink:C.paper});
+      var col=dark?C.white:C.ink; put(2,label,y+10,true,col);
+      keys.forEach(function(k){ put(ci(k),k==='pdays'?(Math.round(t[k]*10)/10).toFixed(1):m2(t[k]),y+10,true,col); });
+      y+=rowH+1.5;
+    }
+    var n=0;
+    groups.forEach(function(g){
+      g.rows.forEach(function(r){
+        if(y+rowH>LIMIT){ y=pdfHead(pb,true); colHead(); }
+        n++; var b=r.b;
+        put(0,String(n),y+10); put(1,r.e.empCode||'',y+10); put(2,(r.e.name||'').toUpperCase(),y+10); put(3,r.short,y+10);
+        put(4,String(data.dim),y+10); put(5,r.att.payB.toFixed(1),y+10);
+        keys.slice(1).forEach(function(k){ put(ci(k),m2(b[k]),y+10,(k==='net'||k==='billing')); });
+        y+=rowH; pb.line(ML,y,ML+tableW,y,0.3,C.line);
+      });
+      var rcCol=(rc.roles||[])[g.col];
+      if(groups.length>1) totalRow('TOTAL '+(rcCol?roleShort(rcCol.roleName)+' '+(N(rcCol.dutyHrs)||hrs)+'h':''),sums(g.rows),false);
+    });
+    var all=[]; groups.forEach(function(g){ all=all.concat(g.rows); });
+    totalRow('GRAND TOTAL',sums(all),true);
+    y+=8;
+    if(y+70>LIMIT){ y=pdfHead(pb,true); }
+    pb.text(ML,y+6,'Amounts in Rs. Calculated from the rate card for the days worked (Pay Days). Total Billing includes the service charge and GST. Uniform, washing and special allowance are flat amounts.',6.6,{color:C.mute});
+    pb.text(ML,y+44,'Prepared by',7.6,{color:C.mute}); pb.line(ML,y+38,ML+150,y+38,0.5,C.ink);
+    pb.text(pb.W-24,y+44,'Authorised signatory (with seal)',7.6,{color:C.mute,align:'right'}); pb.line(pb.W-24-190,y+38,pb.W-24,y+38,0.5,C.ink);
+  }
+/*KA-PDF-END*/
+
+  // when the minimum wages change: Basic and VDA of every role with a skill category, in every new-structure card, follow the table in Compliance
+  async function rcRefreshWages(){
+    if(!canPay()){ toast('Only Accounts or an administrator can do this.'); return; }
+    if(!db){ toast('Storage unavailable, cannot save.'); return; }
+    var N=function(x){ return Number(x)||0; }, plan=[];
+    rateCards.filter(function(c){ return c.format==='ka'; }).forEach(function(c){
+      var n=0, roles=(c.roles||[]).map(function(r){
+        var g=r.skill?govWage(c.zone||'2',r.skill):null; if(!g || !g.basic) return r;
+        if(Math.abs(N(r.basic)-g.basic)<0.005 && Math.abs(N(r.vda)-g.da)<0.005) return r;
+        n++; return Object.assign({}, r, {basic:g.basic, vda:g.da});
+      });
+      if(n) plan.push({c:c, roles:roles, n:n});
+    });
+    if(!plan.length){ toast('The new-structure rate cards already have the wages of the minimum wages table.'); return; }
+    var total=plan.reduce(function(t,x){ return t+x.n; },0), g0=govCfg();
+    if(!confirm('Set Basic and VDA to the minimum wages table'+(g0&&g0.edition?' ('+g0.edition+')':'')+' for '+total+' role'+(total>1?'s':'')+' in '+plan.length+' new-structure rate card'+(plan.length>1?'s':'')+'?\n\nOnly roles that have a skill category change. Cards in the old structures are not touched, and invoices already made keep their amounts.')) return;
+    var done=0; for(var i=0;i<plan.length;i++){ try{ await db.doc('rateCards/'+plan[i].c.id).update({roles:plan[i].roles}); done+=plan[i].n; }catch(e){ toast('Could not save "'+(plan[i].c.name||'a rate card')+'". '+done+' role'+(done===1?'':'s')+' were updated before it.'); return; } }
+    toast('Updated '+done+' role'+(done===1?'':'s')+' in '+plan.length+' rate card'+(plan.length>1?'s':'')+'.');
+  }
+  // an old-structure rate card becomes a new card in the new structure (the old card stays as it is)
+  async function copyRcToKa(id){
+    var rc=rateCards.find(function(x){ return x.id===id; }); if(!rc){ toast('Open the rate card first.'); return; }
+    if(!db){ toast('Storage unavailable, cannot save.'); return; }
+    var N=function(x){ return Number(x)||0; }, zone=String(rc.zone||'2'), firstW=(rc.roles||[])[0]||{};
+    var roles=(rc.roles||[]).map(function(r){
+      var sk=r.skill||defaultSkillFor(r.roleName), g=sk?govWage(zone,sk):null;
+      return {roleName:r.roleName||'Role', skill:sk||'', dutyHrs:N(r.dutyHrs)||8, basic:g?g.basic:N(r.basic), vda:g?g.da:N(r.vda)};
+    });
+    var nc=Object.assign({}, KA_DEFAULTS, {format:'ka', name:(rc.name||'Rate card')+' (new structure)', state:rc.state||'Karnataka', zone:zone, place:rc.place||'', revision:'Rate Revised May26', hours:rc.hours||8, days:rc.days||26,
+      servicePct:(rc.servicePct!=null)?N(rc.servicePct):KA_DEFAULTS.servicePct, gstPct:(rc.gstPct!=null)?N(rc.gstPct):KA_DEFAULTS.gstPct,
+      uniform:(rc.format==='costsheet')?N(rc.uniform):(N(firstW.uniform)||KA_DEFAULTS.uniform), washing:(rc.format==='wagebreakup')?N(firstW.washingAllowance):0, special:(rc.format==='wagebreakup')?N(firstW.specialAllowance):0,
+      showEmp:rc.showEmp!==false, roles:roles});
+    try{ var ref=await db.collection('rateCards').add(nc); toast('A copy in the new structure was made. Check the figures, then use it.'); closeRcModal(); setTimeout(function(){ if(ref && ref.id) openRcModal(ref.id); },300); }
+    catch(e){ toast('Could not save the copy.'); }
+  }
+
 
   function fmt2(n){ return '\u20b9'+(Math.round((n||0)*100)/100).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
   // The 14-line wage break-up used with clients, plus the employee side: PF, ESIC, professional tax and in-hand pay.
   function computeRole(card, role){
+    if(card.format==='ka') return computeKa(card, role, 1);
     if(card.format==='costsheet') return computeCostSheet(card, role, 1);
     var N=function(x){ return Number(x)||0; }, rnd=function(x){ return Math.round(x); }, r2=function(x){ return Math.round(x*100)/100; };
     var basic=N(role.basic), da=N(role.vda), special=N(role.specialAllowance), washing=N(role.washingAllowance), uniform=N(role.uniform);
@@ -5317,9 +5577,9 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     rateCards.sort(function(a,b){return (a.name||'').localeCompare(b.name||'');}).forEach(function(rc){
       var roles = rc.roles||[];
       var names = roles.map(function(r){ return escapeHtml(r.roleName||'Role'); }).join(', ') || '\u2014';
-      var totals = roles.map(function(r){ return escapeHtml(r.roleName||'Role')+(rc.format==='costsheet'?' ('+(Number(r.dutyHrs)||rc.hours||8)+'h)':'')+': <b>'+fmt2(computeRole(rc,r).grandTotal)+'</b>'; }).join('<br>') || '\u2014';
+      var totals = roles.map(function(r){ return escapeHtml(r.roleName||'Role')+((rc.format==='costsheet'||rc.format==='ka')?' ('+(Number(r.dutyHrs)||rc.hours||8)+'h)':'')+': <b>'+fmt2(computeRole(rc,r).grandTotal)+'</b>'; }).join('<br>') || '\u2014';
       var tr=document.createElement('tr');
-      tr.innerHTML = '<td>'+escapeHtml(rc.name)+'</td><td>'+escapeHtml(rc.state||'\u2014')+'</td>'+
+      tr.innerHTML = '<td>'+escapeHtml(rc.name)+(rc.format==='ka'?'':' <span class="tag warn">old structure</span>')+'</td><td>'+escapeHtml(rc.state||'\u2014')+'</td>'+
         '<td>'+(rc.hours||8)+'h x '+(rc.days||26)+'d</td>'+
         '<td>'+names+'</td>'+
         '<td class="right">'+totals+'</td>'+
@@ -5333,12 +5593,14 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 
   function setupRateCardUI(){
     document.getElementById('btnAddRc').addEventListener('click', function(){ openRcModal(null); });
+    document.getElementById('btnRcRefreshWages').addEventListener('click', rcRefreshWages);
     document.getElementById('rcModalClose').addEventListener('click', closeRcModal);
     document.getElementById('btnSaveRc').addEventListener('click', saveRateCard);
     document.getElementById('btnDeleteRc').addEventListener('click', deleteRateCard);
     document.getElementById('btnDownloadRc').addEventListener('click', downloadRateCard);
     document.getElementById('btnAddRole').addEventListener('click', function(){ addRoleBlock(null); });
-    ['rcPf','rcEsic','rcBonus','rcEmpPf','rcEmpEsic','rcShowEmp','rcShowExtra','rcExtraHrs','rcService','rcGst','rcPfCeil','rcMedical','rcUniform','rcTraining','rcLeaveDays','rcNatHol','rcRelieve','rcPlace','rcRevision','rcName','rcHours','rcDays','rcState'].forEach(function(id){
+    document.getElementById('btnRcToKa').addEventListener('click', function(){ copyRcToKa(document.getElementById('rcId').value); });
+    ['rcPf','rcEsic','rcBonus','rcEmpPf','rcEmpEsic','rcShowEmp','rcShowExtra','rcExtraHrs','rcService','rcGst','rcPfCeil','rcMedical','rcUniform','rcTraining','rcLeaveDays','rcNatHol','rcRelieve','rcPlace','rcRevision','rcName','rcHours','rcDays','rcState','rcEdli','rcBonusCeil','rcLeavePct','rcWashing','rcSpecial'].forEach(function(id){
       document.getElementById(id).addEventListener('input', renderRcPreview);
     });
     document.getElementById('rcFormat').addEventListener('change', function(){
@@ -5357,18 +5619,29 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   }
 
   var rcZonePrev='2';
-  // shows the boxes that belong to the chosen format and hides the others
+  // shows the boxes that belong to the chosen structure and hides the others
+  var RC_LABELS={};
   function syncRcFormat(){
-    var cs=document.getElementById('rcFormat').value==='costsheet';
-    document.querySelectorAll('#rcModalBg .rc-cs').forEach(function(el){ el.style.display=cs?'':'none'; });
-    document.querySelectorAll('#rcModalBg .rc-ws').forEach(function(el){ el.style.display=cs?'none':''; });
-    if(!cs) syncExtraFields();
+    var f=document.getElementById('rcFormat').value, ka=(f==='ka'), cs=(f==='costsheet'), ws=(f==='wagebreakup');
+    document.querySelectorAll('#rcModalBg .rc-cs').forEach(function(el){ el.style.display=(ka||cs)?'':'none'; });
+    document.querySelectorAll('#rcModalBg .rc-old-cs').forEach(function(el){ el.style.display=cs?'':'none'; });
+    document.querySelectorAll('#rcModalBg .rc-ws').forEach(function(el){ el.style.display=ws?'':'none'; });
+    document.querySelectorAll('#rcModalBg .rc-ka').forEach(function(el){ el.style.display=ka?'':'none'; });
+    var lab=function(id,txtKa){ var l=document.getElementById(id).previousElementSibling; if(!l) return; if(RC_LABELS[id]==null) RC_LABELS[id]=l.textContent; l.textContent=ka?txtKa:RC_LABELS[id]; };
+    lab('rcUniform','Uniform & operational overhead (₹, flat)'); lab('rcPf','Employer PF % (on Basic + VDA)'); lab('rcBonus','Bonus % (of Basic, up to the bonus ceiling)');
+    lab('rcPfCeil','PF wage ceiling (₹), leave empty or 0 for the full Basic + VDA'); lab('rcService','Service charge % (of Total Direct Cost). Change it here before you send the rate card'); lab('rcEmpPf','Employee PF % (deducted from wages)');
+    if(ws) syncExtraFields();
   }
-  // starting rates for a new card, by format
+  // starting rates for a new card, by structure
   function applyRcDefaults(format){
     var cdef = state.settings.costing || {pfPct:13, esicPct:3.25, bonusPct:8.33, servicePct:7, gstPct:18};
     function set(id,v){ document.getElementById(id).value=v; }
-    if(format==='costsheet'){
+    if(format==='ka'){
+      var d=KA_DEFAULTS;
+      set('rcPf',d.pfPct); set('rcEdli',d.edliPct); set('rcEsic',d.esicPct); set('rcBonus',d.bonusPct); set('rcBonusCeil',d.bonusCeiling); set('rcLeavePct',d.leavePct);
+      set('rcPfCeil',0); set('rcUniform',d.uniform); set('rcWashing',d.washing); set('rcSpecial',d.special); set('rcService',d.servicePct); set('rcGst',d.gstPct);
+      set('rcMedical',0); set('rcTraining',0); set('rcLeaveDays',0); set('rcNatHol',0); set('rcRelieve',0);
+    } else if(format==='costsheet'){
       set('rcPf',13); set('rcEsic',3.25); set('rcBonus',8.33); set('rcService',5); set('rcGst',18);
       set('rcPfCeil',(state.settings.pfCeilingEnabled===false)?0:pfCeilNow());
       set('rcMedical',300); set('rcUniform',250); set('rcTraining',200); set('rcLeaveDays',21); set('rcNatHol',1); set('rcRelieve',16.67);
@@ -5410,16 +5683,17 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 
   function currentCardFromForm(){
     var g=function(id){ return document.getElementById(id); }, n=function(id){ return Number(g(id).value)||0; };
-    var fmt=g('rcFormat').value==='costsheet'?'costsheet':'wagebreakup', stt=g('rcState').value, zone=g('rcZone').value;
+    var fv=g('rcFormat').value, fmt=(fv==='ka')?'ka':(fv==='costsheet'?'costsheet':'wagebreakup'), stt=g('rcState').value, zone=g('rcZone').value;
     return {
       format: fmt,
-      name: g('rcName').value.trim() || (fmt==='costsheet' ? 'Rate structure as per the Minimum Wages, '+stt+'-Zone '+zone : ''),
+      name: g('rcName').value.trim() || ((fmt==='costsheet'||fmt==='ka') ? 'Rate structure as per the Minimum Wages, '+stt+'-Zone '+zone : ''),
       state: stt, zone: zone, place: g('rcPlace').value.trim(), revision: g('rcRevision').value.trim(),
       hours: Number(g('rcHours').value)||8, days: Number(g('rcDays').value)||26,
       pfPct: n('rcPf'), esicPct: n('rcEsic'), bonusPct: n('rcBonus'), empPfPct: n('rcEmpPf'), empEsicPct: n('rcEmpEsic'),
       showEmp: g('rcShowEmp').checked, showExtra: g('rcShowExtra').checked, extraHrs: Number(g('rcExtraHrs').value)||4,
       pfCeiling: n('rcPfCeil'), medical: n('rcMedical'), uniform: n('rcUniform'), training: n('rcTraining'),
       leaveDays: n('rcLeaveDays'), natHolPct: n('rcNatHol'), relievePct: n('rcRelieve'),
+      edliPct: n('rcEdli'), bonusCeiling: n('rcBonusCeil'), leavePct: n('rcLeavePct'), washing: n('rcWashing'), special: n('rcSpecial'),
       servicePct: n('rcService'), gstPct: n('rcGst')
     };
   }
@@ -5439,6 +5713,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   }
 
   function rateCardRows(card, roles){
+    if(card.format==='ka') return kaRows(card, roles);
     if(card.format==='costsheet') return costSheetRows(card, roles);
     var pct=function(x){ return (Number(x)||0).toFixed(2)+'%'; };
     var rows=[];
@@ -5482,32 +5757,35 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var roles=currentRolesFromForm();
     var table=document.getElementById('rcPreviewTable');
     if(!roles.length){ table.querySelector('tbody').innerHTML='<tr><td class="muted">Add at least one role to see the breakdown.</td></tr>'; return; }
-    var cs=card.format==='costsheet';
+    var cs=card.format==='costsheet', ka=card.format==='ka', duty=(cs||ka);
     var computed = roles.map(function(r){ return computeRole(card,r); });
-    var html = '<thead><tr>'+(cs?'':'<th>S.No.</th>')+'<th>Particulars</th><th>% / Type</th>'+roles.map(function(r){
-      return '<th class="right">'+escapeHtml(r.roleName||'Role')+(cs?'<br><span class="muted">'+(Number(r.dutyHrs)||card.hours||8)+' Hrs. Duty</span>':'')+'</th>'; }).join('')+'</tr></thead><tbody>';
+    var html = '<thead><tr>'+(cs?'':'<th>'+(ka?'Line':'S.No.')+'</th>')+'<th>'+(ka?'Customer billing structure (CTC breakup)':'Particulars')+'</th><th>'+(ka?'Calculation basis / rate':'% / Type')+'</th>'+roles.map(function(r){
+      return '<th class="right">'+escapeHtml(r.roleName||'Role')+(duty?'<br><span class="muted">'+(Number(r.dutyHrs)||card.hours||8)+' Hrs. Duty</span>':'')+'</th>'; }).join('')+'</tr></thead><tbody>';
     rateCardRows(card, roles).forEach(function(d){
       if(d[4]==='section'){ html += '<tr><td></td><td colspan="'+(2+roles.length)+'" style="font-weight:700;color:var(--muted)">'+escapeHtml(d[1])+'</td></tr>'; return; }
       var bold=!!d[4];
       html += '<tr'+(bold?' style="font-weight:700;background:rgba(201,151,58,.08)"':'')+'>'+(cs?'':'<td>'+d[0]+'</td>')+'<td>'+escapeHtml(d[1])+'</td><td>'+escapeHtml(d[2])+'</td>';
-      roles.forEach(function(r,i){ var v=d[3](r,computed[i]); html += '<td class="right">'+((cs&&v===0)?'-':fmt2(v))+'</td>'; });
+      roles.forEach(function(r,i){ var v=d[3](r,computed[i]); html += '<td class="right">'+((duty&&v===0)?'-':fmt2(v))+'</td>'; });
       html += '</tr>';
     });
-    var blank=cs?'':'<td></td>';
-    html += '<tr>'+blank+'<td>+ GST @ '+(Number(card.gstPct)||0)+'% (charged additionally)</td><td>'+(Number(card.gstPct)||0)+'%</td>'+computed.map(function(c){return '<td class="right">'+fmt2(c.gstAmt)+'</td>';}).join('')+'</tr>';
-    html += '<tr style="font-weight:700">'+blank+'<td>TOTAL BILL (Grand Total + GST)</td><td>-</td>'+computed.map(function(c){return '<td class="right">'+fmt2(c.totalBill)+'</td>';}).join('')+'</tr>';
+    if(!ka){
+      var blank=cs?'':'<td></td>';
+      html += '<tr>'+blank+'<td>+ GST @ '+(Number(card.gstPct)||0)+'% (charged additionally)</td><td>'+(Number(card.gstPct)||0)+'%</td>'+computed.map(function(c){return '<td class="right">'+fmt2(c.gstAmt)+'</td>';}).join('')+'</tr>';
+      html += '<tr style="font-weight:700">'+blank+'<td>TOTAL BILL (Grand Total + GST)</td><td>-</td>'+computed.map(function(c){return '<td class="right">'+fmt2(c.totalBill)+'</td>';}).join('')+'</tr>';
+    }
     html += '</tbody>';
     table.innerHTML = html;
   }
 
   function openRcModal(id){
     var rc = id ? rateCards.find(function(x){return x.id===id;}) : null;
-    var fmt = rc ? (rc.format==='costsheet'?'costsheet':'wagebreakup') : 'costsheet';
+    var fmt = rc ? (rc.format==='ka'?'ka':(rc.format==='costsheet'?'costsheet':'wagebreakup')) : 'ka';
     var el=function(x){ return document.getElementById(x); };
     function setIf(x,v){ if(v!=null) el(x).value=v; }
     el('rcModalTitle').textContent = rc? 'Edit rate card' : 'New rate card';
     el('rcId').value = id||'';
-    el('rcFormat').value = fmt;
+    Array.prototype.forEach.call(el('rcFormat').options,function(o){ o.hidden=(o.value!==fmt); o.disabled=(o.value!==fmt); });
+    el('rcFormat').value = fmt; el('rcFormatBox').style.display=(rc && fmt!=='ka')?'':'none'; el('rcOldBanner').style.display=(rc && fmt!=='ka')?'flex':'none';
     el('rcName').value = rc?rc.name:'';
     el('rcState').value = rc?rc.state:'Karnataka';
     el('rcHours').value = rc?rc.hours:8;
@@ -5520,6 +5798,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       setIf('rcPf',rc.pfPct); setIf('rcEsic',rc.esicPct); setIf('rcBonus',rc.bonusPct); setIf('rcService',rc.servicePct); setIf('rcGst',rc.gstPct);
       setIf('rcPfCeil',rc.pfCeiling); setIf('rcMedical',rc.medical); setIf('rcUniform',rc.uniform); setIf('rcTraining',rc.training);
       setIf('rcLeaveDays',rc.leaveDays); setIf('rcNatHol',rc.natHolPct); setIf('rcRelieve',rc.relievePct);
+      setIf('rcEdli',rc.edliPct); setIf('rcBonusCeil',rc.bonusCeiling); setIf('rcLeavePct',rc.leavePct); setIf('rcWashing',rc.washing); setIf('rcSpecial',rc.special);
     }
     el('rcEmpPf').value = (rc && rc.empPfPct!=null) ? rc.empPfPct : (state.settings.pfRate||12);
     el('rcEmpEsic').value = (rc && rc.empEsicPct!=null) ? rc.empEsicPct : (state.settings.esiRate||0.75);
@@ -5531,6 +5810,10 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     el('rcRolesContainer').innerHTML='';
     if(rc && rc.roles && rc.roles.length){
       rc.roles.forEach(function(role){ addRoleBlock(role); });
+    } else if(fmt==='ka'){
+      addRoleBlock({roleName:'Security Guard / Lady Guard', skill:'unskilled', dutyHrs:8});
+      addRoleBlock({roleName:'Security Supervisor', skill:'semi', dutyHrs:8});
+      document.querySelectorAll('#rcRolesContainer .rc-role').forEach(function(w){ fillRoleFromGov(w,false); });
     } else if(fmt==='costsheet'){
       addRoleBlock({roleName:'Security Guard / Lady Guard', skill:'unskilled', dutyHrs:12});
       addRoleBlock({roleName:'Security Supervisor', skill:'semi', dutyHrs:12});
@@ -7376,6 +7659,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 
   /* ---------- rate card (the wage break-up shared with clients) ---------- */
   function buildRateCardPdf(card,roles,computed,meta){
+    if(card.format==='ka') return buildKaPdf(card,roles,computed,meta);
     if(card.format==='costsheet') return buildCostSheetPdf(card,roles,computed,meta);
     var land=roles.length>4, pb=pdfNew(land), ML=36, CW=pb.W-72, MR=ML+CW, LIMIT=pb.H-78, C=PDFC;
     var y=pdfHead(pb);
@@ -8177,11 +8461,17 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   }
   // One employee's share of the rate card for the days worked (the columns of the wage register).
   function employeeBilling(card, rr, pay, dim, e){
+    if(card.format==='ka'){
+      var k=computeKa(card, rr, pay/dim);
+      return {ka:true, basic:k.basic, da:k.da, gC:k.gross, extra:k.extra, wages:k.wages, gross:k.wages, pf:k.pf, edli:k.edli, esic:k.esic, bonus:k.bonus, leave:k.leave, statutory:k.statutory,
+        uniform:k.uniform, washing:k.washing, special:k.special, tdc:k.tdc, service:k.service, ctc:k.ctc, gst:k.gst, billing:k.total, scamt:k.tdc,
+        pf12:k.empPf, esic075:k.empEsic, esicOn:k.esicOn, pt:(e&&pay>0)?k.pt:0};
+    }
     if(card.format==='costsheet'){
       var c=computeCostSheet(card, rr, pay/dim);
       return {cs:true, basic:c.basic, da:c.da, subA:c.subA, extra:c.extra, subB:c.subB, pf:c.pf, esic:c.esic, medical:c.medical, bonus:c.bonus, leave:c.leave, natHol:c.natHol,
         uniform:c.uniform, training:c.training, subC:c.subC, relieve:c.relieve, subD:c.subD, service:c.service, gst:c.gstAmt, billing:c.grand+c.gstAmt, scamt:c.subD, gross:c.subB,
-        pf12:c.empPf, esic075:c.empEsic, pt:(e&&pay>0)?c.pt:0};
+        pf12:c.empPf, esic075:c.empEsic, esicOn:c.esicOn, pt:(e&&pay>0)?c.pt:0};
     }
     var N=function(x){return Number(x)||0;}, rnd=Math.round, f=pay/dim, st=state.settings;
     var basic=rnd(N(rr.basic)*f), da=rnd(N(rr.vda)*f), special=rnd(N(rr.specialAllowance)*f), washing=rnd(N(rr.washingAllowance)*f);
@@ -8191,8 +8481,20 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var subb=pf+esic+bonus+uniform, ctc=gross+subb;
     var sc=Math.floor(ctc*N(card.servicePct)/100), grand=ctc+sc, gst=rnd(grand*N(card.gstPct)/100);
     var pf12=rnd(wage*N(card.empPfPct!=null?card.empPfPct:(st.pfRate||12))/100), esic075=rnd(wage*N(card.empEsicPct!=null?card.empEsicPct:(st.esiRate||0.75))/100), pt=(e&&pay>0)?ptForState(e.state,gross):0;
+    var fullG=N(rr.basic)+N(rr.vda)+N(rr.specialAllowance)+(card.showExtra?N(rr.extraHours):0)+N(rr.washingAllowance);
     return {basic:basic,da:da,special:special,extra:extra,washing:washing,gross:gross,pf13:pf,esic325:esic,bonus:bonus,uniform:uniform,subb:subb,ctc:ctc,sc:sc,grand:grand,gst:gst,
-      billing:grand+gst,scamt:ctc,pf12:pf12,esic075:esic075,pt:pt};
+      billing:grand+gst,scamt:ctc,pf12:pf12,esic075:esic075,esicOn:fullG<=(N(st.esiThreshold)||21000),pt:pt};
+  }
+  // The employee's deductions in the wage register follow the same rules as Payroll: PF only for people on PF and within the PF ceiling,
+  // ESIC only for people on ESI and while the pay is within the ESI limit (worked out on all of the pay). The rates are the rate card's.
+  function registerDeductions(b, e, ym, card){
+    var st=state.settings||{}, wage=(Number(b.basic)||0)+(Number(b.da)||0), gross=Number(b.gross)||0;
+    var epf=(card && card.empPfPct!=null)?Number(card.empPfPct):(st.pfRate||12), eesi=(card && card.empEsicPct!=null)?Number(card.empEsicPct):(st.esiRate||0.75);
+    b.pf12=e.pfApplicable?Math.round(pfBreakdown(wage,!!e.pfFull,null,ym).wages*epf/100):0;
+    // who is covered by ESI is decided on the regular monthly wage (as in Payroll), not on a month that has extra duties; the contribution is on all of the pay
+    var esiOn=(b.esicOn!=null)?!!b.esicOn:(gross<=(st.esiThreshold||21000));
+    b.esic075=(e.esiApplicable && esiOn)?Math.round(gross*eesi/100):0;
+    return b;
   }
   async function gatherBilling(site, ym, rc, client){
     var dim=daysInMonth(ym), warns=[];
@@ -8205,7 +8507,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     for(var i=0;i<emps.length;i++){
       var e=emps[i], doc=await getAttendanceDoc(e.id, ym), att=attendanceMarks(e,ym,(doc&&doc.days)||{},(doc&&doc.duty)||{});
       var rr=rc?findRcRole(rc,e.role,e.dutyHrs):null, b=null;
-      if(rr){ b=employeeBilling(rc,rr,att.payB,dim,e); b.adv=advBy[e.id]||0; b.canteen=0; b.unifd=0;
+      if(rr){ b=employeeBilling(rc,rr,att.payB,dim,e); registerDeductions(b,e,ym,rc); b.adv=advBy[e.id]||0; b.canteen=0; b.unifd=0;
         b.totald=b.pf12+b.esic075+b.pt+b.canteen+b.adv+b.unifd; b.net=b.gross-b.totald; }
       else if(rc){ warns.push((e.name||'Employee')+' ('+(e.role||'no role')+') has no matching role on the rate card, so is left out of the wage register.'); }
       rows.push({e:e, att:att, b:b, short:roleShort(e.role), role:e.role||'', col:(rr&&rc&&rc.roles)?rc.roles.indexOf(rr):-1});
@@ -8290,6 +8592,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   }
 
   function drawWageRegister(pb, data){
+    if(data.rc && data.rc.format==='ka') return drawWageRegisterKA(pb, data);
     if(data.rc && data.rc.format==='costsheet') return drawWageRegisterCS(pb, data);
     var C=PDFC, rc=data.rc, ML=24, y=pdfHead(pb,true), CWt=pb.W-48, LIMIT=pb.H-78, st=state.settings;
     var pf=(Number(rc.pfPct)||0), es=(Number(rc.esicPct)||0), epf=(rc.empPfPct!=null?rc.empPfPct:(st.pfRate||12)), eesi=(rc.empEsicPct!=null?rc.empEsicPct:(st.esiRate||0.75));
@@ -8451,6 +8754,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     rs.value=(k&&k.rateCardId)||client.rateCardId||'';
     document.getElementById('packInfo').textContent='Invoice '+(inv.invoiceNo||'')+' for '+(client.name||'')+'. Choose the site, month and rate card the per-employee breakdown should use.';
     var w=document.getElementById('packWarn'); w.style.display='none'; w.innerHTML='';
+    var pc=document.getElementById('packCheck'); pc.style.display='none'; pc.innerHTML=''; document.getElementById('packModal').style.maxWidth='560px';
     document.getElementById('packModalBg').classList.add('show');
   }
   function closePackModal(){ document.getElementById('packModalBg').classList.remove('show'); }
@@ -8477,12 +8781,76 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     }catch(e){ console.error(e); toast('Could not build the document.'); }
     finally{ btns.forEach(function(b,i){ b.disabled=false; b.textContent=labels[i]; }); }
   }
+  // ---- the wage register against what Payroll worked out for the same people and month ----
+  async function registerVsPayroll(data){
+    var rc=data.rc, ym=data.ym, dim=data.dim, st=state.settings||{}, out=[], TOL=2, M=function(x){ return fmtMoney(Math.round(x)); };
+    for(var i=0;i<data.rows.length;i++){
+      var r=data.rows[i], e=r.e, b=r.b;
+      if(!b){ out.push({e:e, noRole:true, match:false, reasons:['This person has no matching role on the rate card, so the register leaves them out. Payroll still pays them.']}); continue; }
+      var p=await computePayroll(e,ym), regDays=r.att.payB, payDays=p.present+p.extraDuty+p.holidayDuty, reasons=[];
+      var regMonthly=regDays>0?b.gross*dim/regDays:0, payMonthly=p.present>0?p.baseGross*dim/p.present:0;
+      if(regDays>0 && p.present>0 && Math.abs(regMonthly-payMonthly)>TOL) reasons.push('The rate card pays '+M(regMonthly)+' a month for this role, but this person is paid '+M(payMonthly)+' a month in Payroll.');
+      if(Math.abs(regDays-payDays)>0.001){
+        if(st.billExtraDuty===false && (p.extraDuty+p.holidayDuty)>0) reasons.push('Extra duties are not counted in the register, because "count extra duties in client billing" is off in Settings.');
+        else reasons.push('The register counts '+regDays+' days and Payroll '+payDays+' days.');
+      }
+      if(p.holidayMult>1 && p.holidayDuty>0) reasons.push('Holiday work is paid at '+p.holidayMult+' times in Payroll, but counted once in the register.');
+      if(p.otPay>0) reasons.push('Payroll includes overtime of '+M(p.otPay)+'.');
+      if(p.nightPay>0) reasons.push('Payroll includes night shift allowance of '+M(p.nightPay)+'.');
+      if(p.arrears>0) reasons.push('Payroll includes arrears of '+M(p.arrears)+'.');
+      if(p.addPay>0) reasons.push('Payroll includes additional pay of '+M(p.addPay)+'.');
+      if(p.otherDed>0) reasons.push('Payroll has another deduction of '+M(p.otherDed)+'.');
+      if(Math.abs((b.adv||0)-(p.advance||0))>TOL) reasons.push('The advance deducted is '+M(b.adv||0)+' in the register and '+M(p.advance||0)+' in Payroll.');
+      var gd=p.gross-b.gross, nd=p.net-b.net, match=Math.abs(gd)<=TOL && Math.abs(nd)<=TOL;
+      if(!match && !reasons.length) reasons.push('The two differ by '+M(Math.abs(nd))+' and no cause was found. Please look at this person.');
+      out.push({e:e, match:match, regDays:regDays, payDays:payDays, regGross:b.gross, payGross:p.gross, regPf:b.pf12, payPf:p.pf, regEsi:b.esic075, payEsi:p.esi, regPt:b.pt, payPt:p.pt, regAdv:b.adv||0, payAdv:p.advance||0, regNet:b.net, payNet:p.net, reasons:reasons});
+    }
+    return out;
+  }
+  function packCheckHtml(list){
+    var ok=list.filter(function(x){ return x.match; }).length, bad=list.length-ok, M=function(x){ return fmtMoney(Math.round(x)); };
+    var rg=0, pg=0, rn=0, pn=0; list.forEach(function(x){ if(!x.noRole){ rg+=x.regGross; pg+=x.payGross; rn+=x.regNet; pn+=x.payNet; } });
+    var h='<div class="banner" style="margin:0 0 .5rem;'+(bad?'border-color:#B07A10;background:var(--warn-soft,#FFF4DA)':'')+'"><div><b>'+(bad?bad+' of '+list.length+' '+(list.length===1?'person differs':'people differ')+' between the wage register and Payroll.':'The wage register and Payroll agree for all '+list.length+' '+(list.length===1?'person':'people')+'.')+'</b><div style="margin-top:.2rem">Gross: register '+M(rg)+', Payroll '+M(pg)+', difference '+M(pg-rg)+'. Net pay: register '+M(rn)+', Payroll '+M(pn)+', difference '+M(pn-rn)+'.</div></div></div>';
+    h+='<div class="scrollx"><table><thead><tr><th>Employee</th><th class="right">Days<br><span class="muted">register / Payroll</span></th><th class="right">Gross<br><span class="muted">register</span></th><th class="right">Gross<br><span class="muted">Payroll</span></th><th class="right">Net<br><span class="muted">register</span></th><th class="right">Net<br><span class="muted">Payroll</span></th><th>Why</th></tr></thead><tbody>';
+    list.forEach(function(x){
+      var nm='<b>'+escapeHtml(x.e.name||'')+'</b><div class="muted" style="font-size:.78rem">'+escapeHtml(x.e.empCode||'')+' '+escapeHtml(x.e.role||'')+'</div>';
+      if(x.noRole){ h+='<tr data-pcrow="diff"><td>'+nm+'</td><td colspan="5" class="muted">not in the register</td><td>'+escapeHtml(x.reasons.join(' '))+'</td></tr>'; return; }
+      h+='<tr data-pcrow="'+(x.match?'ok':'diff')+'"'+(x.match?'':' style="background:var(--warn-soft,#FFF4DA)"')+'><td>'+nm+'</td><td class="right">'+x.regDays+' / '+x.payDays+'</td><td class="right">'+M(x.regGross)+'</td><td class="right">'+M(x.payGross)+'</td><td class="right">'+M(x.regNet)+'</td><td class="right">'+M(x.payNet)+'</td><td>'+(x.match?'<span class="muted">Matches'+(x.reasons.length?'. '+escapeHtml(x.reasons.join(' ')):'')+'</span>':escapeHtml(x.reasons.join(' ')))+'</td></tr>';
+    });
+    return h+'</tbody></table></div><div class="row" style="margin-top:.5rem"><button class="btn small ghost" type="button" id="btnPackCheckCsv">Download as CSV</button></div><p class="muted" style="font-size:.8rem;margin:.4rem 0 0">The register is worked out from the rate card for each role. Payroll is worked out from each person\'s own pay. They agree when the rate card pays what the person is paid. Payroll is calculated here the same way as in the Pay cycle, from the attendance as it is now.</p>';
+  }
+  var packCheckRows=[];
+  async function runPackCheck(){
+    var inv=packInv; if(!inv) return;
+    var site=document.getElementById('packSite').value, ym=document.getElementById('packMonth').value, rc=rateCards.find(function(r){return r.id===document.getElementById('packRate').value;});
+    if(!site){ toast('Choose the site.'); return; } if(!ym){ toast('Choose the month.'); return; } if(!rc){ toast('Choose a rate card.'); return; }
+    var client=clients.find(function(c){return c.id===inv.clientId;})||{name:inv.clientName||''}, btn=document.getElementById('btnPackCheck'), old=btn.textContent, box=document.getElementById('packCheck');
+    btn.disabled=true; btn.textContent='Checking...';
+    try{
+      var data=await gatherBilling(site,ym,rc,client);
+      if(!data.rows.length){ box.style.display=''; box.innerHTML='<p class="muted">No employees are on that site in that month.</p>'; return; }
+      packCheckRows=await registerVsPayroll(data);
+      document.getElementById('packModal').style.maxWidth='980px'; box.style.display=''; box.innerHTML=packCheckHtml(packCheckRows);
+    }catch(e){ console.error(e); toast('Could not compare the two.'); }
+    finally{ btn.disabled=false; btn.textContent=old; }
+  }
+  async function packCheckCsv(){
+    var q=function(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; }, ym=document.getElementById('packMonth').value, site=document.getElementById('packSite').value;
+    var rows=[['Employee ID','Name','Role','Days (register)','Days (Payroll)','Gross (register)','Gross (Payroll)','PF (register)','PF (Payroll)','ESIC (register)','ESIC (Payroll)','PT (register)','PT (Payroll)','Advance (register)','Advance (Payroll)','Net (register)','Net (Payroll)','Net difference','Why']];
+    packCheckRows.forEach(function(x){ var R=Math.round; rows.push(x.noRole?[x.e.empCode,x.e.name,x.e.role,'','','','','','','','','','','','','','','',x.reasons.join(' ')]:[x.e.empCode,x.e.name,x.e.role,x.regDays,x.payDays,R(x.regGross),R(x.payGross),R(x.regPf),R(x.payPf),R(x.regEsi),R(x.payEsi),R(x.regPt),R(x.payPt),R(x.regAdv),R(x.payAdv),R(x.regNet),R(x.payNet),R(x.payNet-x.regNet),x.match?'Matches':x.reasons.join(' ')]); });
+    var csv=rows.map(function(r){ return r.map(q).join(','); }).join('\r\n'), name='register-vs-payroll-'+pdfName(site)+'-'+ym+'.csv';
+    if(downloadsCap){ try{ await downloadsCap.save({filename:name, data:csv}); return; }catch(e){} }
+    var url=URL.createObjectURL(new Blob([csv],{type:'text/csv'})), a=document.createElement('a'); a.href=url; a.download=name; document.body.appendChild(a); a.click(); a.remove(); setTimeout(function(){ URL.revokeObjectURL(url); },4000);
+  }
   function setupPackModal(){
     var c=document.getElementById('packModalClose'); if(!c) return;
     c.addEventListener('click', closePackModal);
     document.getElementById('btnPackAll').addEventListener('click', function(){ runPack('pack'); });
     document.getElementById('btnPackReg').addEventListener('click', function(){ runPack('reg'); });
     document.getElementById('btnPackAtt').addEventListener('click', function(){ runPack('att'); });
+    document.getElementById('btnPackCheck').addEventListener('click', runPackCheck);
+    document.getElementById('packCheck').addEventListener('click', function(ev){ if(ev.target.closest && ev.target.closest('#btnPackCheckCsv')) packCheckCsv(); });
+    ['packSite','packMonth','packRate'].forEach(function(id){ document.getElementById(id).addEventListener('change', function(){ var b=document.getElementById('packCheck'); b.style.display='none'; b.innerHTML=''; }); });
   }
 
   // ======== REMOVING SITES (Settings > Sites) ========

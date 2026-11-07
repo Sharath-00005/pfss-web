@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-At the bottom of the left menu a small line reads, for example, "Version: 6 Nov 2026, build 11". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+At the bottom of the left menu a small line reads, for example, "Version: 7 Nov 2026, build 14". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -754,3 +754,75 @@ When you attach additional documents to an invoice or billing pack email (for ex
 - **If you have typed in the message yourself**, your text is never changed behind your back. A note offers the button "Add it before Warm regards". After that, changes to the sentence update it in place while your own words stay.
 - With no files attached there is no sentence and the message is exactly the usual one. The payment reminder keeps the sentence too.
 - Anyone who can send email can change the wording for one email and keep it as the standard. It is saved in its own record (collection emailTemplates), so no database change is needed.
+
+
+## The wage register against Payroll
+
+### Why they can differ
+The **wage register** (Form XVII, in the billing pack) and **Payroll** are worked out from different things:
+- The **register** is worked out from the **rate card**: for each role, Basic, D.A., Special Allowance and Washing Allowance (and Extra hours if shown) as set on the rate card, shared out by the days paid (monthly amount x days / days in the month). It does not look at what the person is actually paid.
+- **Payroll** (the Pay cycle and the payslip) is worked out from **each person's own pay**: their wage or pay structure, with overtime, night shifts, arrears, additional pay and holiday work added, and PF, ESIC, professional tax, advances and other deductions taken off.
+
+They agree when the rate card pays a role exactly what the person is paid. They differ when a person is paid more or less than the rate card for their role, or when Payroll has something the register does not (overtime, night shifts, arrears, additional pay, holiday work at more than 1 time, another deduction).
+
+### Check against payroll
+In the **billing pack** window (Invoicing, the Pack button on an invoice), choose the site, month and rate card and press **Check against payroll**. It lists every person with the days, the gross and the net pay in the register and in Payroll, marks the people who differ, and gives the **reason** in words, for example:
+- "The rate card pays Rs 19,559 a month for this role, but this person is paid Rs 20,000 a month in Payroll."
+- "Payroll includes overtime of Rs 1,368."
+- "Holiday work is paid at 2 times in Payroll, but counted once in the register."
+- "This person has no matching role on the rate card, so the register leaves them out."
+
+A top line gives the totals and how many people differ (a difference of Rs 2 or less, from rounding, counts as a match). **Download as CSV** keeps the list. Payroll is calculated here the same way as in the Pay cycle, from the attendance as it is now. To settle a difference, make the rate card pay what the person is paid (or change the person's pay in Employees), so the register and Payroll agree.
+
+### What changed in the register
+The deductions columns now follow the same rules as Payroll: **PF** only for people who have PF, and worked out within the PF ceiling (or on the full Basic when the person is marked so), and **ESIC** only for people who have ESI, while their pay is within the ESI wage limit, on all of the pay. The rates are still the rate card's. Before, the register took PF at 12% of Basic and D.A. and ESIC at 0.75% for everyone, with no ceiling and no check of who is on PF or ESI, so its PF, ESIC and net pay could differ from the payslip even when the pay was the same.
+
+### Please note
+The register is headed "Register of Wages" and carries the Form XVII title, but it is worked out from the rate card. If it is given to a client or an inspector as the wages register, it should show what was actually paid, so use the check and settle any differences first, and ask your CA or labour consultant whether this form is relied on as the statutory register.
+
+
+## The new rate structure (Karnataka, minimum wages of May 2026)
+
+### What it is
+Every new rate card now uses one structure, the **Customer billing structure (CTC breakup)** with the employee's take-home pay beside it. For one person it reads, for Zone 3, Unskilled, 8 hours:
+
+| Line | Item | Basis | Amount |
+|---|---|---|---|
+| A | Basic Wage | Fixed | 19,319.36 |
+| B | Variable Dearness Allowance (VDA) | Cost of living | 1,030.80 |
+| C | Gross Minimum Wage (A+B) | | 20,350.16 |
+| D | Employer PF Contribution | 12% on Full Basic+VDA | 2,442.02 |
+| E | Employer EDLI & Admin | 1% combined | 203.50 |
+| F | Employer ESI Contribution | 3.25% of Gross (C) | 661.38 |
+| G | Statutory Bonus | 8.33% of Basic/Ceiling | 1,249.50 |
+| H | Leave with Wages (Paid Leave) | 4.81% of Gross | 978.84 |
+| I | Subtotal Statutory Cost (C+D+E+F+G+H) | | 25,885.40 |
+| J | Uniform & Operational Overhead | Flat allowance | 500.00 |
+| K | Total Direct Cost, TDC (I+J) | | 26,385.40 |
+| L | Agency Service Charge | 8% of TDC (K) | 2,110.83 |
+| M | Subtotal Before GST (Total CTC) (K+L) | | 28,496.23 |
+| N | GST | 18% on Subtotal (M) | 5,129.32 |
+| O | Total Monthly Invoice Amount, Final Billing per Head (M+N) | | 33,625.55 |
+
+Employee take-home: Gross wages 20,350.16, less employee PF 12% (2,442.02) and ESI 0.75% (152.63), **final estimated net pay 17,755.51**. A professional tax line appears only when the pay is high enough for it to apply.
+
+Every amount is worked out to the paisa, line by line in this order, and the lines add up exactly. Bonus is 8.33% of the Basic up to the **bonus ceiling** (15,000 to begin with). PF and EDLI are on the full Basic + VDA (or up to a PF ceiling if you enter one). ESI applies while the monthly wage is within the ESI limit (21,000). A role on a **12-hour duty** gets two extra lines (Extra 4 hrs, Total Wages) and the ESI and leave lines then follow the total wages; for an 8-hour role they do not appear.
+
+### Amounts that change from customer to customer
+Open **Rate Card, New rate card** (or the phone app, New card, Rates and options) and change, for that customer:
+- **Uniform & operational overhead** (500 to begin with), **Washing allowance** and **Special allowance** (0 to begin with). They are flat amounts per person per month, billed as their own lines after the statutory costs, so **PF, ESI, bonus and leave are not worked out on them**, and the service charge is. The washing and special allowance lines appear in the table only when they have an amount, and the letters of the lines after them move on.
+- **Service charge %** (8 to begin with), and also EDLI & admin %, bonus % and ceiling, leave %, PF %, ESI %, GST %.
+- On the **phone app**, the **email window has "Service charge %"** at the top: change it just before you send, and the message to the client and the PDF follow it, with the total per person shown under the box.
+Washing and special allowance are billing amounts only. They are not added to the employee's pay in Payroll (use Additional pay there if the staff are to receive them).
+
+### When the minimum wages change
+Enter the new Basic for each zone and skill, and the VDA, in the **minimum wages table in Compliance**. Then press **Update wages from the minimum wages table** on the Rate Card tab: it sets Basic and VDA of every role that has a skill category, in every new-structure card, to the table (it asks first and says how many roles change). Roles without a skill category, and cards in the old structures, are not touched, and invoices already made keep their amounts. A new card takes the table's wages by itself.
+
+### The old structures
+The two earlier structures (cost sheet, and the 14-line wage break-up) are no longer offered for new cards. Cards already made with them stay in the list marked **old structure** and keep working, so invoices, billing packs and wage registers made from them do not change. Open one and press **Make a copy in the new structure** to get a new card with the same client, zone, roles, service charge and GST, and the uniform, washing and special amounts it had. In the phone app the copy comes up on screen to check and save. A contract that uses an old card keeps using it until you choose the new card on the contract. Delete the old cards when you no longer need them.
+
+### The rest of the system follows
+- **Rate card PDF:** "Monthly Wage Structure", with a band such as KARNATAKA - ZONE 3 - UNSKILLED, the table above for each role, notes, and the signature.
+- **Wage register (Form XVII) in the billing pack:** new columns for this structure (Basic, VDA, Gross Min. Wage, PF, EDLI & Admin, ESI, Bonus, Leave, Statutory Cost, Uniform, Washing, Special, Direct Cost, Service Charge, Total CTC, GST, Total Billing, then the employee's PF, ESI, PT, Advance, Total Deduction and Net Pay), in rupees and paise, with a grand total.
+- **Invoices made from a contract** take each person's Total Direct Cost for the days worked (flat amounts included), add the service charge from the rate card and GST, so the invoice agrees with the register.
+- **Check against payroll** works for the new structure as before. The register now decides ESI by the regular monthly wage, as Payroll does, so an extra duty no longer makes one of them drop ESI.
