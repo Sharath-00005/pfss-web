@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-At the bottom of the left menu a small line reads, for example, "Version: 7 Nov 2026, build 14". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+At the bottom of the left menu a small line reads, for example, "Version: 7 Nov 2026, build 16". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -826,3 +826,17 @@ The two earlier structures (cost sheet, and the 14-line wage break-up) are no lo
 - **Wage register (Form XVII) in the billing pack:** new columns for this structure (Basic, VDA, Gross Min. Wage, PF, EDLI & Admin, ESI, Bonus, Leave, Statutory Cost, Uniform, Washing, Special, Direct Cost, Service Charge, Total CTC, GST, Total Billing, then the employee's PF, ESI, PT, Advance, Total Deduction and Net Pay), in rupees and paise, with a grand total.
 - **Invoices made from a contract** take each person's Total Direct Cost for the days worked (flat amounts included), add the service charge from the rate card and GST, so the invoice agrees with the register.
 - **Check against payroll** works for the new structure as before. The register now decides ESI by the regular monthly wage, as Payroll does, so an extra duty no longer makes one of them drop ESI.
+
+
+### The signature on the rate card
+Every rate card PDF, whether it is downloaded for the client or sent by email (from the main system or the phone app), now carries the **authorised signatory's signature image** above the signature line, under "For PUBLIC FORCE SECURITY SERVICES", with "Authorised signatory, Sharath R, Accounts Head" beneath. It uses the signature image and the name and designation saved in **Settings, Authorised signatory, signature and stamps**, the same as on invoices and payslips. This applies to the new structure and also to the old-structure cards. If no signature image has been saved, the card shows the blank signature line as before. To add or change it, open Settings, choose the signature photo, and press Save: sign with dark ink on plain white paper and take a photo, and the paper is removed and the picture cropped on its own. The phone app reads the same saved signature.
+
+The card stays on one page where it can: when the table, the notes and the signature would not fit, the rows are made a little tighter (a card with the washing and special allowance lines still fits on one page), and a very long card moves the notes and the signature together to the next page. A long label such as the final total now wraps onto two lines instead of being cut off.
+
+
+### The signature on the rate card PDF
+- **Downloaded or shared:** the rate card PDF (the Download PDF button in the Rate Card tab and in the phone app, and Share on the phone) carries the **signature image** saved in Settings, above the line, with "For PUBLIC FORCE SECURITY SERVICES" over it and just **"Authorised signatory"** under it. The name and the designation are not printed.
+- **Emailed from the phone app:** the PDF that goes with the email has **no signature**. In its place it says "This is a computer-generated rate card and does not require a signature." (The footer of every rate card also reads "Computer-generated rate card".)
+- If no signature image has been saved in Settings (Authorised signatory, signature and stamps), the downloaded PDF has a blank signature line, as before.
+- This applies to every rate card PDF, in the new structure and in the two old ones. Invoices, payslips and letters are not changed.
+- The notes and the signature stay on the same page as the table whenever they fit: rows are made slightly tighter when needed, and only a card that is still too long moves the notes and the signature to a second page.
