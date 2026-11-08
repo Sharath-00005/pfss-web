@@ -381,7 +381,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <button class="navbtn" id="tabs-settings" data-tab="settings">Settings</button>
     <div class="grp" id="railTitle">Pay cycle</div>
     <ul class="rail" id="workflowRail"></ul>
-    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 7 Nov 2026, build 17</div>
+    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 7 Nov 2026, build 18</div>
   </nav>
 
   <div class="main-col">
@@ -5330,6 +5330,13 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   }
 /*KA-END*/
 /*KA-ROWS-BEGIN*/
+  // how professional tax is worked out for this state, in words (from the slabs in Compliance)
+  function kaPtBasis(card){
+    var slabs=((state.settings&&state.settings.ptSlabs)||{})[card.state]||[], pos=slabs.filter(function(x){ return x.amt>0; }).sort(function(a,b){ return a.min-b.min; });
+    if(!slabs.length || !pos.length) return 'No professional tax in '+(card.state||'this state');
+    if(pos.length===1) return '\u20b9'+pos[0].amt+' from \u20b9'+Math.round(pos[0].min).toLocaleString('en-IN')+' gross';
+    return 'As per the '+card.state+' slab';
+  }
   // The lines of the structure, in the order of the table. Each line: [letter, label, basis text, function(role, result), style].
   // The letters follow the lines that are shown (the washing and special allowance lines only appear when they have an amount).
   function kaRows(card, roles){
@@ -5372,7 +5379,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       rows.push(['','Gross wages ('+L[wk]+')','',function(r,c){ return c.wages; },'']);
       rows.push(['','Employee PF',pct(ep)+(N(card.pfCeiling)>0?' on Basic+VDA up to '+inr(card.pfCeiling):' on Full Basic+VDA'),function(r,c){ return c.empPf; },'']);
       rows.push(['','Employee ESI',pct(ee)+' of Gross',function(r,c){ return c.empEsic; },'']);
-      if(anyPt) rows.push(['','Professional Tax','',function(r,c){ return c.pt; },'']);
+      rows.push(['','Professional Tax',kaPtBasis(card),function(r,c){ return c.pt; },'']);
       rows.push(['','Final Estimated Net Pay','',function(r,c){ return c.net; },'net']);
     }
     return rows;
@@ -5395,9 +5402,9 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var skills=roles.map(function(r){ return r.skill; }).filter(function(v,i,a){ return v && a.indexOf(v)===i; });
     var sk=skills.length===1?(SKILLS.filter(function(s){ return s[0]===skills[0]; })[0]||['',''])[1]:'';
     var band=String(card.state||'Karnataka').toUpperCase()+' - ZONE '+(card.zone||'')+(sk?' - '+sk.toUpperCase():'');
-    pb.text(pb.W/2,y+16,'Monthly Wage Structure',15,{bold:true,align:'center'}); y+=24;
+    pb.text(pb.W/2,y+16,'Monthly Wage Structure',15,{bold:true,align:'center'}); y+=21;
     if(card.name) pb.wrap(card.name,CW,9.6,true).forEach(function(l){ pb.text(pb.W/2,y+10,l,9.6,{bold:true,align:'center',color:C.goldDk}); y+=13; });
-    y+=3; pb.rect(ML,y,CW,17,{fill:C.goldLt}); pb.text(pb.W/2,y+12,band,9,{bold:true,align:'center',color:C.goldDk}); y+=24;
+    y+=3; pb.rect(ML,y,CW,17,{fill:C.goldLt}); pb.text(pb.W/2,y+12,band,9,{bold:true,align:'center',color:C.goldDk}); y+=21;
     y=pdfMetaBand(pb,ML,CW,MR,y,meta,C);
     var n=roles.length, ltrW=18, basisW=118, aw=Math.min(100,(CW-ltrW-basisW-170)/n), partW=CW-ltrW-basisW-aw*n, xl=ML, xp=ML+ltrW, xb=xp+partW, xa=xb+basisW, rh=15;
     var lines=roles.map(function(r){ return pb.wrap(r.roleName||'Role',aw-8,8.2,true); });
@@ -5413,8 +5420,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     // if the table, the notes and the signature would not fit on one page, the rows are made a little tighter (down to a floor)
     var rowsData=kaRows(card,roles), nRows=0, nSec=0, nExtra=0, notes=kaNotes(card,roles);
     rowsData.forEach(function(d){ if(d[4]==='section'){ nSec++; return; } nRows++; nExtra+=pb.wrap(d[1],partW-10,8.6,!!d[4]).length-1; });
-    var availRows=LIMIT-y-8-pdfNotesNeed(pb,notes,CW,!!(meta&&meta.computerGenerated))-12.5*nSec-9.5*nExtra;
-    if(nRows*rh>availRows) rh=Math.max(12.6,availRows/nRows);
+    var availRows=LIMIT-y-14-pdfNotesNeed(pb,notes,CW,!!(meta&&meta.computerGenerated))-12.5*nSec-9.5*nExtra;
+    if(nRows*rh>availRows) rh=Math.max(12.2,availRows/nRows);
     kaRows(card,roles).forEach(function(d){
       var st=d[4], col=C.ink, bold=!!st, lines=(st==='section')?[d[1]]:pb.wrap(d[1],partW-10,8.6,bold), rr=rh+(lines.length-1)*9.5;
       if(y+rr>LIMIT){ y=pdfHead(pb); }
@@ -5426,7 +5433,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       var by=(lines.length>1)?y+rr/2+3:y+rh-5;   // the baseline of the letter, the basis and the amounts
       if(d[0]) pb.text(xl+ltrW/2,by,d[0],8.4,{bold:true,color:col,align:'center'});
       lines.forEach(function(l,k){ pb.text(xp+6,(lines.length>1)?y+10+k*9.5:y+rh-5,l,8.6,{bold:bold,color:col}); });
-      if(d[2]) pb.text(xb+basisW/2,by,pdfFit(pb,d[2],basisW-6,7.6,false),7.6,{align:'center',color:col});
+      if(d[2]) pb.text(xb+basisW/2,by,pdfFit(pb,String(d[2]).replace(/\u20b9/g,'Rs. '),basisW-6,7.6,false),7.6,{align:'center',color:col});
       roles.forEach(function(r,i){ var v=d[3](r,computed[i]); pb.text(xa+(i+1)*aw-8,by,(v===0)?'-':pdfMoney(v),8.6,{bold:bold,color:col,align:'right'}); });
       y+=rr; pb.line(ML,y,MR,y,0.35,C.line);
     });

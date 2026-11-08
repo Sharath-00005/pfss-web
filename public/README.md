@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-At the bottom of the left menu a small line reads, for example, "Version: 7 Nov 2026, build 17". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+At the bottom of the left menu a small line reads, for example, "Version: 7 Nov 2026, build 18". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -859,3 +859,7 @@ Some clients pay a **fixed amount for the month**. Others have a rate for **8 ho
 - **A pay type that does not follow the billing is flagged:** in the pay cycle checks (a warning, which does not stop the payroll), "The client (card) is billed per day, but this person is paid a monthly wage" and "The client (card) is billed a fixed monthly amount, but this person is paid a daily wage". The warning looks at the contract of the person's site and the role on its rate card. **Check against payroll** in the billing pack says the same in words ("Set their pay as a daily wage of 782.70 to match") and shows the difference per person.
 - **For a daily-wage person** the Basic + D.A. box in the employee record should hold the same amount as the daily wage, so that PF is worked out on the whole wage.
 - **ESI, to confirm with your consultant:** the pay cycle decides each month whether ESI applies from that month's pay. A daily-wage person paid for 31 days can cross the ESI limit in a long month although the pay for 26 days is below it. ESIC rules decide coverage for a whole contribution period, so ask your CA or ESIC consultant how you want this treated; it is not changed here.
+
+
+### Professional tax in the rate card
+The employee take-home block of the new structure (screen, PDF and phone app) now **always has a Professional Tax line**, between Employee ESI and the Final Estimated Net Pay. It is worked out from the **Professional Tax slabs in Compliance** for the state of the rate card, on the gross wages (the Total Wages when a role has extra hours), and it is taken off the net pay. The basis column says how it works, for example "₹200 from ₹25,000 gross" for Karnataka. It shows a dash while the wages are below the first taxed slab, and ₹200 from ₹25,000 (so, for example, for a 12-hour guard or a skilled role). If a state has several slabs it reads "As per the (state) slab", and if it has none, "No professional tax in (state)". It is a deduction from the employee, so it is not part of the billing lines and does not change the amount the client pays. To change the amounts, change the slabs in Compliance. In the PDF the rupee sign is written "Rs." so that it always prints. The wage register has its own PT column in the deductions, as before.
