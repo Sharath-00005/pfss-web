@@ -381,7 +381,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <button class="navbtn" id="tabs-settings" data-tab="settings">Settings</button>
     <div class="grp" id="railTitle">Pay cycle</div>
     <ul class="rail" id="workflowRail"></ul>
-    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 7 Nov 2026, build 19</div>
+    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 7 Nov 2026, build 20</div>
   </nav>
 
   <div class="main-col">
@@ -708,6 +708,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         <button class="btn small ghost" data-ctab="licences">Licences and registrations</button>
         <button class="btn small ghost" data-ctab="workforce">Workforce gaps</button>
         <button class="btn small ghost" data-ctab="minwage">Minimum wages</button>
+        <button class="btn small ghost" data-ctab="bonus">Bonus ledger</button>
         <button class="btn small ghost" data-ctab="links">Pay and file links</button>
       </div>
       <div id="cmpBody" style="margin-top:14px"></div>
@@ -804,6 +805,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         <div class="field"><label>Employer ESIC %</label><input type="number" step="0.01" id="setEsiEr"></div>
         <div class="field"><label>Warn when overtime is over (hours)</label><input type="number" id="setOtWarn"></div>
         <div class="field"><label>A duty worked on a weekly off or holiday is paid at (times the daily rate)</label><input type="number" step="0.5" min="0.5" id="setHolidayMult"></div>
+        <div class="field"><label>Statutory bonus % (accrued with each payroll)</label><input type="number" step="0.01" min="0" id="setBonusPct"></div>
+        <div class="field"><label>Bonus wage ceiling per month (₹), 0 for none</label><input type="number" step="1" min="0" id="setBonusCeil"></div>
       </div>
       <div class="row" style="margin-top:.6rem"><label><input type="checkbox" id="setBillExtra" checked style="width:auto;margin-right:.4rem">Count extra duties (1.5 or 2 duties on one day) as days worked in client billing: the wage register, the attendance sheet and the man-days on invoices</label></div>
       <div class="row" style="margin-top:1rem"><button class="btn" id="btnSaveCycSettings">Save</button></div>
@@ -994,6 +997,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       <div class="field"><label><input type="checkbox" id="fPf" style="width:auto;margin-right:.4rem">PF applicable</label></div>
       <div class="field"><label><input type="checkbox" id="fPfFull" style="width:auto;margin-right:.4rem">PF on the full Basic, above the ceiling</label></div>
       <div class="field"><label><input type="checkbox" id="fEsi" style="width:auto;margin-right:.4rem">ESI applicable</label></div>
+      <div class="field"><label><input type="checkbox" id="fBonus" style="width:auto;margin-right:.4rem">Statutory bonus applicable</label></div>
       
     </div>
     <div class="row">
@@ -1979,6 +1983,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     document.getElementById('fBasicDa').value = bdv;
     setTimeout(function(){ syncBasicDa(); renderFormPayPreview(); },0);
     document.getElementById('fEsi').checked = e? !!e.esiApplicable : true;
+    document.getElementById('fBonus').checked = e? e.bonusApplicable!==false : true;
     document.getElementById('fWeeklyOff').value = (e && e.weeklyOff!=null) ? String(e.weeklyOff) : '';
     document.getElementById('fHolidayOff').checked = !!(e && e.holidayOff);
     document.getElementById('fDoj').value = e? (e.doj||'') : xToday();
@@ -2041,6 +2046,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       basicDaAmt:payStdOn()?null:bpVal,
       basicPct:null,
       esiApplicable:document.getElementById('fEsi').checked,
+      bonusApplicable:document.getElementById('fBonus').checked,
       weeklyOff:document.getElementById('fWeeklyOff').value,
       holidayOff:document.getElementById('fHolidayOff').checked,
       active:!leftV,
@@ -5066,6 +5072,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         basicPay:x.r.struct?Math.round(x.r.basicPart):0, daPay:x.r.struct?Math.round(x.r.daPart):0,
         extraPay:x.r.struct?Math.max(0,Math.round(x.r.baseGross)-Math.round(x.r.basicPart)-Math.round(x.r.daPart)):0,
         arrears:Math.round(x.r.arrears||0), arrearsNote:x.r.arrearsNote||'', revNote:x.r.revNote||'',
+        bonusBase:bonusAccrual(x.emp,x.r).base, bonusAmt:bonusAccrual(x.emp,x.r).amt, bonusPct:bonusCfg().pct,
         extraDuty:x.r.extraDuty||0, dutyPay:Math.round(x.r.dutyPay||0), holidayDuty:x.r.holidayDuty||0, holidayPay:Math.round(x.r.holidayPay||0), holidayMult:x.r.holidayMult||1,
         addPay:Math.round(x.r.addPay||0), addLines:(x.r.addLines||[]).map(function(a){ return {type:a.type, amount:Math.round(a.amount*100)/100, note:a.note||''}; }),
         esiWages:Math.round(x.r.esiWages||0), pfWages:Math.round(x.r.pfWages||0), epsEr:Math.round(x.r.epsEr||0), epfEr:Math.round(x.r.epfEr||0), edliWages:Math.round(x.r.edliWages||0), edliEr:Math.round(x.r.edliEr||0)};
@@ -7099,6 +7106,97 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     }
     return g;
   }
+  /* ---------- statutory bonus: accrued with each payroll, saved in the payroll, paid once a year ---------- */
+  var cmpBonusFy='';
+  function bonusCfg(){ var b=(state.settings&&state.settings.bonus)||{}; return {pct:(b.pct!=null&&b.pct!=='')?Number(b.pct):8.33, ceiling:(b.ceiling!=null&&b.ceiling!=='')?Number(b.ceiling):15000}; }
+  function bonusR2(x){ return Math.round((Number(x)||0)*100+1e-9)/100; }
+  function bonusM2(x){ return (Number(x)||0).toLocaleString('en-IN',{minimumFractionDigits:2,maximumFractionDigits:2}); }
+  // the bonus of one person for one payroll: the percentage of the Basic + D.A. earned, up to the monthly ceiling for the days paid
+  function bonusAccrual(e, r){
+    var c=bonusCfg();
+    if(e && e.bonusApplicable===false) return {base:0, amt:0, pct:c.pct, ceiling:c.ceiling};
+    var days=(r.present||0)+(r.extraDuty||0)+(r.holidayDuty||0), frac=r.dim>0?days/r.dim:0, cap=c.ceiling>0?c.ceiling*frac:Infinity;
+    var base=Math.max(0, Math.min(Number(r.basic)||0, cap));
+    return {base:bonusR2(base), amt:bonusR2(base*c.pct/100), pct:c.pct, ceiling:c.ceiling};
+  }
+  function bonusFyMonths(fy){
+    var a=Number(fy.slice(0,2)), y=(a>=70?1900:2000)+a, out=[], m;
+    for(m=4;m<=12;m++) out.push(y+'-'+String(m).padStart(2,'0'));
+    for(m=1;m<=3;m++) out.push((y+1)+'-'+String(m).padStart(2,'0'));
+    return out;
+  }
+  // the approved payrolls of a financial year (every group's payroll of every month)
+  function bonusApprovedRuns(fy){
+    var ms=bonusFyMonths(fy), keys={}, out=[];
+    Object.keys(allRuns).concat(Object.keys(runCache)).forEach(function(k){ keys[k]=1; });
+    Object.keys(keys).forEach(function(k){ var r=cycRunByKey(k); if(r && r.status==='approved' && r.rows && ms.indexOf(r.ym)>-1) out.push(r); });
+    return out;
+  }
+  function bonusLedger(fy){
+    var months=bonusFyMonths(fy), runs=bonusApprovedRuns(fy), by={}, missing=0;
+    runs.forEach(function(run){
+      run.rows.forEach(function(x){
+        if(x.bonusAmt==null){ missing++; return; }
+        var o=by[x.empId]||(by[x.empId]={empId:x.empId, code:x.empCode||'', name:x.name||'', site:x.site||'', m:{}, total:0});
+        o.m[run.ym]=bonusR2((o.m[run.ym]||0)+Number(x.bonusAmt)); o.total=bonusR2(o.total+Number(x.bonusAmt));
+      });
+    });
+    var list=Object.keys(by).map(function(k){ return by[k]; }).sort(function(a,b){ return String(a.name).localeCompare(String(b.name)); }), tm={}, tt=0;
+    list.forEach(function(o){ months.forEach(function(ym){ tm[ym]=bonusR2((tm[ym]||0)+(o.m[ym]||0)); }); tt=bonusR2(tt+o.total); });
+    return {fy:fy, months:months, list:list, missing:missing, runs:runs.length, tm:tm, total:tt};
+  }
+  function bonusFyOptions(){
+    var set={}; set[fyCodeOf('')]=1;
+    Object.keys(allRuns).forEach(function(k){ var r=allRuns[k]; if(r && r.status==='approved' && r.ym) set[fyCodeOf(r.ym+'-01')]=1; });
+    return Object.keys(set).sort(function(x,y){ return (Number(y.slice(0,2))<70?100:0)+Number(y.slice(0,2))-((Number(x.slice(0,2))<70?100:0)+Number(x.slice(0,2))); });
+  }
+  function bonusLedgerCsv(L){
+    var q=function(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; };
+    var rows=[['Employee ID','Name','Site'].concat(L.months.map(function(ym){ return xMonthShort(ym)+' '+ym.slice(0,4); })).concat(['Total for '+fyLabel(L.fy)])];
+    L.list.forEach(function(o){ rows.push([o.code,o.name,o.site].concat(L.months.map(function(ym){ return o.m[ym]!=null?o.m[ym].toFixed(2):''; })).concat([o.total.toFixed(2)])); });
+    rows.push(['','Total',''].concat(L.months.map(function(ym){ return (L.tm[ym]||0).toFixed(2); })).concat([L.total.toFixed(2)]));
+    return rows.map(function(r){ return r.map(q).join(','); }).join('\r\n');
+  }
+  function cmpBonusHtml(){
+    var opts=bonusFyOptions(), fy=cmpBonusFy&&opts.indexOf(cmpBonusFy)>-1?cmpBonusFy:opts[0]; cmpBonusFy=fy;
+    var L=bonusLedger(fy), c=bonusCfg(), h='<p class="muted" style="margin-top:0">Statutory bonus is paid once a year. Every payroll adds <b>'+bonusM2(c.pct).replace(/\.00$/,'')+'%</b> of the Basic + D.A. earned'+(c.ceiling>0?' (up to <b>'+c.ceiling.toLocaleString('en-IN')+'</b> a month, for the days paid)':'')+' for each person, and the figure is saved in that payroll when it is approved. This is the total for each person over the financial year (April to March). Change the percentage and ceiling in Settings.</p>';
+    h+='<div class="row" style="align-items:flex-end;gap:.8rem"><div class="field" style="max-width:190px"><label for="bonusFy">Financial year</label><select id="bonusFy">'+opts.map(function(o){ return '<option value="'+o+'"'+(o===fy?' selected':'')+'>'+fyLabel(o)+'</option>'; }).join('')+'</select></div>'+(L.list.length?'<button class="btn ghost" data-act="bonusCsv" type="button">Download (CSV)</button>':'')+'</div>';
+    if(L.missing) h+='<div class="banner" style="border-color:#B07A10;background:var(--warn-soft,#FFF4DA);margin-top:.6rem"><div><b>'+L.missing+' line'+(L.missing>1?'s':'')+' of approved payrolls in this year '+(L.missing>1?'have':'has')+' no bonus figure</b>, because '+(L.missing>1?'they were':'it was')+' approved before this was added. They can be worked out now from the records as they stand, and are saved in those payrolls.</div><button class="btn small" data-act="bonusFill" type="button">Work them out and save</button></div>';
+    if(!L.list.length){ return h+'<p class="muted" style="margin-top:.8rem">'+(L.runs?'No bonus figures yet for '+fyLabel(fy)+'.':'No approved payroll yet in '+fyLabel(fy)+'. The figures appear here as payrolls are approved.')+'</p>'; }
+    h+='<div class="scrollx" style="margin-top:.6rem"><table><thead><tr><th>Employee</th><th>Site</th>'+L.months.map(function(ym){ return '<th class="right">'+xMonthShort(ym)+'</th>'; }).join('')+'<th class="right">Total</th></tr></thead><tbody>';
+    L.list.forEach(function(o){ h+='<tr><td><b>'+escapeHtml(o.name)+'</b><br><span class="muted">'+escapeHtml(o.code)+'</span></td><td>'+escapeHtml(o.site||'-')+'</td>'+L.months.map(function(ym){ return '<td class="right">'+(o.m[ym]!=null?bonusM2(o.m[ym]):'<span class="muted">-</span>')+'</td>'; }).join('')+'<td class="right"><b>'+bonusM2(o.total)+'</b></td></tr>'; });
+    h+='</tbody><tfoot><tr><td>Total</td><td></td>'+L.months.map(function(ym){ return '<td class="right">'+(L.tm[ym]?bonusM2(L.tm[ym]):'-')+'</td>'; }).join('')+'<td class="right">'+bonusM2(L.total)+'</td></tr></tfoot></table></div>';
+    return h;
+  }
+  async function bonusFill(){
+    var fy=cmpBonusFy||fyCodeOf(''), runs=bonusApprovedRuns(fy), done=0;
+    for(var i=0;i<runs.length;i++){
+      var run=runs[i], changed=false;
+      for(var k=0;k<run.rows.length;k++){
+        var row=run.rows[k]; if(row.bonusAmt!=null) continue;
+        var e=state.employees.find(function(x){ return x.id===row.empId; }); if(!e) continue;
+        var r=await computePayroll(e,run.ym), ba=bonusAccrual(e,r);
+        row.bonusBase=ba.base; row.bonusAmt=ba.amt; row.bonusPct=ba.pct; row.bonusFilled=true; changed=true; done++;
+      }
+      if(changed) await saveRunKey(run.scopeKey||runKeyOf(run.ym,''), run);
+    }
+    toast(done?'Bonus worked out and saved for '+done+' line'+(done>1?'s':'')+'.':'Nothing to fill in.'); renderCompliance();
+  }
+  // the card in the pay cycle: this payroll's bonus for each person
+  function bonusMonthCardHtml(r, ym){
+    var rows=r.rows||[], c=bonusCfg(), have=rows.some(function(x){ return x.bonusAmt!=null; }), tot=rows.reduce(function(t,x){ return t+(Number(x.bonusAmt)||0); },0);
+    var h='<div class="card"><h2>Bonus accrued, '+escapeHtml(xMonthLabel(ym))+'</h2><p class="muted">Statutory bonus is paid once a year. This payroll adds '+bonusM2(c.pct).replace(/\.00$/,'')+'% of the Basic + D.A. earned for each person'+(c.ceiling>0?' (up to '+c.ceiling.toLocaleString('en-IN')+' a month, for the days paid)':'')+'. '+(r.status==='approved'?'It is saved with this approved payroll.':'It is saved when this payroll is approved.')+' The total for the year is in Compliance, Bonus ledger.</p>';
+    if(!have) return h+'<p class="muted" style="margin:0">Calculate the payroll again to get the bonus figures for this month.</p></div>';
+    h+='<div class="scrollx"><table><thead><tr><th>Employee</th><th>Site</th><th class="right">Bonus base</th><th class="right">Bonus</th></tr></thead><tbody>';
+    rows.forEach(function(x){ h+='<tr><td><b>'+escapeHtml(x.name||'')+'</b> <span class="muted">'+escapeHtml(x.empCode||'')+'</span></td><td>'+escapeHtml(x.site||'-')+'</td><td class="right">'+bonusM2(x.bonusBase)+'</td><td class="right">'+(x.bonusAmt?bonusM2(x.bonusAmt):'<span class="muted">-</span>')+'</td></tr>'; });
+    return h+'</tbody><tfoot><tr><td>Total</td><td></td><td class="right"></td><td class="right">'+bonusM2(tot)+'</td></tr></tfoot></table></div><div class="row" style="margin-top:.6rem"><button class="btn ghost" data-cyc="bonusCsv" type="button">Download (CSV)</button></div></div>';
+  }
+  function bonusMonthCsv(r, ym){
+    var q=function(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; }, rows=[['Employee ID','Name','Site','Month','Bonus base','Bonus %','Bonus']];
+    (r.rows||[]).forEach(function(x){ rows.push([x.empCode,x.name,x.site,ym,x.bonusBase!=null?Number(x.bonusBase).toFixed(2):'',x.bonusPct!=null?x.bonusPct:'',x.bonusAmt!=null?Number(x.bonusAmt).toFixed(2):'']); });
+    return rows.map(function(a){ return a.map(q).join(','); }).join('\r\n');
+  }
+
   function renderCompliance(){
     var el=document.getElementById('cmpBody'); if(!el) return;
     document.querySelectorAll('#cmpTabs [data-ctab]').forEach(function(b){ b.classList.toggle('on', b.dataset.ctab===cmpTab); });
@@ -7107,6 +7205,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     else if(cmpTab==='workforce') el.innerHTML=cmpWorkforceHtml();
     else if(cmpTab==='gst') el.innerHTML=cmpGstHtml();
     else if(cmpTab==='links') el.innerHTML=cmpLinksHtml();
+    else if(cmpTab==='bonus') el.innerHTML=cmpBonusHtml();
     else el.innerHTML=cmpMinWageHtml();
   }
   function cmpCalendarHtml(){
@@ -7214,10 +7313,13 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       if(t.dataset.act==='addLic') openLicModal(null);
       if(t.dataset.act==='editLic') openLicModal(t.dataset.id);
       if(t.dataset.act==='seedLic') seedLicences();
+      if(t.dataset.act==='bonusFill') bonusFill();
+      if(t.dataset.act==='bonusCsv'){ var bl=bonusLedger(cmpBonusFy||fyCodeOf('')); saveCsvFile('bonus-ledger-'+bl.fy+'.csv', bonusLedgerCsv(bl)); }
       if(t.dataset.act==='gstCsv') saveCsvFile('gstr1-'+curGstMonth()+'.csv', gstr1Csv(gstr1Data(curGstMonth(),invoices,clients)));
     });
     root.addEventListener('change', async function(ev){
       var el=ev.target;
+      if(el.id==='bonusFy'){ cmpBonusFy=el.value; renderCompliance(); return; }
       if(el.id==='cmpMonth'){ if(el.value){ cmpMonth=el.value; renderCompliance(); } return; }
       if(el.id==='onlyGaps'){ cmpOnlyGaps=el.checked; renderCompliance(); return; }
       if(el.id==='gstMonthSel'){ if(el.value){ gstMonth=el.value; renderCompliance(); } return; }
@@ -9305,6 +9407,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       h+='<div class="card"><h2>Cost by site, '+escapeHtml(xMonthLabel(ym))+(payGroups.length?' \u00b7 '+escapeHtml(groupName(payScope)):'')+'</h2><p class="muted">Cost to company includes the employer share of PF and ESI.</p><div class="scrollx"><table><thead><tr><th>Site</th><th class="right">Employees</th><th class="right">Gross pay</th><th class="right">Net pay</th><th class="right">Cost to company</th></tr></thead><tbody>';
       Object.keys(by).sort().forEach(function(k){ var b=by[k]; h+='<tr><td><b>'+escapeHtml(k)+'</b></td><td class="right">'+b.n+'</td><td class="right">'+fmtMoney(b.gross)+'</td><td class="right">'+fmtMoney(b.net)+'</td><td class="right">'+fmtMoney(b.cost)+'</td></tr>'; });
       h+='</tbody><tfoot><tr><td>Total</td><td class="right">'+t.n+'</td><td class="right">'+fmtMoney(t.gross)+'</td><td class="right">'+fmtMoney(t.net)+'</td><td class="right">'+fmtMoney(t.cost)+'</td></tr></tfoot></table></div></div>';
+      h+=bonusMonthCardHtml(r,ym);
       if(!payGroups.length) h+=govPayHtml(t,ym);
       else {
         var mg=monthGovRows(ym);
@@ -9437,6 +9540,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       case 'confirmAtt': await patchCycle(ym,{attConfirmed:true,attConfirmedAt:Date.now()},'Attendance and shifts confirmed'); break;
       case 'confirmReview': await patchCycle(ym,{reviewed:true},'Overtime, leave and absence review confirmed'); break;
       case 'calc': await cycCalculate(); break;
+      case 'bonusCsv': { var br=cycRun(ym); if(br&&br.rows) saveCsvFile('bonus-'+ym+'.csv', bonusMonthCsv(br,ym)); break; }
       case 'runChecks': await cycRunChecks(); break;
       case 'pushThrough': await cycPushThrough(); break;
       case 'undoPush': await cycUndoPush(); break;
@@ -9498,6 +9602,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     document.getElementById('setOtWarn').value=s.otWarnHours==null?50:s.otWarnHours;
     document.getElementById('setBillExtra').checked=s.billExtraDuty!==false;
     document.getElementById('setHolidayMult').value=s.holidayMult>0?s.holidayMult:1;
+    document.getElementById('setBonusPct').value=bonusCfg().pct; document.getElementById('setBonusCeil').value=bonusCfg().ceiling;
   }
   function setupCycleSettings(){
     var b=document.getElementById('btnSaveCycSettings'); if(!b) return;
@@ -9509,6 +9614,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       s.otWarnHours=Number(document.getElementById('setOtWarn').value)||50;
       s.billExtraDuty=document.getElementById('setBillExtra').checked;
       s.holidayMult=Number(document.getElementById('setHolidayMult').value)>0?Number(document.getElementById('setHolidayMult').value):1;
+      var bp=document.getElementById('setBonusPct').value, bc=document.getElementById('setBonusCeil').value; s.bonus={pct:bp===''?8.33:Math.max(0,Number(bp)||0), ceiling:bc===''?15000:Math.max(0,Number(bc)||0)};
       if(!db){ toast('Storage unavailable.'); return; }
       try{ await db.doc('settings/config').set(s); toast('Saved. Recalculate payroll to apply.'); }catch(e){ toast('Could not save: '+(e&&e.code||'')); }
     });

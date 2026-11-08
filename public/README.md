@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-At the bottom of the left menu a small line reads, for example, "Version: 7 Nov 2026, build 19". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+At the bottom of the left menu a small line reads, for example, "Version: 7 Nov 2026, build 20". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -872,3 +872,25 @@ For a rate card in the new structure, the **wage register adds the special allow
 - **Payroll does not pay the special allowance by itself.** For the register to be true, give each person at that client the special allowance in the pay cycle as **Additional pay, type Allowance** (Pay cycle, step 1, Attendance and shifts, "Additional pay"). Untick the ESI and PT box of that line if you want it left out of ESI and professional tax, as in the register.
 - **Check against payroll** (the billing pack) now counts the special allowance in the register's gross and net. A person whose special allowance has not been paid in Payroll shows as different, with the reason "The register adds the special allowance of ... to net pay, but Payroll has not paid it. Add it for the person as Additional pay (Allowance) in the pay cycle." When it has been paid, the person agrees, and the additional pay is not reported as an extra.
 - The rate card's own **Employee take-home pay block is unchanged**: it still shows the wages less PF, ESI and professional tax, without the special allowance. Registers and cards in the old structures are also unchanged.
+
+
+## Statutory bonus: accrued with each payroll, saved, paid once a year
+
+The bonus is paid to the employees once a year, so the system **works out each person's bonus in every payroll and saves it**, and adds the months up for the year.
+
+### How it is worked out
+For each person in each payroll: **8.33% of the Basic + D.A. earned in the month**, where the Basic + D.A. counted is **capped at 15,000 a month for the days paid** (the ceiling is scaled by the days paid out of the days of the month, as on the rate card, so extra duties raise it and absent days lower it). Example, October (31 days), Basic + D.A. above 15,000: full month 8.33% of 15,000 = **1,249.50**; 29.5 days paid 8.33% of 14,274.19 = **1,189.04**; 32 days paid (an extra duty) 8.33% of 15,483.87 = **1,289.81**. These are the same figures as the Bonus column of the wage register and the Statutory Bonus line of the rate card. Overtime, night shifts, arrears and additional pay are not part of it.
+
+### Where it is saved and where you see it
+- **Saved with the payroll:** when a payroll is calculated, every line carries the bonus base, the percentage and the bonus. When the payroll is **approved**, those figures are part of the approved payroll for good. A payroll that is sent back, or calculated again, is not counted until it is approved again.
+- **Each month, in the pay cycle:** the **Reports** step has the card **"Bonus accrued"** for the month, each person and the total, with a **Download (CSV)** button.
+- **For the year: Compliance, Bonus ledger.** Choose the **financial year (April to March)**: one row for each person, a column for every month, and the **total for the year**, with a total row and **Download (CSV)**. Only approved payrolls count, every group's payroll is included, and a month that is not approved yet shows a dash. This is the figure to pay from at the end of the year.
+- **Payrolls approved before this was added** have no bonus figures. The ledger says how many lines are missing and offers **Work them out and save**: the bonus is then worked out again from the records as they stand now and saved in those payrolls (marked as worked out later). Check the months once before relying on them.
+
+### Settings
+- **Settings, "Overtime, night shifts and employer ESIC": Statutory bonus %** (8.33) and **Bonus wage ceiling per month** (15,000, or 0 for no ceiling). A change applies to the next calculation: calculate the month again to refresh a month that is not approved. Figures already saved in approved payrolls are not changed.
+- **In each employee record: "Statutory bonus applicable"** (ticked to begin with). A person who is not ticked gets no bonus in the payrolls from then on.
+
+### Please note
+- The bonus is **not added to the monthly pay, the payslip or the net pay**: it is a saving for the year-end payment. Paying it (and recording that it was paid) is not part of the ledger yet.
+- The Payment of Bonus Act has its own rules on who is eligible and on the wage the bonus is worked out on. The system accrues for everyone who is ticked, at the percentage and ceiling in Settings, so please confirm both with your CA before you pay.
