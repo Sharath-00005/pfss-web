@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-At the bottom of the left menu a small line reads, for example, "Version: 7 Nov 2026, build 18". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+At the bottom of the left menu a small line reads, for example, "Version: 7 Nov 2026, build 19". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -863,3 +863,12 @@ Some clients pay a **fixed amount for the month**. Others have a rate for **8 ho
 
 ### Professional tax in the rate card
 The employee take-home block of the new structure (screen, PDF and phone app) now **always has a Professional Tax line**, between Employee ESI and the Final Estimated Net Pay. It is worked out from the **Professional Tax slabs in Compliance** for the state of the rate card, on the gross wages (the Total Wages when a role has extra hours), and it is taken off the net pay. The basis column says how it works, for example "₹200 from ₹25,000 gross" for Karnataka. It shows a dash while the wages are below the first taxed slab, and ₹200 from ₹25,000 (so, for example, for a 12-hour guard or a skilled role). If a state has several slabs it reads "As per the (state) slab", and if it has none, "No professional tax in (state)". It is a deduction from the employee, so it is not part of the billing lines and does not change the amount the client pays. To change the amounts, change the slabs in Compliance. In the PDF the rupee sign is written "Rs." so that it always prints. The wage register has its own PT column in the deductions, as before.
+
+
+### Special allowance in the net pay of the wage register
+For a rate card in the new structure, the **wage register adds the special allowance to the employee's Net Pay**: Net Pay = wages + special allowance - deductions. The last column then reads **Net Pay incl. Special** (when the card has a special allowance), and a note under the table gives the formula. The special allowance is for the days paid like the other lines (so 30/26 of it on a per-day card for 30 days).
+- It is **not part of the PF and ESI** (it is a flat amount like the uniform), and **professional tax is worked out on the wages plus the special allowance**.
+- **Washing allowance is not added to the net pay.** It is a billing amount only. Tell me if it should be treated the same way.
+- **Payroll does not pay the special allowance by itself.** For the register to be true, give each person at that client the special allowance in the pay cycle as **Additional pay, type Allowance** (Pay cycle, step 1, Attendance and shifts, "Additional pay"). Untick the ESI and PT box of that line if you want it left out of ESI and professional tax, as in the register.
+- **Check against payroll** (the billing pack) now counts the special allowance in the register's gross and net. A person whose special allowance has not been paid in Payroll shows as different, with the reason "The register adds the special allowance of ... to net pay, but Payroll has not paid it. Add it for the person as Additional pay (Allowance) in the pay cycle." When it has been paid, the person agrees, and the additional pay is not reported as an extra.
+- The rate card's own **Employee take-home pay block is unchanged**: it still shows the wages less PF, ESI and professional tax, without the special allowance. Registers and cards in the old structures are also unchanged.

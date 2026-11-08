@@ -381,7 +381,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <button class="navbtn" id="tabs-settings" data-tab="settings">Settings</button>
     <div class="grp" id="railTitle">Pay cycle</div>
     <ul class="rail" id="workflowRail"></ul>
-    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 7 Nov 2026, build 18</div>
+    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 7 Nov 2026, build 19</div>
   </nav>
 
   <div class="main-col">
@@ -5458,7 +5458,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     cols=cols.concat([['pf','PF @ '+p2(rc.pfPct)+'%',25,'r'],['edli','EDLI & Admin @ '+p2(rc.edliPct)+'%',25,'r'],['esic','ESI @ '+p2(rc.esicPct)+'%',24,'r'],['bonus','Bonus @ '+p2(rc.bonusPct)+'%',25,'r'],['leave','Leave @ '+p2(rc.leavePct)+'%',25,'r'],['statutory','Statutory Cost',28,'r'],['uniform','Uniform',23,'r']]);
     if(hasW) cols.push(['washing','Washing',23,'r']); if(hasS) cols.push(['special','Special',23,'r']);
     cols=cols.concat([['tdc','Direct Cost',28,'r'],['service','Service Charge @ '+p2(rc.servicePct)+'%',27,'r'],['ctc','Total CTC',28,'r'],['gst','GST @ '+p2(rc.gstPct)+'%',26,'r'],['billing','Total Billing',29,'r'],
-      ['pf12','PF @ '+p2(epf)+'%',25,'r'],['esic075','ESI @ '+p2(eesi)+'%',24,'r'],['pt','PT',17,'r'],['adv','Advance',22,'r'],['totald','Total Deduction',26,'r'],['net','Net Pay',29,'r'],['sign','Signature',30,'l']]);
+      ['pf12','PF @ '+p2(epf)+'%',25,'r'],['esic075','ESI @ '+p2(eesi)+'%',24,'r'],['pt','PT',17,'r'],['adv','Advance',22,'r'],['totald','Total Deduction',26,'r'],['net',hasS?'Net Pay incl. Special':'Net Pay',29,'r'],['sign','Signature',30,'l']]);
     var tw=cols.reduce(function(s,c){return s+c[2];},0), scale=Math.min(1,CWt/tw);
     cols=cols.map(function(c){ return [c[0],c[1],c[2]*scale,c[3]]; });
     var xs=[], x=ML; cols.forEach(function(c){ xs.push(x); x+=c[2]; });
@@ -5515,9 +5515,12 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     totalRow('GRAND TOTAL',sums(all),true);
     y+=8;
     if(y+70>LIMIT){ y=pdfHead(pb,true); }
-    pb.text(ML,y+6,'Amounts in Rs. Calculated from the rate card for the days worked (Pay Days). '+(rc.billBasis==='perday'?'Billed per day: the monthly amount divided by '+(N(rc.days)||26)+', for each day paid. ':'')+'Total Billing includes the service charge and GST. Uniform, washing and special allowance are flat amounts.',6.6,{color:C.mute});
-    pb.text(ML,y+44,'Prepared by',7.6,{color:C.mute}); pb.line(ML,y+38,ML+150,y+38,0.5,C.ink);
-    pb.text(pb.W-24,y+44,'Authorised signatory (with seal)',7.6,{color:C.mute,align:'right'}); pb.line(pb.W-24-190,y+38,pb.W-24,y+38,0.5,C.ink);
+    var fnLines=pb.wrap('Amounts in Rs. Calculated from the rate card for the days worked (Pay Days). '+(hasS?'Net Pay = wages + special allowance - deductions (the special allowance is not part of the PF and ESI, and professional tax is on the wages and the special allowance). ':'')+(rc.billBasis==='perday'?'Billed per day: the monthly amount divided by '+(N(rc.days)||26)+', for each day paid. ':'')+'Total Billing includes the service charge and GST. Uniform, washing and special allowance are flat amounts.',CWt,6.6,false), fy=fnLines.length*8.5;
+    if(y+fy+62>LIMIT){ y=pdfHead(pb,true); }
+    fnLines.forEach(function(l,k){ pb.text(ML,y+6+k*8.5,l,6.6,{color:C.mute}); });
+    pb.text(ML,y+fy+44,'Prepared by',7.6,{color:C.mute}); pb.line(ML,y+fy+38,ML+150,y+fy+38,0.5,C.ink);
+    pb.text(pb.W-24,y+fy+44,'Authorised signatory (with seal)',7.6,{color:C.mute,align:'right'}); pb.line(pb.W-24-190,y+fy+38,pb.W-24,y+fy+38,0.5,C.ink);
+
   }
 /*KA-PDF-END*/
 
@@ -8508,7 +8511,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       var k=computeKa(card, rr, pay/((card.billBasis==='perday')?(Number(card.days)||26):dim));
       return {ka:true, basic:k.basic, da:k.da, gC:k.gross, extra:k.extra, wages:k.wages, gross:k.wages, pf:k.pf, edli:k.edli, esic:k.esic, bonus:k.bonus, leave:k.leave, statutory:k.statutory,
         uniform:k.uniform, washing:k.washing, special:k.special, tdc:k.tdc, service:k.service, ctc:k.ctc, gst:k.gst, billing:k.total, scamt:k.tdc,
-        pf12:k.empPf, esic075:k.empEsic, esicOn:k.esicOn, pt:(e&&pay>0)?k.pt:0};
+        pf12:k.empPf, esic075:k.empEsic, esicOn:k.esicOn, pt:(e&&pay>0)?ptForState(card.state,k.wages+k.special):0};   // professional tax is on the wages and the special allowance
     }
     if(card.format==='costsheet'){
       var c=computeCostSheet(card, rr, pay/dim);
@@ -8551,7 +8554,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       var e=emps[i], doc=await getAttendanceDoc(e.id, ym), att=attendanceMarks(e,ym,(doc&&doc.days)||{},(doc&&doc.duty)||{});
       var rr=rc?findRcRole(rc,e.role,e.dutyHrs):null, b=null;
       if(rr){ b=employeeBilling(rc,rr,att.payB,dim,e); registerDeductions(b,e,ym,rc); b.adv=advBy[e.id]||0; b.canteen=0; b.unifd=0;
-        b.totald=b.pf12+b.esic075+b.pt+b.canteen+b.adv+b.unifd; b.net=b.gross-b.totald; }
+        b.totald=b.pf12+b.esic075+b.pt+b.canteen+b.adv+b.unifd; b.net=b.gross+(b.ka?(b.special||0):0)-b.totald; }
       else if(rc){ warns.push((e.name||'Employee')+' ('+(e.role||'no role')+') has no matching role on the rate card, so is left out of the wage register.'); }
       rows.push({e:e, att:att, b:b, short:roleShort(e.role), role:e.role||'', col:(rr&&rc&&rc.roles)?rc.roles.indexOf(rr):-1});
     }
@@ -8845,12 +8848,18 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       if(p.otPay>0) reasons.push('Payroll includes overtime of '+M(p.otPay)+'.');
       if(p.nightPay>0) reasons.push('Payroll includes night shift allowance of '+M(p.nightPay)+'.');
       if(p.arrears>0) reasons.push('Payroll includes arrears of '+M(p.arrears)+'.');
-      if(p.addPay>0) reasons.push('Payroll includes additional pay of '+M(p.addPay)+'.');
+      var spec=b.ka?(b.special||0):0, addLeft=p.addPay||0;
+      if(spec>0){
+        if((p.addPay||0)>=spec-TOL) addLeft=p.addPay-spec;
+        else reasons.push('The register adds the special allowance of '+M(spec)+' to net pay, but Payroll has not paid it. Add it for the person as Additional pay (Allowance) in the pay cycle.');
+      }
+      if(addLeft>TOL) reasons.push('Payroll includes additional pay of '+M(addLeft)+(spec>0?', besides the special allowance':'')+'.');
       if(p.otherDed>0) reasons.push('Payroll has another deduction of '+M(p.otherDed)+'.');
       if(Math.abs((b.adv||0)-(p.advance||0))>TOL) reasons.push('The advance deducted is '+M(b.adv||0)+' in the register and '+M(p.advance||0)+' in Payroll.');
-      var gd=p.gross-b.gross, nd=p.net-b.net, match=Math.abs(gd)<=TOL && Math.abs(nd)<=TOL;
+      var regG=b.gross+spec, gd=p.gross-regG, nd=p.net-b.net, match=Math.abs(gd)<=TOL && Math.abs(nd)<=TOL;
+      if(!match && spec>0 && (p.addPay||0)>=spec-TOL && Math.abs(gd)<=TOL) reasons.push('The special allowance is not part of the PF and ESI in the register, and professional tax there is on the wages and the special allowance. In Payroll, check the ESI and PT ticks of the additional pay line.');
       if(!match && !reasons.length) reasons.push('The two differ by '+M(Math.abs(nd))+' and no cause was found. Please look at this person.');
-      out.push({e:e, match:match, regDays:regDays, payDays:payDays, regGross:b.gross, payGross:p.gross, regPf:b.pf12, payPf:p.pf, regEsi:b.esic075, payEsi:p.esi, regPt:b.pt, payPt:p.pt, regAdv:b.adv||0, payAdv:p.advance||0, regNet:b.net, payNet:p.net, reasons:reasons});
+      out.push({e:e, match:match, regDays:regDays, payDays:payDays, regGross:regG, payGross:p.gross, regPf:b.pf12, payPf:p.pf, regEsi:b.esic075, payEsi:p.esi, regPt:b.pt, payPt:p.pt, regAdv:b.adv||0, payAdv:p.advance||0, regNet:b.net, payNet:p.net, reasons:reasons});
     }
     return out;
   }
