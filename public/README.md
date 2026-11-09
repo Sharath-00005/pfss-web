@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-At the bottom of the left menu a small line reads, for example, "Version: 9 Nov 2026, build 25". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+Under the name at the top of the left menu a small line reads, for example, "Version: 9 Nov 2026, build 26". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -972,3 +972,7 @@ Different clients get different services, so the SAC code (and the description o
 - **The invoice PDF** prints the code and the service in the supplier block (also for invoices with the amounts typed by you, where each row has its own HSN/SAC box as well).
 - **GST for the month, Table 12 (SAC summary):** one row for each SAC code (and for B2B and B2C), with its taxable value and taxes, so invoices with different codes are listed separately. The description is the official name of the code when it is one of the above. **The invoice list (CSV)** has a new **SAC** column.
 - **The Document ID** covers the code and the service of an invoice that has them, so changing the SAC code of a saved invoice changes its Document ID, like any other change (if the invoice was already issued or filed, the client's copy and the GST return then need correcting too). **Invoices made before this existed** are not touched: they show the default code, and saving one without changing anything does not store a code or change its Document ID.
+
+
+## One version line
+The page used to show two version lines: an old one under the name ("Build 5 Nov 2026 · 44", which was never updated) and the real one at the bottom of the menu. The old one is removed. There is now a single line, **under "Public Force" at the top of the left menu**, such as "Version: 9 Nov 2026, build 26". It is the line to check after an upload (press Ctrl + Shift + R first): if it shows an older build, the new file is not live yet.
