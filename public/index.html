@@ -381,7 +381,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <button class="navbtn" id="tabs-settings" data-tab="settings">Settings</button>
     <div class="grp" id="railTitle">Pay cycle</div>
     <ul class="rail" id="workflowRail"></ul>
-    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 8 Nov 2026, build 21</div>
+    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 9 Nov 2026, build 24</div>
   </nav>
 
   <div class="main-col">
@@ -1045,6 +1045,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <button class="close-x" id="rcModalClose">&times;</button>
     <h3 id="rcModalTitle">New rate card</h3>
     <input type="hidden" id="rcId">
+    <datalist id="rcDutyList"><option value="8*26"><option value="9*26"><option value="12*26"><option value="8*30"><option value="9*30"></datalist>
     <div class="banner" id="rcOldBanner" style="display:none;justify-content:space-between;align-items:center;gap:1rem"><div>This rate card uses an <b>old structure</b>. It keeps working for the invoices and registers already made with it. For new quotes, use the new structure.</div><button class="btn small" id="btnRcToKa" type="button">Make a copy in the new structure</button></div>
     <div class="row">
       <div class="field" id="rcFormatBox"><label>Rate card structure</label>
@@ -1083,7 +1084,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     </div>
     <div class="row rc-ka">
       <div class="field"><label>Employer EDLI & admin % (on Basic + VDA)</label><input type="number" id="rcEdli" step="0.01"></div>
-      <div class="field"><label>Bonus ceiling (₹): bonus is worked out on Basic up to this</label><input type="number" id="rcBonusCeil" step="1"></div>
+      <div class="field"><label>Bonus ceiling (₹): bonus is worked out on Basic + VDA up to this</label><input type="number" id="rcBonusCeil" step="1"></div>
       <div class="field"><label>Leave with wages % (of Gross)</label><input type="number" id="rcLeavePct" step="0.01"></div>
     </div>
     <div class="card rc-ka" style="margin:.6rem 0;background:var(--bg)">
@@ -1098,6 +1099,11 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       <div style="font-weight:700">How the client is billed for the days</div>
       <div class="field" style="margin-top:.4rem"><label for="rcBasis">Bill by</label><select id="rcBasis"><option value="month">Fixed monthly amount: the full amount for a full month, pro-rata by the days of the month</option><option value="perday">Per day: the monthly amount divided by the days per month above, for each day paid</option></select></div>
       <div class="muted" style="font-size:.84rem">Choose <b>Per day</b> for a client whose rate is for 8 hours x 26 days: the table shows the amount for 26 days (for example 26,000), and the client pays 1/26 of it for every day paid, so 30,000 for a month of 30 days and 31,000 for 31 days. Days paid include weekly offs and holidays, and extra duties. The wage register and the invoice follow it.</div>
+    </div>
+    <div class="card rc-ka" style="margin:.6rem 0;background:var(--bg)">
+      <div style="font-weight:700">How the duty is described on the PDF</div>
+      <div class="muted" style="font-size:.84rem;margin:.15rem 0 .5rem">The wages are worked out for the duty hours of each column (8 or 12). If the duty is longer on paper, for example 9 hours with a 1 hour break, type what the PDF should say: under each column (the box "Duty shown on the PDF", for example <b>9*26</b>) and in the note under the table here. You can change both whenever it is needed. Nothing here changes the amounts.</div>
+      <div class="field"><label for="rcDutyNote">Duty note under the table (optional)</label><input type="text" id="rcDutyNote" placeholder="Wage calculation is considered for 8 working hours per day and 26 working days per month."></div>
     </div>
     <div class="row">
       <div class="field"><label>Employee PF % (deducted from wages)</label><input type="number" id="rcEmpPf" step="0.01"></div>
@@ -1145,6 +1151,9 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       <div class="field"><label>Duty</label><select class="rc-f" data-f="dutyHrs"><option value="8">8 hrs duty</option><option value="12">12 hrs duty</option></select></div>
       <div class="field" style="align-self:flex-end"><button class="btn small ghost rc-fill" type="button">Fill Basic and D.A. from minimum wages</button></div>
     </div>
+    <div class="row rc-ka" style="display:none">
+      <div class="field grow"><label>Duty shown on the PDF (optional)</label><input class="rc-f" data-f="dutyText" list="rcDutyList" placeholder="Leave empty to show the duty hours, or type for example 9*26"></div>
+    </div>
     <div class="row">
       <div class="field"><label>Basic (₹)</label><input type="number" class="rc-f" data-f="basic" step="0.01"></div>
       <div class="field"><label>Dearness Allowance, D.A. (₹)</label><input type="number" class="rc-f" data-f="vda" step="0.01"></div>
@@ -1183,6 +1192,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     </div>
     <div class="row">
       <div class="field"><label><input type="checkbox" id="clGstExempt" style="width:auto;margin-right:.4rem">GST exempt</label></div>
+      <div class="field"><label><input type="checkbox" id="clManual" style="width:auto;margin-right:.4rem">Type this client's invoice amounts myself</label><div class="muted" style="font-size:.78rem">New invoices for this client start with "Type all the amounts myself" ticked.</div></div>
       <div class="field grow"><label>Exemption reference / certificate no. (if exempt)</label><input id="clGstExemptRef" placeholder="e.g. Govt dept exemption order no."></div>
     </div>
     <div class="row">
@@ -1486,6 +1496,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       </div>
     </div>
 
+    <div class="row" style="margin-top:.8rem"><div class="field grow"><label><input type="checkbox" id="invManual" style="width:auto;margin-right:.4rem">Type all the amounts myself (no calculation)</label><div class="muted" style="font-size:.82rem">For clients whose invoice has its own figures. Every row and every total is typed exactly as it should print. Nothing is worked out, not the amounts, the service charge, the GST or the total.</div></div></div>
+    <div id="invAutoBox">
     <div class="row" style="margin-top:1rem;align-items:flex-end">
       <div class="field grow"><label>Contract (generate lines from attendance)</label><select id="invContract"><option value="">Select contract</option></select></div>
       <button class="btn small" id="btnGenFromContract" type="button">Generate lines</button>
@@ -1505,7 +1517,6 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <div class="row" style="margin-top:1rem">
       <div class="field"><label>Service charge % (PFSS)</label><input type="number" id="invSvcPct" step="0.01" min="0"><div class="muted">On top of the line items. Enter 0 for none.</div></div>
       <div class="field"><label>GST %</label><input type="number" id="invGstPct" step="0.01"><div class="muted" id="invGstExemptNote" style="display:none;color:var(--ok)">This client is GST exempt — rate set to 0%.</div></div>
-      <div class="field grow"><label>Notes</label><input id="invNotes" placeholder="e.g. payment terms, bank details"></div>
     </div>
 
     <div class="card" style="margin-top:1rem;background:var(--bg)">
@@ -1517,6 +1528,25 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       </div>
       <div class="muted" id="invTaxNote" style="margin-top:.7rem;text-align:right;line-height:1.6"></div>
     </div>
+    </div>
+    <div id="invManualBox" style="display:none">
+      <div class="card" style="margin-top:1rem;background:var(--bg)">
+        <div style="font-weight:700">Amounts typed by you</div>
+        <div class="muted" style="font-size:.84rem;margin:.15rem 0 .6rem">Type each row exactly as the invoice should show it, including rows such as PF, ESI and the service charge. A box left empty prints nothing. The description can have two lines (press Enter).</div>
+        <div class="row" style="justify-content:space-between;align-items:center"><h3 style="font-size:1.05rem;margin:0">Rows</h3><button class="btn small ghost" id="btnManAddRow" type="button">+ Add row</button></div>
+        <div id="invManRows"></div>
+        <h3 style="font-size:1.05rem;margin:1rem 0 .3rem">Totals</h3>
+        <div class="row">
+          <div class="field"><label for="invManSub">Total, before tax (₹)</label><input type="number" step="any" id="invManSub"></div>
+          <div class="field"><label for="invManRate">GST rate for the GST return (%)</label><input type="number" step="any" id="invManRate" placeholder="18"></div>
+        </div>
+        <div id="invManTax"></div>
+        <div class="row" style="gap:.4rem;margin:.3rem 0 .6rem"><button class="btn small ghost" id="btnManSgst" type="button">+ SGST and CGST</button><button class="btn small ghost" id="btnManIgst" type="button">+ IGST</button><button class="btn small ghost" id="btnManTax" type="button">+ Another row</button></div>
+        <div class="row"><div class="field"><label for="invManTotal">Invoice total (₹)</label><input type="number" step="any" id="invManTotal" style="font-weight:700"></div></div>
+        <div id="invManCheck" style="font-size:.84rem;color:#8a5a00;min-height:1.2em"></div>
+      </div>
+    </div>
+    <div class="row" style="margin-top:1rem"><div class="field grow"><label>Notes</label><input id="invNotes" placeholder="e.g. payment terms, bank details"></div></div>
 
     <div class="row" style="margin-top:1rem;justify-content:flex-end">
       <button class="btn ghost" id="btnDeleteInvoice" style="display:none">Delete</button>
@@ -1552,6 +1582,29 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <div class="row" style="margin-top:.4rem"><button class="btn" id="btnRenumApply" type="button" style="display:none">Renumber</button></div>
   </div>
 </div>
+
+<template id="invManRowTemplate">
+  <div class="inv-man-row card" style="margin:.4rem 0;padding:.6rem;background:var(--panel)">
+    <div class="row" style="align-items:flex-start">
+      <div class="field grow"><label>Description</label><textarea class="man-f" data-m="description" rows="2" placeholder="e.g. HOUSE KEEPING SERVICES BILL FOR THE MONTH OF OCTOBER - 2026 (Enter, then) Duties 31"></textarea></div>
+      <div class="field" style="max-width:110px"><label>HSN/SAC</label><input class="man-f" data-m="hsn" placeholder="998533"></div>
+      <button class="btn small danger man-remove" type="button" style="align-self:flex-end" aria-label="Remove this row">×</button>
+    </div>
+    <div class="row">
+      <div class="field"><label>Quantity</label><input type="number" step="any" class="man-f" data-m="qty"></div>
+      <div class="field"><label>Rate</label><input type="number" step="any" class="man-f" data-m="rate"></div>
+      <div class="field"><label>Per</label><input class="man-f" data-m="per" placeholder="e.g. 1.00"></div>
+      <div class="field"><label>Amount</label><input type="number" step="any" class="man-f" data-m="amount"></div>
+    </div>
+  </div>
+</template>
+<template id="invManTaxTemplate">
+  <div class="row inv-man-tax" style="align-items:flex-end">
+    <div class="field grow"><label>Row after the Total</label><input class="mt-f" data-m="label" placeholder="e.g. SGST 9%"></div>
+    <div class="field" style="max-width:170px"><label>Amount (₹)</label><input type="number" step="any" class="mt-f" data-m="amount"></div>
+    <button class="btn small danger mt-remove" type="button" aria-label="Remove this row">×</button>
+  </div>
+</template>
 
 <template id="invLineTemplate">
   <div class="row inv-line" style="align-items:center">
@@ -4127,11 +4180,14 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     return H.map(function(x){ return ('00000000'+(x>>>0).toString(16)).slice(-8); }).join('');
   }
   function r2s(v){ return (Math.round((Number(v)||0)*100)/100).toFixed(2); }
-  function invTotalOf(m){ var sub=Number(m.subtotal)||0, tax=m.exempt?0:(Number(m.normalBase)||0)*(Number(m.gstPct)||0)/100; return Math.round(sub+tax); }
+  function invTotalOf(m){ if(m.manual) return manR(m.manual.total); var sub=Number(m.subtotal)||0, tax=m.exempt?0:(Number(m.normalBase)||0)*(Number(m.gstPct)||0)/100; return Math.round(sub+tax); }
   function invNoKey(v){ return String(v==null?'':v).replace(/[^A-Za-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
   // everything that matters on the invoice, in a fixed order: if any of it changes, the Document ID changes
   function invCanon(m){
     var cl=m.client||{};
+    if(m.manual) return ['PFSS-INV-1M',COMPANY.gstin,String(m.no||''),String(m.date||''),String(m.due||''),String(m.month||''),String(cl.name||''),String(cl.gstin||''),String(m.pos||''),'MANUAL',r2s(m.gstPct),r2s(m.manual.subtotal),r2s(m.manual.total),String(m.notes||'')]
+      .concat((m.items||[]).map(function(i){ return [String(i.description||''),String(i.hsn||''),i.qty==null?'':r2s(i.qty),i.rate==null?'':r2s(i.rate),String(i.per||''),i.amount==null?'':r2s(i.amount)].join('~'); }))
+      .concat((m.manual.taxRows||[]).map(function(t){ return 'T~'+String(t.label||'')+'~'+r2s(t.amount); })).join('|');
     return ['PFSS-INV-1',COMPANY.gstin,String(m.no||''),String(m.date||''),String(m.due||''),String(m.month||''),String(cl.name||''),String(cl.gstin||''),String(m.pos||''),m.exempt?'E':'N',r2s(m.gstPct),r2s(m.subtotal),r2s(m.normalBase),r2s(m.rcmBase),String(invTotalOf(m)),String(m.notes||'')]
       .concat((m.items||[]).map(function(i){ return [String(i.description||''),r2s(i.qty),r2s(i.rate),r2s(i.amount),String(i.cat||'normal')].join('~'); })).join('|');
   }
@@ -5327,7 +5383,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var ceil=N(card.pfCeiling), pfBaseM=(ceil>0)?Math.min(grossM,ceil):grossM, pfBase=r2(pfBaseM*f);
     var pf=r2(pfBase*N(card.pfPct)/100), edli=r2(pfBase*N(card.edliPct)/100);                // D, E
     var esicOn=fullWages<=(N(st.esiThreshold)||21000), esi=esicOn?r2(wages*N(card.esicPct)/100):0;   // F
-    var bonCeil=N(card.bonusCeiling), bonusBase=r2((bonCeil>0?Math.min(basicM,bonCeil):basicM)*f);
+    var bonCeil=N(card.bonusCeiling), bonusBase=r2((bonCeil>0?Math.min(grossM,bonCeil):grossM)*f);   // Basic + VDA, or the ceiling if that is lower
     var bonus=r2(bonusBase*N(card.bonusPct)/100), leave=r2(wages*N(card.leavePct)/100);      // G, H
     var statutory=r2(wages+pf+edli+esi+bonus+leave);                                         // I
     var uniform=r2(N(card.uniform)*f), washing=r2(N(card.washing)*f), special=r2(N(card.special)*f);   // flat amounts for this customer
@@ -5352,6 +5408,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     if(pos.length===1) return '\u20b9'+pos[0].amt+' from \u20b9'+Math.round(pos[0].min).toLocaleString('en-IN')+' gross';
     return 'As per the '+card.state+' slab';
   }
+  // what is printed under a column of the new structure: the text typed for it (for example 9*26), or the duty hours
+  function kaDutyLabel(card, r){ var t=String(r.dutyText||'').trim(); return t || ((Number(r.dutyHrs)||Number(card.hours)||8)+' Hrs. Duty'); }
   // The lines of the structure, in the order of the table. Each line: [letter, label, basis text, function(role, result), style].
   // The letters follow the lines that are shown (the washing and special allowance lines only appear when they have an amount).
   function kaRows(card, roles){
@@ -5376,7 +5434,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     add('pf','Employer PF Contribution',N(card.pfCeiling)>0?pct(card.pfPct)+' on Basic+VDA up to '+inr(card.pfCeiling):pct(card.pfPct)+' on Full Basic+VDA',function(r,c){ return c.pf; });
     add('edli','Employer EDLI & Admin',pct(card.edliPct)+' combined',function(r,c){ return c.edli; });
     add('esic','Employer ESI Contribution',pct(card.esicPct)+' of Gross ('+L[wk]+')',function(r,c){ return c.esic; });
-    add('bonus','Statutory Bonus',pct(card.bonusPct)+(N(card.bonusCeiling)>0?' of Basic/Ceiling':' of Basic'),function(r,c){ return c.bonus; });
+    add('bonus','Statutory Bonus',pct(card.bonusPct)+(N(card.bonusCeiling)>0?' of Basic+VDA/Ceiling':' of Basic+VDA'),function(r,c){ return c.bonus; });
     add('leave','Leave with Wages (Paid Leave)',pct(card.leavePct)+' of Gross',function(r,c){ return c.leave; });
     add('statutory','Subtotal Statutory Cost ('+[L[wk],L.pf,L.edli,L.esic,L.bonus,L.leave].join('+')+')','',function(r,c){ return c.statutory; },'sub');
     sec('Other costs and billing');
@@ -5406,7 +5464,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var N=function(x){ return Number(x)||0; };
     var g=govCfg(), hrs=N(card.hours)||8, notes=['The Total Monthly Invoice Amount includes GST @ '+(N(card.gstPct))+'%.',
       'Rates are based on the Minimum Wages notification of the Karnataka Government'+(g&&g.edition?' ('+String(g.edition).replace(/\s*\(in force from[^)]*\)/,'')+')':'')+'. Any change in minimum wages, VDA, statutory contributions and/or taxes will be charged as per law.',
-      'Wage calculation is considered for '+hrs+' working hours per day and '+(N(card.days)||26)+' working days per month.'+(roles.some(function(r){ return (N(r.dutyHrs)||hrs)>hrs; })?' The Extra hrs line applies to the longer duty shown above the column.':'')+(card.billBasis==='perday'?' Billing is per day: the amounts above are for '+(N(card.days)||26)+' days, and each day paid is billed at 1/'+(N(card.days)||26)+' of them, so a 30-day month is billed 30/'+(N(card.days)||26)+' of the amounts and a 31-day month 31/'+(N(card.days)||26)+'.':'')];
+      (String(card.dutyNote||'').trim()||('Wage calculation is considered for '+hrs+' working hours per day and '+(N(card.days)||26)+' working days per month.'))+(roles.some(function(r){ return (N(r.dutyHrs)||hrs)>hrs; })?' The Extra hrs line applies to the longer duty shown above the column.':'')+(card.billBasis==='perday'?' Billing is per day: the amounts above are for '+(N(card.days)||26)+' days, and each day paid is billed at 1/'+(N(card.days)||26)+' of them, so a 30-day month is billed 30/'+(N(card.days)||26)+' of the amounts and a 31-day month 31/'+(N(card.days)||26)+'.':'')];
     if(N(card.washing)>0||N(card.special)>0) notes.push('Uniform, washing and special allowance are flat amounts per person per month.');
     return notes;
   }
@@ -5430,7 +5488,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     y+=h1;
     pb.rect(ML,y,CW,17,{fill:C.paper});
     pb.text(xp+6,y+12,pdfFit(pb,(card.revision||'Monthly amount per person (Rs.)')+(card.place?'  |  '+card.place:''),partW+basisW-10,8.4,true),8.4,{bold:true,color:C.goldDk});
-    roles.forEach(function(r,i){ var d=N(r.dutyHrs)||N(card.hours)||8; pb.text(xa+i*aw+aw/2,y+12,d+' Hrs. Duty',8.2,{bold:true,align:'center'}); });
+    roles.forEach(function(r,i){ pb.text(xa+i*aw+aw/2,y+12,pdfFit(pb,kaDutyLabel(card,r),aw-6,8.2,true),8.2,{bold:true,align:'center'}); });
     y+=17;
     // if the table, the notes and the signature would not fit on one page, the rows are made a little tighter (down to a floor)
     var rowsData=kaRows(card,roles), nRows=0, nSec=0, nExtra=0, notes=kaNotes(card,roles);
@@ -5642,7 +5700,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     document.getElementById('btnDownloadRc').addEventListener('click', downloadRateCard);
     document.getElementById('btnAddRole').addEventListener('click', function(){ addRoleBlock(null); });
     document.getElementById('btnRcToKa').addEventListener('click', function(){ copyRcToKa(document.getElementById('rcId').value); });
-    ['rcPf','rcEsic','rcBonus','rcEmpPf','rcEmpEsic','rcShowEmp','rcShowExtra','rcExtraHrs','rcService','rcGst','rcPfCeil','rcMedical','rcUniform','rcTraining','rcLeaveDays','rcNatHol','rcRelieve','rcPlace','rcRevision','rcName','rcHours','rcDays','rcState','rcEdli','rcBonusCeil','rcLeavePct','rcWashing','rcSpecial','rcBasis'].forEach(function(id){
+    ['rcPf','rcEsic','rcBonus','rcEmpPf','rcEmpEsic','rcShowEmp','rcShowExtra','rcExtraHrs','rcService','rcGst','rcPfCeil','rcMedical','rcUniform','rcTraining','rcLeaveDays','rcNatHol','rcRelieve','rcPlace','rcRevision','rcName','rcHours','rcDays','rcState','rcEdli','rcBonusCeil','rcLeavePct','rcWashing','rcSpecial','rcBasis','rcDutyNote'].forEach(function(id){
       document.getElementById(id).addEventListener('input', renderRcPreview);
     });
     document.getElementById('rcFormat').addEventListener('change', function(){
@@ -5670,7 +5728,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     document.querySelectorAll('#rcModalBg .rc-ws').forEach(function(el){ el.style.display=ws?'':'none'; });
     document.querySelectorAll('#rcModalBg .rc-ka').forEach(function(el){ el.style.display=ka?'':'none'; });
     var lab=function(id,txtKa){ var l=document.getElementById(id).previousElementSibling; if(!l) return; if(RC_LABELS[id]==null) RC_LABELS[id]=l.textContent; l.textContent=ka?txtKa:RC_LABELS[id]; };
-    lab('rcUniform','Uniform & operational overhead (₹, flat)'); lab('rcPf','Employer PF % (on Basic + VDA)'); lab('rcBonus','Bonus % (of Basic, up to the bonus ceiling)');
+    lab('rcUniform','Uniform & operational overhead (₹, flat)'); lab('rcPf','Employer PF % (on Basic + VDA)'); lab('rcBonus','Bonus % (of Basic + VDA, up to the bonus ceiling)');
     lab('rcPfCeil','PF wage ceiling (₹), leave empty or 0 for the full Basic + VDA'); lab('rcService','Service charge % (of Total Direct Cost). Change it here before you send the rate card'); lab('rcEmpPf','Employee PF % (deducted from wages)');
     if(ws) syncExtraFields();
   }
@@ -5682,7 +5740,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       var d=KA_DEFAULTS;
       set('rcPf',d.pfPct); set('rcEdli',d.edliPct); set('rcEsic',d.esicPct); set('rcBonus',d.bonusPct); set('rcBonusCeil',d.bonusCeiling); set('rcLeavePct',d.leavePct);
       set('rcPfCeil',0); set('rcUniform',d.uniform); set('rcWashing',d.washing); set('rcSpecial',d.special); set('rcService',d.servicePct); set('rcGst',d.gstPct);
-      set('rcMedical',0); set('rcTraining',0); set('rcLeaveDays',0); set('rcNatHol',0); set('rcRelieve',0); set('rcBasis','month');
+      set('rcMedical',0); set('rcTraining',0); set('rcLeaveDays',0); set('rcNatHol',0); set('rcRelieve',0); set('rcBasis','month'); set('rcDutyNote','');
     } else if(format==='costsheet'){
       set('rcPf',13); set('rcEsic',3.25); set('rcBonus',8.33); set('rcService',5); set('rcGst',18);
       set('rcPfCeil',(state.settings.pfCeilingEnabled===false)?0:pfCeilNow());
@@ -5735,7 +5793,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       showEmp: g('rcShowEmp').checked, showExtra: g('rcShowExtra').checked, extraHrs: Number(g('rcExtraHrs').value)||4,
       pfCeiling: n('rcPfCeil'), medical: n('rcMedical'), uniform: n('rcUniform'), training: n('rcTraining'),
       leaveDays: n('rcLeaveDays'), natHolPct: n('rcNatHol'), relievePct: n('rcRelieve'),
-      edliPct: n('rcEdli'), bonusCeiling: n('rcBonusCeil'), leavePct: n('rcLeavePct'), washing: n('rcWashing'), special: n('rcSpecial'), billBasis: (g('rcBasis').value==='perday')?'perday':'month',
+      edliPct: n('rcEdli'), bonusCeiling: n('rcBonusCeil'), leavePct: n('rcLeavePct'), washing: n('rcWashing'), special: n('rcSpecial'), billBasis: (g('rcBasis').value==='perday')?'perday':'month', dutyNote: g('rcDutyNote').value.trim(),
       servicePct: n('rcService'), gstPct: n('rcGst')
     };
   }
@@ -5747,7 +5805,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       var role={};
       wrap.querySelectorAll('.rc-f').forEach(function(inp){
         var f=inp.dataset.f;
-        role[f] = (f==='roleName'||f==='skill') ? inp.value.trim() : (Number(inp.value)||0);
+        role[f] = (f==='roleName'||f==='skill'||f==='dutyText') ? inp.value.trim() : (Number(inp.value)||0);
       });
       roles.push(role);
     });
@@ -5802,7 +5860,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var cs=card.format==='costsheet', ka=card.format==='ka', duty=(cs||ka);
     var computed = roles.map(function(r){ return computeRole(card,r); });
     var html = '<thead><tr>'+(cs?'':'<th>'+(ka?'Line':'S.No.')+'</th>')+'<th>'+(ka?'Customer billing structure (CTC breakup)':'Particulars')+'</th><th>'+(ka?'Calculation basis / rate':'% / Type')+'</th>'+roles.map(function(r){
-      return '<th class="right">'+escapeHtml(r.roleName||'Role')+(duty?'<br><span class="muted">'+(Number(r.dutyHrs)||card.hours||8)+' Hrs. Duty</span>':'')+'</th>'; }).join('')+'</tr></thead><tbody>';
+      return '<th class="right">'+escapeHtml(r.roleName||'Role')+(duty?'<br><span class="muted">'+escapeHtml(ka?kaDutyLabel(card,r):(Number(r.dutyHrs)||card.hours||8)+' Hrs. Duty')+'</span>':'')+'</th>'; }).join('')+'</tr></thead><tbody>';
     rateCardRows(card, roles).forEach(function(d){
       if(d[4]==='section'){ html += '<tr><td></td><td colspan="'+(2+roles.length)+'" style="font-weight:700;color:var(--muted)">'+escapeHtml(d[1])+'</td></tr>'; return; }
       var bold=!!d[4];
@@ -5841,7 +5899,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       setIf('rcPf',rc.pfPct); setIf('rcEsic',rc.esicPct); setIf('rcBonus',rc.bonusPct); setIf('rcService',rc.servicePct); setIf('rcGst',rc.gstPct);
       setIf('rcPfCeil',rc.pfCeiling); setIf('rcMedical',rc.medical); setIf('rcUniform',rc.uniform); setIf('rcTraining',rc.training);
       setIf('rcLeaveDays',rc.leaveDays); setIf('rcNatHol',rc.natHolPct); setIf('rcRelieve',rc.relievePct);
-      setIf('rcEdli',rc.edliPct); setIf('rcBonusCeil',rc.bonusCeiling); setIf('rcLeavePct',rc.leavePct); setIf('rcWashing',rc.washing); setIf('rcSpecial',rc.special); el('rcBasis').value=(rc.billBasis==='perday')?'perday':'month';
+      setIf('rcEdli',rc.edliPct); setIf('rcBonusCeil',rc.bonusCeiling); setIf('rcLeavePct',rc.leavePct); setIf('rcWashing',rc.washing); setIf('rcSpecial',rc.special); el('rcBasis').value=(rc.billBasis==='perday')?'perday':'month'; el('rcDutyNote').value=rc.dutyNote||'';
     }
     el('rcEmpPf').value = (rc && rc.empPfPct!=null) ? rc.empPfPct : (state.settings.pfRate||12);
     el('rcEmpEsic').value = (rc && rc.empEsicPct!=null) ? rc.empEsicPct : (state.settings.esiRate||0.75);
@@ -6166,6 +6224,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     }).join('');
     rcSel.value = c?(c.defaultRateCardId||''):'';
     document.getElementById('clGstExempt').checked = c? !!c.gstExempt : false;
+    document.getElementById('clManual').checked = c? c.manualInvoices===true : false;
     document.getElementById('clRcm').checked = c? c.rcmSecurity===true : false;
     document.getElementById('clGstExemptRef').value = c?(c.gstExemptRef||''):'';
     document.getElementById('btnDeleteClient').style.display = c? '' : 'none';
@@ -6186,6 +6245,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       address:document.getElementById('clAddress').value.trim(),
       defaultRateCardId:document.getElementById('clRateCard').value,
       gstExempt:document.getElementById('clGstExempt').checked,
+      manualInvoices:document.getElementById('clManual').checked,
       rcmSecurity:document.getElementById('clRcm').checked,
       gstExemptRef:document.getElementById('clGstExemptRef').value.trim()
     };
@@ -6259,6 +6319,13 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     document.getElementById('btnAddLineItem').addEventListener('click', function(){ addLineItemBlock(null); });
     document.getElementById('btnLoadRateCard').addEventListener('click', loadFromRateCard);
     document.getElementById('invClient').addEventListener('change', applyClientGstDefault);
+    document.getElementById('invClient').addEventListener('change', applyClientManualDefault);
+    document.getElementById('invManual').addEventListener('change', function(){ if(manualOn()) startManualRows(); syncInvManual(); });
+    document.getElementById('btnManAddRow').addEventListener('click', function(){ addManRow(null); });
+    document.getElementById('btnManSgst').addEventListener('click', function(){ addManTax({label:'SGST 9%'}); addManTax({label:'CGST 9%'}); });
+    document.getElementById('btnManIgst').addEventListener('click', function(){ addManTax({label:'IGST 18%'}); });
+    document.getElementById('btnManTax').addEventListener('click', function(){ addManTax(null); });
+    ['invManSub','invManRate','invManTotal'].forEach(function(id){ document.getElementById(id).addEventListener('input', manCheck); });
     document.getElementById('invClientFilter').addEventListener('change', renderInvoicesTable);
     document.getElementById('invStatusFilter').addEventListener('change', renderInvoicesTable);
     document.getElementById('invGstPct').addEventListener('input', renderInvoicePreview);
@@ -6386,6 +6453,10 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     document.getElementById('invGstPct').value = inv? inv.gstPct : ((state.settings.costing && state.settings.costing.gstPct) || 18);
     document.getElementById('invSvcPct').value = inv? (inv.serviceChargePct||0) : ((state.settings.costing && state.settings.costing.servicePct) || 0);
     document.getElementById('invNotes').value = inv? (inv.notes||'') : '';
+    document.getElementById('invManRows').innerHTML=''; document.getElementById('invManTax').innerHTML='';
+    document.getElementById('invManual').checked=!!(inv && inv.manual);
+    document.getElementById('invManSub').value=(inv&&inv.manual)?inv.subtotal:''; document.getElementById('invManRate').value=(inv&&inv.manual&&inv.gstPct)?inv.gstPct:''; document.getElementById('invManTotal').value=(inv&&inv.manual)?inv.total:'';
+    if(inv && inv.manual){ (inv.items||[]).forEach(addManRow); (inv.manualTax||[]).forEach(addManTax); }
     document.getElementById('invLineItems').innerHTML='';
     if(inv && inv.items && inv.items.length){ inv.items.forEach(function(line){ addLineItemBlock(line); }); }
     else { addLineItemBlock(null); }
@@ -6393,7 +6464,21 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     applyClientGstDefault(!!inv);
     document.getElementById('invGenNote').textContent='';
     renderInvContractOptions(inv? inv.contractId : '');
+    if(!inv) applyClientManualDefault(); else syncInvManual();
     document.getElementById('invModalBg').classList.add('show');
+  }
+  // a new manual invoice starts with an empty row and the two tax rows ready to be typed in
+  function startManualRows(){
+    if(!document.querySelector('#invManRows .inv-man-row')) addManRow(null);
+    if(!document.querySelector('#invManTax .inv-man-tax')){ addManTax({label:'SGST 9%'}); addManTax({label:'CGST 9%'}); }
+  }
+  // for a client set to "type this client's invoice amounts myself", a new invoice starts that way
+  function applyClientManualDefault(){
+    if(document.getElementById('invId').value){ syncInvManual(); return; }
+    var c=clients.find(function(x){ return x.id===document.getElementById('invClient').value; });
+    document.getElementById('invManual').checked=!!(c && c.manualInvoices===true);
+    if(manualOn()) startManualRows();
+    syncInvManual();
   }
   function closeInvoiceModal(){ document.getElementById('invModalBg').classList.remove('show'); }
 
@@ -6402,8 +6487,12 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var clientId=document.getElementById('invClient').value;
     var client=clients.find(function(c){return c.id===clientId;});
     if(!client){ toast('Select a client.'); return; }
+    var man=manualOn()?readManual():null;
     var preview = renderInvoicePreview();
-    if(!preview.items.length || !preview.items.some(function(i){return i.description;})){ toast('Add at least one line item.'); return; }
+    if(man){
+      if(!man.rows.some(function(r){ return r.description; })){ toast('Add at least one row with a description.'); return; }
+      if(man.subtotal==null || man.total==null){ toast('Type the Total (before tax) and the Invoice total. Nothing is worked out for you.'); return; }
+    } else if(!preview.items.length || !preview.items.some(function(i){return i.description;})){ toast('Add at least one line item.'); return; }
     var data = {
       invoiceNo: String(document.getElementById('invNo').value||'').trim(),
       clientId: clientId,
@@ -6424,8 +6513,10 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       placeOfSupply: preview.pos,
       cgst: Math.round(preview.cgst), sgst: Math.round(preview.sgst), igst: Math.round(preview.igst),
       rcmBase: Math.round(preview.rcmBase), rcmTax: Math.round(preview.rcmTax),
-      tdsPct: preview.tdsPct, tdsAmt: Math.round(preview.tdsAmt), netReceivable: Math.round(preview.receivable)
+      tdsPct: preview.tdsPct, tdsAmt: Math.round(preview.tdsAmt), netReceivable: Math.round(preview.receivable),
+      manual:false, manualTax:[]
     };
+    if(man) Object.assign(data, manualStored(man));
     var oldNo=id?invoices.find(function(x){ return x.id===id; }):null, numChanged=!oldNo || String(oldNo.invoiceNo)!==data.invoiceNo;
     if(numChanged){
       var prob=invNoProblem(data.invoiceNo,id); if(prob){ toast(prob); invNoHintRefresh(); document.getElementById('invNo').focus(); return; }
@@ -7581,6 +7672,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     function tableHead(y){
       pb.rect(ML,y,CW,19,{fill:C.ink});
       var t=function(x,s,al){ pb.text(x,y+12.5,s,8.3,{bold:true,color:C.white,align:al}); };
+      if(m.manual){ t(ML+7,'#'); t(ML+30,'Description'); t(MR-282,'HSN/SAC','left'); t(MR-206,'Qty','right'); t(MR-150,'Rate','right'); t(MR-98,'Per','right'); t(MR-8,'Amount (Rs.)','right'); return y+19; }
       t(ML+7,'#'); t(ML+30,'Description'); t(ML+CW-190,'GST','left'); t(ML+CW-142,'Qty','right'); t(ML+CW-84,'Rate','right'); t(MR-8,'Amount (Rs.)','right');
       return y+19;
     }
@@ -7611,7 +7703,20 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     y=Math.max(ly,ry)+8;
     pb.line(ML,y,MR,y,0.5,C.line); y+=12;
     y=tableHead(y);
-    m.items.forEach(function(it,idx){
+    if(m.manual) m.items.forEach(function(it,idx){
+      var lines=[]; String(it.description||'').split('\n').forEach(function(part){ pb.wrap(part,CW-320,8.9,false).forEach(function(l){ lines.push(l); }); }); if(!lines.length) lines=[''];
+      var rh=Math.max(1,lines.length)*11+9;
+      if(y+rh>LIMIT){ y=head(); y=tableHead(y); }
+      lines.forEach(function(l,i){ pb.text(ML+30,y+13+i*11,l,8.9); });
+      pb.text(ML+7,y+13,String(idx+1),8.9,{color:C.mute});
+      if(it.hsn) pb.text(MR-282,y+13,it.hsn,8.9);
+      if(it.qty!=null) pb.text(MR-206,y+13,pdfMoney(it.qty),8.9,{align:'right'});
+      if(it.rate!=null) pb.text(MR-150,y+13,pdfMoney(it.rate),8.9,{align:'right'});
+      if(it.per) pb.text(MR-98,y+13,it.per,8.9,{align:'right'});
+      if(it.amount!=null) pb.text(MR-8,y+13,pdfMoney(it.amount),8.9,{align:'right',bold:true});
+      y+=rh; pb.line(ML,y,MR,y,0.4,C.line);
+    });
+    if(!m.manual) m.items.forEach(function(it,idx){
       var lines=pb.wrap(it.description||'-',CW-30-200,8.9,false), rh=Math.max(1,lines.length)*11+9;
       if(y+rh>LIMIT){ y=head(); y=tableHead(y); }
       lines.forEach(function(l,i){ pb.text(ML+30,y+13+i*11,l,8.9); });
@@ -7629,7 +7734,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     if(m.exempt) rows.push(['GST (exempt client)',0]);
     else if(m.normalBase>0){ if(m.inter) rows.push(['IGST @ '+m.gstPct+'%',normalTax]); else { rows.push(['CGST @ '+(m.gstPct/2)+'%',normalTax/2]); rows.push(['SGST @ '+(m.gstPct/2)+'%',normalTax/2]); } }
     if(Math.abs(roundOff)>=0.005) rows.push(['Round off',roundOff]);
-    var bh=rows.length*16+30, nw=250, words='Rupees '+pdfWords(total)+' only';
+    if(m.manual){ rows=[['Total',m.manual.subtotal]].concat((m.manual.taxRows||[]).map(function(t){ return [t.label||'Tax',t.amount]; })); total=Number(m.manual.total)||0; }   // typed amounts: nothing is worked out
+    var bh=rows.length*16+30, nw=250, words=m.manual?invWordsOf(total):'Rupees '+pdfWords(total)+' only';
     var wl=pb.wrap(words,nw-4,8.8,true), rcmLines=[];
     if(m.rcmBase>0&&!m.exempt){
       rcmLines=pb.wrap('Tax payable on reverse charge basis: Yes. GST at '+m.gstPct+'% on Rs. '+pdfMoney(m.rcmBase)+' of security services, amounting to Rs. '+pdfMoney(m.rcmBase*m.gstPct/100)+', is payable by the recipient under Section 9(3) of the CGST Act read with Notification No. 29/2018-Central Tax (Rate). It is not included in the invoice total.',nw-16,8.2,false);
@@ -7671,8 +7777,68 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     pb.meta.title='Tax Invoice '+m.no; pb.meta.subject=fp?'Document ID '+fp.id:(m.sample?'Sample, not an invoice':'Draft, not issued'); pb.meta.keywords='invoice, '+(m.client&&m.client.name||'');
     pdfFoot(pb, fp?'Computer-generated invoice  |  Document ID '+invIdShown(fp):(m.sample?'Sample invoice, not issued':'Draft invoice, not issued')); return pb.build();
   }
+  /* ---------- an invoice with the amounts typed by the user: nothing is calculated ---------- */
+  function manualOn(){ var e=document.getElementById('invManual'); return !!(e && e.checked); }
+  function manNum(v){ if(v===''||v==null) return null; var n=Number(String(v).replace(/,/g,'')); return isFinite(n)?n:null; }
+  function manR(x){ return Math.round((Number(x)||0)*100)/100; }
+  function syncInvManual(){
+    var on=manualOn(); document.getElementById('invAutoBox').style.display=on?'none':''; document.getElementById('invManualBox').style.display=on?'':'none';
+    if(on) manCheck();
+  }
+  function addManRow(r){
+    var node=document.getElementById('invManRowTemplate').content.cloneNode(true), wrap=node.querySelector('.inv-man-row');
+    wrap.querySelectorAll('.man-f').forEach(function(inp){ var f=inp.dataset.m; if(r && r[f]!=null) inp.value=r[f]; inp.addEventListener('input', manCheck); });
+    wrap.querySelector('.man-remove').addEventListener('click', function(){ wrap.remove(); manCheck(); });
+    document.getElementById('invManRows').appendChild(node);
+  }
+  function addManTax(t){
+    var node=document.getElementById('invManTaxTemplate').content.cloneNode(true), wrap=node.querySelector('.inv-man-tax');
+    wrap.querySelectorAll('.mt-f').forEach(function(inp){ var f=inp.dataset.m; if(t && t[f]!=null) inp.value=t[f]; inp.addEventListener('input', manCheck); });
+    wrap.querySelector('.mt-remove').addEventListener('click', function(){ wrap.remove(); manCheck(); });
+    document.getElementById('invManTax').appendChild(node);
+  }
+  // what is typed, exactly as typed (an empty box stays empty)
+  function readManual(){
+    var rows=[], taxRows=[];
+    document.querySelectorAll('#invManRows .inv-man-row').forEach(function(w){
+      var g=function(f){ return w.querySelector('[data-m="'+f+'"]').value; };
+      var r={description:String(g('description')||'').replace(/\r/g,'').replace(/\s+$/,''), hsn:String(g('hsn')||'').trim(), qty:manNum(g('qty')), rate:manNum(g('rate')), per:String(g('per')||'').trim(), amount:manNum(g('amount'))};
+      if(r.description||r.hsn||r.qty!=null||r.rate!=null||r.per||r.amount!=null) rows.push(r);
+    });
+    document.querySelectorAll('#invManTax .inv-man-tax').forEach(function(w){
+      var t={label:String(w.querySelector('[data-m="label"]').value||'').trim(), amount:manNum(w.querySelector('[data-m="amount"]').value)};
+      if(t.label||t.amount!=null) taxRows.push(t);
+    });
+    return {rows:rows, taxRows:taxRows, subtotal:manNum(document.getElementById('invManSub').value), gstPct:manNum(document.getElementById('invManRate').value), total:manNum(document.getElementById('invManTotal').value)};
+  }
+  // a gentle check for the person typing: it never changes a figure
+  function manCheck(){
+    var el=document.getElementById('invManCheck'); if(!el) return;
+    var m=readManual(), sum=m.rows.reduce(function(a,r){ return a+(r.amount||0); },0), tax=m.taxRows.reduce(function(a,t){ return a+(t.amount||0); },0), msg=[];
+    if(m.subtotal!=null && Math.abs(sum-m.subtotal)>0.5) msg.push('The rows add up to '+fmtMoney(sum)+' but the Total you typed is '+fmtMoney(m.subtotal)+'.');
+    if(m.subtotal!=null && m.total!=null && Math.abs(m.subtotal+tax-m.total)>0.5) msg.push('The Total and the tax rows add up to '+fmtMoney(m.subtotal+tax)+' but the invoice total you typed is '+fmtMoney(m.total)+'.');
+    el.textContent=msg.length?('For your check, nothing was changed: '+msg.join(' ')):'';
+  }
+  function manKind(label){ var l=String(label||'').toLowerCase(); return /igst/.test(l)?'igst':(/cgst/.test(l)?'cgst':(/sgst|utgst/.test(l)?'sgst':'other')); }
+  // the fields stored with an invoice whose amounts were typed; the totals and the tax split are what was typed
+  function manualStored(m){
+    var cg=0, sg=0, ig=0, ot=0; m.taxRows.forEach(function(t){ var k=manKind(t.label), a=Number(t.amount)||0; if(k==='cgst') cg+=a; else if(k==='sgst') sg+=a; else if(k==='igst') ig+=a; else ot+=a; });
+    return {manual:true, items:m.rows.map(function(r){ return {description:r.description, hsn:r.hsn, qty:r.qty, rate:r.rate, per:r.per, amount:r.amount, cat:'normal'}; }), manualTax:m.taxRows,
+      serviceChargePct:0, serviceChargeAmt:0, subtotal:manR(m.subtotal), gstPct:Number(m.gstPct)||0, gstAmt:manR(cg+sg+ig+ot), cgst:manR(cg), sgst:manR(sg), igst:manR(ig),
+      total:manR(m.total), rcmBase:0, rcmTax:0, tdsPct:0, tdsAmt:0, netReceivable:manR(m.total)};
+  }
+  function manualModelParts(items, taxRows, subtotal, total){
+    return {items:(items||[]).map(function(i){ return {description:String(i.description||''), hsn:String(i.hsn||''), qty:i.qty==null?null:Number(i.qty), rate:i.rate==null?null:Number(i.rate), per:String(i.per||''), amount:i.amount==null?null:Number(i.amount), cat:'normal'}; }),
+      manual:{subtotal:Number(subtotal)||0, taxRows:(taxRows||[]).map(function(t){ return {label:String(t.label||''), amount:Number(t.amount)||0}; }), total:Number(total)||0}};
+  }
+  function invWordsOf(t){ t=manR(t); var ru=Math.floor(t), pa=Math.round((t-ru)*100); return 'Rupees '+pdfWords(ru)+(pa?' and '+pdfWords(pa)+' Paise':'')+' only'; }
   function invoiceModelFromModal(){
     var client=clients.find(function(c){return c.id===document.getElementById('invClient').value;})||{name:''};
+    if(manualOn()){
+      var mm=readManual(), sp0=supplyType(client), part=manualModelParts(mm.rows,mm.taxRows,mm.subtotal,mm.total);
+      return {no:document.getElementById('invNo').value, date:document.getElementById('invDate').value, due:document.getElementById('invDue').value, month:document.getElementById('invMonth').value, notes:document.getElementById('invNotes').value.trim(), client:client, items:part.items, manual:part.manual,
+        subtotal:part.manual.subtotal, normalBase:part.manual.subtotal, rcmBase:0, gstPct:Number(mm.gstPct)||0, inter:sp0.inter, pos:sp0.pos, posCode:sp0.code, exempt:false, status:document.getElementById('invStatus').value, unsaved:true};
+    }
     var p=renderInvoicePreview();
     return {no:document.getElementById('invNo').value, date:document.getElementById('invDate').value, due:document.getElementById('invDue').value, month:document.getElementById('invMonth').value,
       notes:document.getElementById('invNotes').value.trim(), client:client, items:p.allItems.filter(function(i){return i.description||i.amount;}),
@@ -7681,6 +7847,11 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   }
   function invoiceModelFromSaved(inv){
     var client=clients.find(function(c){return c.id===inv.clientId;})||{name:inv.clientName||''};
+    if(inv.manual){
+      var spm=supplyType(client), pm=manualModelParts(inv.items,inv.manualTax,inv.subtotal,inv.total);
+      return {no:inv.invoiceNo, date:inv.invoiceDate, due:inv.dueDate, month:inv.month, notes:inv.notes||'', client:client, items:pm.items, manual:pm.manual,
+        subtotal:pm.manual.subtotal, normalBase:pm.manual.subtotal, rcmBase:0, gstPct:Number(inv.gstPct)||0, inter:spm.inter, pos:spm.pos, posCode:spm.code, exempt:false, status:inv.status||''};
+    }
     var items=(inv.items||[]).map(function(i){ var q=Number(i.qty)||0, r=Number(i.rate)||0; return {description:i.description, qty:q, rate:r, amount:(i.amount!=null?Number(i.amount):q*r), cat:i.cat||'normal'}; });
     items=items.concat(serviceChargeLines(items, Number(inv.serviceChargePct)||0));
     var subtotal=items.reduce(function(s,i){return s+i.amount;},0);

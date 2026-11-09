@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-At the bottom of the left menu a small line reads, for example, "Version: 8 Nov 2026, build 21". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+At the bottom of the left menu a small line reads, for example, "Version: 9 Nov 2026, build 24". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -794,7 +794,7 @@ Every new rate card now uses one structure, the **Customer billing structure (CT
 | D | Employer PF Contribution | 12% on Full Basic+VDA | 2,442.02 |
 | E | Employer EDLI & Admin | 1% combined | 203.50 |
 | F | Employer ESI Contribution | 3.25% of Gross (C) | 661.38 |
-| G | Statutory Bonus | 8.33% of Basic/Ceiling | 1,249.50 |
+| G | Statutory Bonus | 8.33% of Basic+VDA/Ceiling | 1,249.50 |
 | H | Leave with Wages (Paid Leave) | 4.81% of Gross | 978.84 |
 | I | Subtotal Statutory Cost (C+D+E+F+G+H) | | 25,885.40 |
 | J | Uniform & Operational Overhead | Flat allowance | 500.00 |
@@ -806,7 +806,7 @@ Every new rate card now uses one structure, the **Customer billing structure (CT
 
 Employee take-home: Gross wages 20,350.16, less employee PF 12% (2,442.02) and ESI 0.75% (152.63), **final estimated net pay 17,755.51**. A professional tax line appears only when the pay is high enough for it to apply.
 
-Every amount is worked out to the paisa, line by line in this order, and the lines add up exactly. Bonus is 8.33% of the Basic up to the **bonus ceiling** (15,000 to begin with). PF and EDLI are on the full Basic + VDA (or up to a PF ceiling if you enter one). ESI applies while the monthly wage is within the ESI limit (21,000). A role on a **12-hour duty** gets two extra lines (Extra 4 hrs, Total Wages) and the ESI and leave lines then follow the total wages; for an 8-hour role they do not appear.
+Every amount is worked out to the paisa, line by line in this order, and the lines add up exactly. Bonus is 8.33% of the **Basic + VDA, or the bonus ceiling if that is lower** (15,000 to begin with), the same base the bonus ledger uses for each person. PF and EDLI are on the full Basic + VDA (or up to a PF ceiling if you enter one). ESI applies while the monthly wage is within the ESI limit (21,000). A role on a **12-hour duty** gets two extra lines (Extra 4 hrs, Total Wages) and the ESI and leave lines then follow the total wages; for an 8-hour role they do not appear.
 
 ### Amounts that change from customer to customer
 Open **Rate Card, New rate card** (or the phone app, New card, Rates and options) and change, for that customer:
@@ -915,3 +915,42 @@ Payslips (the single payslip and the all-payslips PDF) now come in the layout of
 - The days and the monthly rates are **saved with each payroll when it is calculated**. A payroll approved before this layout has no day counts: its slips still print, with "Pay for days worked" in one line, a dash where a figure was not saved, and the workable, worked and LOP days that are known. Calculate such a month again if you want the full slip (a month that is already approved has to be reopened first).
 - **Bonus is not on the slip:** it is paid once a year (see the bonus ledger), and the leave and week-off wage lines of the sample are part of the monthly wage here.
 - Casual, sick and earned leave are not kept apart: they appear as **Paid Leaves**. Late-day deductions are not used.
+
+
+### How the duty is described on the rate card PDF (for example 9*26)
+The wages are worked out for the **duty hours of each column** (8 or 12). If the duty is longer on paper, for example **9 hours including a 1 hour break**, you can change what the PDF says without changing any amount. Both texts can be changed whenever it is needed, for a new card or an existing one (new structure only):
+- **"Duty shown on the PDF" under each column** (in the column's box in the main system, and in each column on the phone app). Type for example **9*26**; the PDF and the preview then print "9*26" under that column's name instead of "8 Hrs. Duty". There is a list of suggestions (8*26, 9*26, 12*26, 8*30, 9*30), and any other text can be typed. Empty means the usual "8 Hrs. Duty" or "12 Hrs. Duty". Each column has its own, so a 9-hour housekeeping column and a 12-hour guard column can say different things.
+- **"Duty note under the table"** (one for the card; in the box "How the duty is described on the PDF" in the main system, and in Rates and options on the phone app). It replaces the first sentence of note 3 ("Wage calculation is considered for 8 working hours per day and 26 working days per month."), for example "Duty is 9 hours per day including a 1 hour break, 26 days per month (9*26)." The notes about extra hours and about billing per day are still added after it when they apply. Empty means the usual sentence.
+- The texts are saved with the rate card, in the main system and from the phone app, and the phone app keeps them when it saves a card made in the main system. The message to the client from the phone app uses the column text too ("Security Guard / Lady Guard (9*26 duty): Rs. ...").
+- **No amount changes:** the hours used for the wages, the extra hours line of a 12-hour duty and the billing basis stay as set in the duty box (8 or 12 hrs duty) and "Days per month".
+
+
+### The bonus base is Basic + VDA (correction)
+The Statutory Bonus line of the rate card (and so of the wage register and of the invoice amounts for the new structure) was worked out on the **Basic alone**, up to the ceiling. It is now worked out on the **Basic + VDA, or the bonus ceiling if that is lower**, the same base that Payroll uses for the bonus ledger. The line now reads "8.33% of Basic+VDA/Ceiling". With the ceiling at 15,000 nothing changes in the figures, because Basic is already above it (for example Zone 3, unskilled: 8.33% of 15,000 = 1,249.50). The figures change only where the ceiling is above the Basic, or is left at 0 for none: for example with a ceiling of 20,000 the unskilled Zone 3 line is 8.33% of 20,000 = 1,666.00 (it was 1,609.30), and with no ceiling it is 8.33% of 20,350.16 = 1,695.17 (it was 1,609.30). Rate cards already saved are worked out again with the new base when they are opened or used; invoices and registers already made keep their amounts.
+
+
+## Invoices with the amounts typed by you (no calculation)
+
+Some clients have an invoice with figures of their own, for example a line for the housekeeping bill, then PF, ESI and the service charge as separate lines with their own amounts, then the Total, SGST, CGST and the final total. For these, the invoice can be made **with every amount typed by you and nothing worked out**.
+
+### How to use it
+- **For one invoice:** Invoicing, New invoice (or open an existing one), and tick **"Type all the amounts myself (no calculation)"** at the top. The boxes that calculate (contract lines, service charge %, GST %) are hidden, and the typing boxes appear. Unticking brings the calculating form back, and ticking again brings back what was typed.
+- **For a client, once:** Invoicing, the client's **Edit**, tick **"Type this client's invoice amounts myself"**. Every new invoice for that client then starts with the tick on, with one empty row and two tax rows (SGST 9%, CGST 9%) ready. Other clients are not affected.
+
+### What you type
+- **Rows:** Description (two lines are allowed, press Enter), **HSN/SAC**, **Quantity**, **Rate**, **Per** and **Amount**, each exactly as it should print. A row can be only a description and an amount (such as "PF Employer's 13%" 1,950.00 or "Service Charge @7% on 14216.00" 995.00). A box left empty prints nothing. **+ Add row** adds more.
+- **Total, before tax**, and the **GST rate for the GST return** (for example 18).
+- **The rows after the Total:** a label and an amount for each (for example SGST 9% 1,765.00 and CGST 9% 1,765.00). The buttons **+ SGST and CGST**, **+ IGST** and **+ Another row** add them.
+- **Invoice total.**
+
+To save, an invoice needs at least one row with a description, the Total (before tax) and the Invoice total.
+
+### Nothing is worked out
+The amount is not rate times quantity, there is no service charge line made by the system, the GST is not calculated (1,765 and 1,765 stay as typed, not 1,764.54), there is no round-off line, no reverse-charge text and no TDS figure. The only help is a small remark in amber, for example "The rows add up to ... but the Total you typed is ...", when the typed figures do not agree with each other. It never changes a figure, and the invoice can still be saved.
+
+### Where the typed figures go
+- **The PDF** has the columns #, Description, HSN/SAC, Qty, Rate, Per and Amount, the Total, the tax rows and the **Invoice total** as typed, with the amount in words from the typed total. The Document ID and QR code (once saved) cover every typed figure, so changing one changes the ID.
+- **The lists and the money owed** use the typed Invoice total.
+- **GST for the month (GSTR-1):** the taxable value is the typed Total and the tax is taken from the tax rows by their label: a label with "CGST", "SGST" (or "UTGST") or "IGST" goes to that tax; any other label is added to the GST amount but not to the split. The rate is the typed GST rate. The invoice is a normal sale: it is not treated as reverse charge.
+- The amounts on a typed invoice are not checked against a rate card or a contract, and **Generate lines** and **Load from rate card** work only on the calculating form. Invoices made before are not changed.
+- Because nothing is checked, **the GST amounts typed are what goes in the GST return**: please make sure they are right.
