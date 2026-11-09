@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-At the bottom of the left menu a small line reads, for example, "Version: 7 Nov 2026, build 20". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+At the bottom of the left menu a small line reads, for example, "Version: 8 Nov 2026, build 22". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -894,3 +894,32 @@ For each person in each payroll: **8.33% of the Basic + D.A. earned in the month
 ### Please note
 - The bonus is **not added to the monthly pay, the payslip or the net pay**: it is a saving for the year-end payment. Paying it (and recording that it was paid) is not part of the ledger yet.
 - The Payment of Bonus Act has its own rules on who is eligible and on the wage the bonus is worked out on. The system accrues for everyone who is ticked, at the percentage and ceiling in Settings, so please confirm both with your CA before you pay.
+
+
+## The payslip as a wage slip (grid layout)
+
+Payslips (the single payslip and the all-payslips PDF) now come in the layout of a statutory **wage slip**: grids of labelled cells, as in a wage slip of the contract-labour kind.
+
+### What is on it
+- **Title block:** "PAY SLIP FOR THE MONTH OF OCTOBER - 2026", the **establishment** (the client and the site, found from the contract of the site), and a **heading** line, "Wage Slip - Form XIX [See Rule 78 of the Contract Labour (Regulation and Abolition) Rules]".
+- **Employee grid:** name, father's name, date of birth, employee code, date of joining, designation, bank and account number, site, PAN, **Aadhaar (printed masked, XXXX XXXX 1234)**, UAN, ESI number, the company's PF number and the IFSC.
+- **Days block:** Workable Days, Worked Days, LOP / LWOP, Half Days, Present Days, Week Offs, Holidays, Paid Leaves, OT Days (extra duties and work on offs), Total Days and the wage period. Worked Days are the days paid (present + week offs + holidays + paid leave + half days at half); Total Days add the OT days.
+- **Earnings table:** Pay Heads, **Rate** (the monthly rate, or the daily rate marked "/day" for a daily wage) and Current Month Amount: Basic and D.A. (or Basic + D.A. and Other allowance), extra hours, extra duty, holiday work, overtime, night shift, arrears and additional pay lines, with Total Earnings.
+- **Deductions table:** only the deductions that apply (PF, ESI, professional tax, salary advance, other), with Total Deductions.
+- **Net Pay** in figures and **in words**, the employer contributions line, the notes on pay revisions and arrears, the **electronic approval stamp with its reference** and the signature lines, as before.
+
+### Settings
+**Settings, "Overtime, night shifts and employer ESIC": Payslip layout** (wage slip with grids, which is the new standard, or the earlier simple payslip) and **Heading of the wage slip**, which you can change if the heading should read differently. The form number and rule in the heading are for the contract-labour wage slip (Form XIX); the sample you gave carries the form number of its own state's rules. Please confirm the wording with your CA or labour consultant.
+
+### Good to know
+- The days and the monthly rates are **saved with each payroll when it is calculated**. A payroll approved before this layout has no day counts: its slips still print, with "Pay for days worked" in one line, a dash where a figure was not saved, and the workable, worked and LOP days that are known. Calculate such a month again if you want the full slip (a month that is already approved has to be reopened first).
+- **Bonus is not on the slip:** it is paid once a year (see the bonus ledger), and the leave and week-off wage lines of the sample are part of the monthly wage here.
+- Casual, sick and earned leave are not kept apart: they appear as **Paid Leaves**. Late-day deductions are not used.
+
+
+### How the duty is described on the rate card PDF (for example 9*26)
+The wages are worked out for the **duty hours of each column** (8 or 12). If the duty is longer on paper, for example **9 hours including a 1 hour break**, you can change what the PDF says without changing any amount. Both texts can be changed whenever it is needed, for a new card or an existing one (new structure only):
+- **"Duty shown on the PDF" under each column** (in the column's box in the main system, and in each column on the phone app). Type for example **9*26**; the PDF and the preview then print "9*26" under that column's name instead of "8 Hrs. Duty". There is a list of suggestions (8*26, 9*26, 12*26, 8*30, 9*30), and any other text can be typed. Empty means the usual "8 Hrs. Duty" or "12 Hrs. Duty". Each column has its own, so a 9-hour housekeeping column and a 12-hour guard column can say different things.
+- **"Duty note under the table"** (one for the card; in the box "How the duty is described on the PDF" in the main system, and in Rates and options on the phone app). It replaces the first sentence of note 3 ("Wage calculation is considered for 8 working hours per day and 26 working days per month."), for example "Duty is 9 hours per day including a 1 hour break, 26 days per month (9*26)." The notes about extra hours and about billing per day are still added after it when they apply. Empty means the usual sentence.
+- The texts are saved with the rate card, in the main system and from the phone app, and the phone app keeps them when it saves a card made in the main system. The message to the client from the phone app uses the column text too ("Security Guard / Lady Guard (9*26 duty): Rs. ...").
+- **No amount changes:** the hours used for the wages, the extra hours line of a 12-hour duty and the billing basis stay as set in the duty box (8 or 12 hrs duty) and "Days per month".
