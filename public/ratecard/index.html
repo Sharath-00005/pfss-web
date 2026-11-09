@@ -850,7 +850,7 @@ var COMPANY={tradeName:'PUBLIC FORCE SECURITY SERVICES', legalName:'Satish Kumar
     var ceil=N(card.pfCeiling), pfBaseM=(ceil>0)?Math.min(grossM,ceil):grossM, pfBase=r2(pfBaseM*f);
     var pf=r2(pfBase*N(card.pfPct)/100), edli=r2(pfBase*N(card.edliPct)/100);                // D, E
     var esicOn=fullWages<=(N(st.esiThreshold)||21000), esi=esicOn?r2(wages*N(card.esicPct)/100):0;   // F
-    var bonCeil=N(card.bonusCeiling), bonusBase=r2((bonCeil>0?Math.min(basicM,bonCeil):basicM)*f);
+    var bonCeil=N(card.bonusCeiling), bonusBase=r2((bonCeil>0?Math.min(grossM,bonCeil):grossM)*f);   // Basic + VDA, or the ceiling if that is lower
     var bonus=r2(bonusBase*N(card.bonusPct)/100), leave=r2(wages*N(card.leavePct)/100);      // G, H
     var statutory=r2(wages+pf+edli+esi+bonus+leave);                                         // I
     var uniform=r2(N(card.uniform)*f), washing=r2(N(card.washing)*f), special=r2(N(card.special)*f);   // flat amounts for this customer
@@ -901,7 +901,7 @@ var COMPANY={tradeName:'PUBLIC FORCE SECURITY SERVICES', legalName:'Satish Kumar
     add('pf','Employer PF Contribution',N(card.pfCeiling)>0?pct(card.pfPct)+' on Basic+VDA up to '+inr(card.pfCeiling):pct(card.pfPct)+' on Full Basic+VDA',function(r,c){ return c.pf; });
     add('edli','Employer EDLI & Admin',pct(card.edliPct)+' combined',function(r,c){ return c.edli; });
     add('esic','Employer ESI Contribution',pct(card.esicPct)+' of Gross ('+L[wk]+')',function(r,c){ return c.esic; });
-    add('bonus','Statutory Bonus',pct(card.bonusPct)+(N(card.bonusCeiling)>0?' of Basic/Ceiling':' of Basic'),function(r,c){ return c.bonus; });
+    add('bonus','Statutory Bonus',pct(card.bonusPct)+(N(card.bonusCeiling)>0?' of Basic+VDA/Ceiling':' of Basic+VDA'),function(r,c){ return c.bonus; });
     add('leave','Leave with Wages (Paid Leave)',pct(card.leavePct)+' of Gross',function(r,c){ return c.leave; });
     add('statutory','Subtotal Statutory Cost ('+[L[wk],L.pf,L.edli,L.esic,L.bonus,L.leave].join('+')+')','',function(r,c){ return c.statutory; },'sub');
     sec('Other costs and billing');
