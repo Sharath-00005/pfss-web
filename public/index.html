@@ -381,7 +381,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <button class="navbtn" id="tabs-settings" data-tab="settings">Settings</button>
     <div class="grp" id="railTitle">Pay cycle</div>
     <ul class="rail" id="workflowRail"></ul>
-    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 9 Nov 2026, build 24</div>
+    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 9 Nov 2026, build 25</div>
   </nav>
 
   <div class="main-col">
@@ -848,8 +848,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         <div class="field"><label>UPI ID</label><input id="invSetUpi"></div>
       </div>
       <div class="row">
-        <div class="field"><label>SAC code printed on invoices and used in GSTR-1</label><input id="invSetSac" placeholder="998525"></div>
-        <div class="field grow"><div class="muted" style="margin-top:1.6rem">998525 is guard services. Ask your CA if you also supply other services.</div></div>
+        <div class="field"><label>Default SAC code (used when the client and the invoice do not have their own)</label><input id="invSetSac" placeholder="998525"></div>
+        <div class="field grow"><div class="muted" style="margin-top:1.6rem">998525 is guard services and 998533 general cleaning (housekeeping). Each client, and each invoice, can have its own SAC code. Ask your CA which code fits each service.</div></div>
       </div>
       <div class="row">
         <div class="field grow"><label>Terms printed on invoices (blank uses the default)</label><textarea id="invSetTerms" rows="2" placeholder="Payment is due by the date shown on this invoice. Subject to Bengaluru jurisdiction. This is a computer-generated invoice."></textarea></div>
@@ -1192,6 +1192,10 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     </div>
     <div class="row">
       <div class="field"><label><input type="checkbox" id="clGstExempt" style="width:auto;margin-right:.4rem">GST exempt</label></div>
+      <div class="field"><label for="clSac">Default SAC code</label><input id="clSac" list="sacList" maxlength="10" placeholder="e.g. 998533" autocomplete="off"></div>
+      <div class="field grow"><label for="clService">Service described on its invoices</label><input id="clService" placeholder="e.g. Housekeeping (general cleaning) services"></div>
+    </div>
+    <div class="row">
       <div class="field"><label><input type="checkbox" id="clManual" style="width:auto;margin-right:.4rem">Type this client's invoice amounts myself</label><div class="muted" style="font-size:.78rem">New invoices for this client start with "Type all the amounts myself" ticked.</div></div>
       <div class="field grow"><label>Exemption reference / certificate no. (if exempt)</label><input id="clGstExemptRef" placeholder="e.g. Govt dept exemption order no."></div>
     </div>
@@ -1546,6 +1550,11 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         <div id="invManCheck" style="font-size:.84rem;color:#8a5a00;min-height:1.2em"></div>
       </div>
     </div>
+    <div class="row" style="margin-top:1rem">
+      <div class="field" style="max-width:190px"><label for="invSac">SAC code</label><input id="invSac" list="sacList" maxlength="10" placeholder="998525" autocomplete="off"><div class="muted" style="font-size:.78rem">Printed on this invoice and used in the GST return.</div></div>
+      <div class="field grow"><label for="invService">Service described on the invoice</label><input id="invService" placeholder="Manpower, security and housekeeping services"></div>
+    </div>
+    <datalist id="sacList"><option value="998525" label="Guard services"><option value="998533" label="General cleaning services (housekeeping)"><option value="998513" label="Contract staffing services"><option value="998514" label="Temporary staffing services"><option value="998529" label="Other security services"><option value="998531" label="Disinfecting and exterminating services"><option value="998532" label="Window cleaning services"></datalist>
     <div class="row" style="margin-top:1rem"><div class="field grow"><label>Notes</label><input id="invNotes" placeholder="e.g. payment terms, bank details"></div></div>
 
     <div class="row" style="margin-top:1rem;justify-content:flex-end">
@@ -4183,7 +4192,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   function invTotalOf(m){ if(m.manual) return manR(m.manual.total); var sub=Number(m.subtotal)||0, tax=m.exempt?0:(Number(m.normalBase)||0)*(Number(m.gstPct)||0)/100; return Math.round(sub+tax); }
   function invNoKey(v){ return String(v==null?'':v).replace(/[^A-Za-z0-9]+/g,'-').replace(/^-+|-+$/g,''); }
   // everything that matters on the invoice, in a fixed order: if any of it changes, the Document ID changes
-  function invCanon(m){
+  function invCanon(m){ var base=invCanonBase(m); return (m.sac||m.serviceText)? base+'|SAC~'+(m.sac||'')+'~'+(m.serviceText||'') : base; }
+  function invCanonBase(m){
     var cl=m.client||{};
     if(m.manual) return ['PFSS-INV-1M',COMPANY.gstin,String(m.no||''),String(m.date||''),String(m.due||''),String(m.month||''),String(cl.name||''),String(cl.gstin||''),String(m.pos||''),'MANUAL',r2s(m.gstPct),r2s(m.manual.subtotal),r2s(m.manual.total),String(m.notes||'')]
       .concat((m.items||[]).map(function(i){ return [String(i.description||''),String(i.hsn||''),i.qty==null?'':r2s(i.qty),i.rate==null?'':r2s(i.rate),String(i.per||''),i.amount==null?'':r2s(i.amount)].join('~'); }))
@@ -6225,6 +6235,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     rcSel.value = c?(c.defaultRateCardId||''):'';
     document.getElementById('clGstExempt').checked = c? !!c.gstExempt : false;
     document.getElementById('clManual').checked = c? c.manualInvoices===true : false;
+    document.getElementById('clSac').value = c? (c.sac||'') : ''; document.getElementById('clService').value = c? (c.serviceText||'') : ''; document.getElementById('clService').dataset.auto='';
     document.getElementById('clRcm').checked = c? c.rcmSecurity===true : false;
     document.getElementById('clGstExemptRef').value = c?(c.gstExemptRef||''):'';
     document.getElementById('btnDeleteClient').style.display = c? '' : 'none';
@@ -6246,6 +6257,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       defaultRateCardId:document.getElementById('clRateCard').value,
       gstExempt:document.getElementById('clGstExempt').checked,
       manualInvoices:document.getElementById('clManual').checked,
+      sac:document.getElementById('clSac').value.trim(), serviceText:document.getElementById('clService').value.trim(),
       rcmSecurity:document.getElementById('clRcm').checked,
       gstExemptRef:document.getElementById('clGstExemptRef').value.trim()
     };
@@ -6320,6 +6332,9 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     document.getElementById('btnLoadRateCard').addEventListener('click', loadFromRateCard);
     document.getElementById('invClient').addEventListener('change', applyClientGstDefault);
     document.getElementById('invClient').addEventListener('change', applyClientManualDefault);
+    document.getElementById('invClient').addEventListener('change', applyClientSacDefault);
+    document.getElementById('invSac').addEventListener('input', function(){ autoServiceFor('invSac','invService'); });
+    document.getElementById('clSac').addEventListener('input', function(){ autoServiceFor('clSac','clService'); });
     document.getElementById('invManual').addEventListener('change', function(){ if(manualOn()) startManualRows(); syncInvManual(); });
     document.getElementById('btnManAddRow').addEventListener('click', function(){ addManRow(null); });
     document.getElementById('btnManSgst').addEventListener('click', function(){ addManTax({label:'SGST 9%'}); addManTax({label:'CGST 9%'}); });
@@ -6464,6 +6479,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     applyClientGstDefault(!!inv);
     document.getElementById('invGenNote').textContent='';
     renderInvContractOptions(inv? inv.contractId : '');
+    if(inv){ document.getElementById('invSac').value=invSacOf(inv); document.getElementById('invService').value=String(inv.serviceText||'').trim()||INV_SVC_DEFAULT; document.getElementById('invService').dataset.auto=''; } else applyClientSacDefault();
     if(!inv) applyClientManualDefault(); else syncInvManual();
     document.getElementById('invModalBg').classList.add('show');
   }
@@ -6517,6 +6533,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       manual:false, manualTax:[]
     };
     if(man) Object.assign(data, manualStored(man));
+    Object.assign(data, invSacFields(id?invoices.find(function(x){ return x.id===id; }):null));
     var oldNo=id?invoices.find(function(x){ return x.id===id; }):null, numChanged=!oldNo || String(oldNo.invoiceNo)!==data.invoiceNo;
     if(numChanged){
       var prob=invNoProblem(data.invoiceNo,id); if(prob){ toast(prob); invNoHintRefresh(); document.getElementById('invNo').focus(); return; }
@@ -7008,6 +7025,31 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   var gstMonth=null, gstMonthDocs={};
   function curGstMonth(){ return gstMonth||cmpMonth; }
   function invSac(){ var v=(state.settings&&state.settings.invoice)||{}; return String(v.sac||'').trim()||'998525'; }
+  // the services and their SAC codes (heading 9985, support services). The codes are suggestions: any code can be typed.
+  var SAC_NAMES={'998513':'Contract staffing services','998514':'Temporary staffing services','998525':'Guard services','998529':'Other security services','998531':'Disinfecting and exterminating services','998532':'Window cleaning services','998533':'General cleaning services'};
+  var SAC_SERVICE={'998513':'Contract staffing (manpower supply) services','998514':'Temporary staffing (manpower supply) services','998525':'Security (guard) services','998529':'Security services','998531':'Disinfecting and exterminating services','998532':'Window cleaning services','998533':'Housekeeping (general cleaning) services'};
+  var INV_SVC_DEFAULT='Manpower, security and housekeeping services';
+  function invSacOf(inv){ return String((inv&&inv.sac)||'').trim()||invSac(); }
+  // when the code is changed, the service text follows it, unless it was typed by hand
+  function autoServiceFor(codeId, svcId){
+    var code=document.getElementById(codeId).value.trim(), box=document.getElementById(svcId), cur=box.value.trim(), a=SAC_SERVICE[code];
+    if(a && (!cur || cur===INV_SVC_DEFAULT || cur===(box.dataset.auto||'') || Object.keys(SAC_SERVICE).some(function(k){ return SAC_SERVICE[k]===cur; }))){ box.value=a; box.dataset.auto=a; }
+  }
+  // what is stored with an invoice: always for a new invoice; for an older one only if it already had them or they were changed (so that its Document ID does not change by itself)
+  function invSacFields(old){
+    var sac=(document.getElementById('invSac').value||'').trim(), svc=(document.getElementById('invService').value||'').trim(), o={};
+    if(!old || old.sac!=null || (sac && sac!==invSac())) o.sac=sac||invSac();
+    if(!old || old.serviceText!=null || (svc && svc!==INV_SVC_DEFAULT)) o.serviceText=svc||INV_SVC_DEFAULT;
+    return o;
+  }
+  function invModalSacFields(){ var id=document.getElementById('invId').value; return invSacFields(id?invoices.find(function(x){ return x.id===id; }):null); }
+  // a new invoice starts with the code and the service of its client
+  function applyClientSacDefault(){
+    if(document.getElementById('invId').value) return;
+    var c=clients.find(function(x){ return x.id===document.getElementById('invClient').value; })||{};
+    document.getElementById('invSac').value=String(c.sac||'').trim()||invSac(); document.getElementById('invService').value=String(c.serviceText||'').trim()||INV_SVC_DEFAULT; document.getElementById('invService').dataset.auto='';
+  }
+
 
   // Every invoice of the month, sorted into the GSTR-1 tables. Drafts are left out.
   function gstr1Data(ym, invs, clientList){
@@ -7025,7 +7067,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       if(igst==null && cgst==null && sgst==null){ if(sp.inter){ igst=gst; cgst=0; sgst=0; } else { cgst=gst/2; sgst=gst/2; igst=0; } }
       igst=Number(igst)||0; cgst=Number(cgst)||0; sgst=Number(sgst)||0;
       var exempt=!!(c&&c.gstExempt), value=Number(inv.total)||0;
-      var base={no:inv.invoiceNo||'', date:inv.invoiceDate||'', client:inv.clientName||(c&&c.name)||'', gstin:reg?gstin:'', pos:sp.pos, posCode:sp.code, inter:sp.inter, rate:rate, value:value, reg:reg, mixed:(normal>0&&rcm>0)};
+      var sacV=invSacOf(inv), base={sac:sacV, svc:SAC_NAMES[sacV]||String(inv.serviceText||'').trim(), no:inv.invoiceNo||'', date:inv.invoiceDate||'', client:inv.clientName||(c&&c.name)||'', gstin:reg?gstin:'', pos:sp.pos, posCode:sp.code, inter:sp.inter, rate:rate, value:value, reg:reg, mixed:(normal>0&&rcm>0)};
       if(normal>0){
         if(exempt) rows.push(Object.assign({},base,{table:'8',taxable:normal,igst:0,cgst:0,sgst:0,rcm:'N'}));
         else if(reg) rows.push(Object.assign({},base,{table:'4A',taxable:normal,igst:igst,cgst:cgst,sgst:sgst,rcm:'N'}));
@@ -7042,11 +7084,12 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   function gstZero(){ return {n:0,taxable:0,igst:0,cgst:0,sgst:0,rcmTax:0}; }
   function gstAdd(t,r){ t.n++; t.taxable+=r.taxable; t.igst+=r.igst; t.cgst+=r.cgst; t.sgst+=r.sgst; t.rcmTax+=(r.rcmTax||0); return t; }
   function gstr1Summary(d){
-    var S={t4a:gstZero(),t4b:gstZero(),t5:gstZero(),t8:gstZero(),t7:{},t7total:gstZero(),b2b:gstZero(),b2c:gstZero(),invoices:d.inMonth,drafts:d.drafts,nums:d.nums};
+    var S={t4a:gstZero(),t4b:gstZero(),t5:gstZero(),t8:gstZero(),t7:{},t7total:gstZero(),b2b:gstZero(),b2c:gstZero(),sacRows:{},invoices:d.inMonth,drafts:d.drafts,nums:d.nums};
     d.rows.forEach(function(r){
       if(r.table==='4A') gstAdd(S.t4a,r); else if(r.table==='4B') gstAdd(S.t4b,r); else if(r.table==='5') gstAdd(S.t5,r); else if(r.table==='8') gstAdd(S.t8,r);
       else if(r.table==='7'){ var k=r.pos+'|'+r.rate; S.t7[k]=S.t7[k]||Object.assign(gstZero(),{pos:r.pos,rate:r.rate}); gstAdd(S.t7[k],r); gstAdd(S.t7total,r); }
       gstAdd(r.reg?S.b2b:S.b2c, r);
+      var sk=(r.sac||'')+'|'+(r.reg?'B2B':'B2C'); S.sacRows[sk]=S.sacRows[sk]||Object.assign(gstZero(),{sac:r.sac||'',svc:r.svc||'',kind:r.reg?'B2B':'B2C'}); gstAdd(S.sacRows[sk],r);
     });
     S.first=d.nums.length?d.nums[0]:''; S.last=d.nums.length?d.nums[d.nums.length-1]:'';
     return S;
@@ -7064,9 +7107,9 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     return {sales:t, liability:t.igst+t.cgst+t.sgst, rcmValue:S.t4b.taxable, rcmTax:S.t4b.rcmTax, exemptValue:S.t8.taxable, off:off};
   }
   function gstr1Csv(d){
-    var head=['Table','GSTIN','Client','Invoice no','Invoice date','Invoice value','Taxable value','Rate %','IGST','CGST','SGST','Place of supply','Reverse charge','Note'];
+    var head=['Table','GSTIN','Client','Invoice no','Invoice date','Invoice value','Taxable value','Rate %','IGST','CGST','SGST','Place of supply','Reverse charge','SAC','Note'];
     var lines=[head].concat(d.rows.map(function(r){
-      return [r.table,r.gstin,r.client,r.no,r.date,Math.round(r.value),Math.round(r.taxable),r.rate,Math.round(r.igst),Math.round(r.cgst),Math.round(r.sgst),r.pos+' ('+r.posCode+')',r.rcm,
+      return [r.table,r.gstin,r.client,r.no,r.date,Math.round(r.value),Math.round(r.taxable),r.rate,Math.round(r.igst),Math.round(r.cgst),Math.round(r.sgst),r.pos+' ('+r.posCode+')',r.rcm,r.sac||'',
         (r.rcm==='Y'?'Tax of '+fmtMoney(r.rcmTax||0)+' paid by the client. ':'')+(r.mixed?'Invoice has both reverse charge and normal lines.':'')];
     }));
     return lines.map(function(r){ return r.map(function(c){ return '"'+String(c).replace(/"/g,'""')+'"'; }).join(','); }).join('\n');
@@ -7108,7 +7151,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       h+=section('Table 8','Nil-rated or exempt (GST-exempt clients)','8',S.t8);
       var sac=invSac();
       h+='<details open style="margin:.8rem 0"><summary><b>Table 12</b> <span class="muted">SAC summary</span></summary>'+tbl(H(['SAC','Description','Taxable value','IGST','CGST','SGST'],2),
-        [['B2B',S.b2b],['B2C',S.b2c]].map(function(p){ return p[1].n?'<tr><td>'+e(sac)+' ('+p[0]+')</td><td>Guard services</td><td class="right">'+m(p[1].taxable)+'</td><td class="right">'+m(p[1].igst)+'</td><td class="right">'+m(p[1].cgst)+'</td><td class="right">'+m(p[1].sgst)+'</td></tr>':''; }).join(''))+
+        Object.keys(S.sacRows).sort().map(function(k){ var p=S.sacRows[k]; return '<tr><td>'+e(p.sac)+' ('+p.kind+')</td><td>'+e(p.svc||'')+'</td><td class="right">'+m(p.taxable)+'</td><td class="right">'+m(p.igst)+'</td><td class="right">'+m(p.cgst)+'</td><td class="right">'+m(p.sgst)+'</td></tr>'; }).join(''))+
         '<p class="muted">Pick the SAC from the dropdown on the GST portal. The B2B total includes the reverse charge invoices.</p></details>';
       h+='<details open style="margin:.8rem 0"><summary><b>Table 13</b> <span class="muted">Invoices issued</span></summary><p>From <b>'+e(S.first)+'</b> to <b>'+e(S.last)+'</b>: '+S.invoices+' issued, 0 cancelled.</p></details>';
     }
@@ -7697,7 +7740,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     pb.text(rx,ry,'GSTIN: '+COMPANY.gstin+'    PAN: '+COMPANY.pan,8.8,{color:C.mute}); ry+=11;
     pb.wrap('Phone: '+COMPANY.phone+'    '+COMPANY.email,half,8.4,false).forEach(function(l){ pb.text(rx,ry,l,8.4,{color:C.mute}); ry+=10.5; });
     ry+=8;
-    [['Place of supply',m.pos+' ('+m.posCode+')'],['Service','Manpower, security and housekeeping services'],['SAC code',invSac()]].forEach(function(r){
+    [['Place of supply',m.pos+' ('+m.posCode+')'],['Service',m.serviceText||INV_SVC_DEFAULT],['SAC code',m.sac||invSac()]].forEach(function(r){
       pb.text(rx,ry,r[0]+':',8.8,{color:C.mute}); var lines=pb.wrap(r[1],half-82,8.8,true); lines.forEach(function(l,i){ pb.text(rx+82,ry,l,8.8,{bold:true}); if(i<lines.length-1) ry+=11; }); ry+=12;
     });
     y=Math.max(ly,ry)+8;
@@ -7832,7 +7875,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       manual:{subtotal:Number(subtotal)||0, taxRows:(taxRows||[]).map(function(t){ return {label:String(t.label||''), amount:Number(t.amount)||0}; }), total:Number(total)||0}};
   }
   function invWordsOf(t){ t=manR(t); var ru=Math.floor(t), pa=Math.round((t-ru)*100); return 'Rupees '+pdfWords(ru)+(pa?' and '+pdfWords(pa)+' Paise':'')+' only'; }
-  function invoiceModelFromModal(){
+  function invoiceModelFromModal(){ var m=invoiceModelFromModalBase(), f=invModalSacFields(); m.sac=f.sac||''; m.serviceText=f.serviceText||''; return m; }
+  function invoiceModelFromModalBase(){
     var client=clients.find(function(c){return c.id===document.getElementById('invClient').value;})||{name:''};
     if(manualOn()){
       var mm=readManual(), sp0=supplyType(client), part=manualModelParts(mm.rows,mm.taxRows,mm.subtotal,mm.total);
@@ -7845,7 +7889,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       subtotal:p.subtotal, normalBase:p.normalBase, rcmBase:p.rcmBase, gstPct:p.gstPct, inter:p.inter, pos:p.pos, posCode:p.posCode, exempt:!!client.gstExempt,
       status:document.getElementById('invStatus').value, unsaved:true};
   }
-  function invoiceModelFromSaved(inv){
+  function invoiceModelFromSaved(inv){ var m=invoiceModelFromSavedBase(inv); m.sac=String(inv.sac||'').trim(); m.serviceText=String(inv.serviceText||'').trim(); return m; }
+  function invoiceModelFromSavedBase(inv){
     var client=clients.find(function(c){return c.id===inv.clientId;})||{name:inv.clientName||''};
     if(inv.manual){
       var spm=supplyType(client), pm=manualModelParts(inv.items,inv.manualTax,inv.subtotal,inv.total);

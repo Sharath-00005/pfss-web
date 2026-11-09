@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-At the bottom of the left menu a small line reads, for example, "Version: 9 Nov 2026, build 24". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+At the bottom of the left menu a small line reads, for example, "Version: 9 Nov 2026, build 25". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -954,3 +954,21 @@ The amount is not rate times quantity, there is no service charge line made by t
 - **GST for the month (GSTR-1):** the taxable value is the typed Total and the tax is taken from the tax rows by their label: a label with "CGST", "SGST" (or "UTGST") or "IGST" goes to that tax; any other label is added to the GST amount but not to the split. The rate is the typed GST rate. The invoice is a normal sale: it is not treated as reverse charge.
 - The amounts on a typed invoice are not checked against a rate card or a contract, and **Generate lines** and **Load from rate card** work only on the calculating form. Invoices made before are not changed.
 - Because nothing is checked, **the GST amounts typed are what goes in the GST return**: please make sure they are right.
+
+
+## SAC code for each client and each invoice
+
+Different clients get different services, so the SAC code (and the description of the service) is no longer one setting for every invoice.
+
+### Where to set it
+- **For a client, once:** Invoicing, the client's **Edit**: **Default SAC code** and **Service described on its invoices**. Choosing a code from the list fills the service for you (for example 998533 gives "Housekeeping (general cleaning) services"); any other code or wording can be typed.
+- **For one invoice:** in the invoice window, below the totals and above the Notes: **SAC code** and **Service described on the invoice**. A new invoice starts with the code and service of its client (and changes with them if you change the client on a new invoice). An invoice that is already saved keeps its own. Change either box when an invoice needs something different; if you change the code and have not typed the service yourself, the service follows the code.
+- **For everyone else:** Settings, **Default SAC code**, still applies when neither the client nor the invoice has its own. Nothing changes for clients and invoices that do not have one.
+
+### The suggestions
+998525 Guard services, 998533 General cleaning services (housekeeping), 998513 Contract staffing services, 998514 Temporary staffing services, 998529 Other security services, 998531 Disinfecting and exterminating services, 998532 Window cleaning services. They are only suggestions: type any code. Please ask your CA which code fits each service you supply.
+
+### Where it goes
+- **The invoice PDF** prints the code and the service in the supplier block (also for invoices with the amounts typed by you, where each row has its own HSN/SAC box as well).
+- **GST for the month, Table 12 (SAC summary):** one row for each SAC code (and for B2B and B2C), with its taxable value and taxes, so invoices with different codes are listed separately. The description is the official name of the code when it is one of the above. **The invoice list (CSV)** has a new **SAC** column.
+- **The Document ID** covers the code and the service of an invoice that has them, so changing the SAC code of a saved invoice changes its Document ID, like any other change (if the invoice was already issued or filed, the client's copy and the GST return then need correcting too). **Invoices made before this existed** are not touched: they show the default code, and saving one without changing anything does not store a code or change its Document ID.
