@@ -381,7 +381,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <button class="navbtn" id="tabs-settings" data-tab="settings">Settings</button>
     <div class="grp" id="railTitle">Pay cycle</div>
     <ul class="rail" id="workflowRail"></ul>
-    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 8 Nov 2026, build 22</div>
+    <div id="buildTag" style="font-size:.68rem;padding:.7rem 1rem .3rem;opacity:.55;color:inherit">Version: 8 Nov 2026, build 21</div>
   </nav>
 
   <div class="main-col">
@@ -1045,7 +1045,6 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <button class="close-x" id="rcModalClose">&times;</button>
     <h3 id="rcModalTitle">New rate card</h3>
     <input type="hidden" id="rcId">
-    <datalist id="rcDutyList"><option value="8*26"><option value="9*26"><option value="12*26"><option value="8*30"><option value="9*30"></datalist>
     <div class="banner" id="rcOldBanner" style="display:none;justify-content:space-between;align-items:center;gap:1rem"><div>This rate card uses an <b>old structure</b>. It keeps working for the invoices and registers already made with it. For new quotes, use the new structure.</div><button class="btn small" id="btnRcToKa" type="button">Make a copy in the new structure</button></div>
     <div class="row">
       <div class="field" id="rcFormatBox"><label>Rate card structure</label>
@@ -1100,11 +1099,6 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       <div class="field" style="margin-top:.4rem"><label for="rcBasis">Bill by</label><select id="rcBasis"><option value="month">Fixed monthly amount: the full amount for a full month, pro-rata by the days of the month</option><option value="perday">Per day: the monthly amount divided by the days per month above, for each day paid</option></select></div>
       <div class="muted" style="font-size:.84rem">Choose <b>Per day</b> for a client whose rate is for 8 hours x 26 days: the table shows the amount for 26 days (for example 26,000), and the client pays 1/26 of it for every day paid, so 30,000 for a month of 30 days and 31,000 for 31 days. Days paid include weekly offs and holidays, and extra duties. The wage register and the invoice follow it.</div>
     </div>
-    <div class="card rc-ka" style="margin:.6rem 0;background:var(--bg)">
-      <div style="font-weight:700">How the duty is described on the PDF</div>
-      <div class="muted" style="font-size:.84rem;margin:.15rem 0 .5rem">The wages are worked out for the duty hours of each column (8 or 12). If the duty is longer on paper, for example 9 hours with a 1 hour break, type what the PDF should say: under each column (the box "Duty shown on the PDF", for example <b>9*26</b>) and in the note under the table here. You can change both whenever it is needed. Nothing here changes the amounts.</div>
-      <div class="field"><label for="rcDutyNote">Duty note under the table (optional)</label><input type="text" id="rcDutyNote" placeholder="Wage calculation is considered for 8 working hours per day and 26 working days per month."></div>
-    </div>
     <div class="row">
       <div class="field"><label>Employee PF % (deducted from wages)</label><input type="number" id="rcEmpPf" step="0.01"></div>
       <div class="field"><label>Employee ESIC % (deducted from wages)</label><input type="number" id="rcEmpEsic" step="0.01"></div>
@@ -1150,9 +1144,6 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       <div class="field"><label>Skill category</label><select class="rc-f" data-f="skill"><option value="">Choose</option><option value="highly">Highly skilled</option><option value="skilled">Skilled</option><option value="semi">Semi-skilled</option><option value="unskilled">Unskilled</option></select></div>
       <div class="field"><label>Duty</label><select class="rc-f" data-f="dutyHrs"><option value="8">8 hrs duty</option><option value="12">12 hrs duty</option></select></div>
       <div class="field" style="align-self:flex-end"><button class="btn small ghost rc-fill" type="button">Fill Basic and D.A. from minimum wages</button></div>
-    </div>
-    <div class="row rc-ka" style="display:none">
-      <div class="field grow"><label>Duty shown on the PDF (optional)</label><input class="rc-f" data-f="dutyText" list="rcDutyList" placeholder="Leave empty to show the duty hours, or type for example 9*26"></div>
     </div>
     <div class="row">
       <div class="field"><label>Basic (₹)</label><input type="number" class="rc-f" data-f="basic" step="0.01"></div>
@@ -5361,8 +5352,6 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     if(pos.length===1) return '\u20b9'+pos[0].amt+' from \u20b9'+Math.round(pos[0].min).toLocaleString('en-IN')+' gross';
     return 'As per the '+card.state+' slab';
   }
-  // what is printed under a column of the new structure: the text typed for it (for example 9*26), or the duty hours
-  function kaDutyLabel(card, r){ var t=String(r.dutyText||'').trim(); return t || ((Number(r.dutyHrs)||Number(card.hours)||8)+' Hrs. Duty'); }
   // The lines of the structure, in the order of the table. Each line: [letter, label, basis text, function(role, result), style].
   // The letters follow the lines that are shown (the washing and special allowance lines only appear when they have an amount).
   function kaRows(card, roles){
@@ -5417,7 +5406,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var N=function(x){ return Number(x)||0; };
     var g=govCfg(), hrs=N(card.hours)||8, notes=['The Total Monthly Invoice Amount includes GST @ '+(N(card.gstPct))+'%.',
       'Rates are based on the Minimum Wages notification of the Karnataka Government'+(g&&g.edition?' ('+String(g.edition).replace(/\s*\(in force from[^)]*\)/,'')+')':'')+'. Any change in minimum wages, VDA, statutory contributions and/or taxes will be charged as per law.',
-      (String(card.dutyNote||'').trim()||('Wage calculation is considered for '+hrs+' working hours per day and '+(N(card.days)||26)+' working days per month.'))+(roles.some(function(r){ return (N(r.dutyHrs)||hrs)>hrs; })?' The Extra hrs line applies to the longer duty shown above the column.':'')+(card.billBasis==='perday'?' Billing is per day: the amounts above are for '+(N(card.days)||26)+' days, and each day paid is billed at 1/'+(N(card.days)||26)+' of them, so a 30-day month is billed 30/'+(N(card.days)||26)+' of the amounts and a 31-day month 31/'+(N(card.days)||26)+'.':'')];
+      'Wage calculation is considered for '+hrs+' working hours per day and '+(N(card.days)||26)+' working days per month.'+(roles.some(function(r){ return (N(r.dutyHrs)||hrs)>hrs; })?' The Extra hrs line applies to the longer duty shown above the column.':'')+(card.billBasis==='perday'?' Billing is per day: the amounts above are for '+(N(card.days)||26)+' days, and each day paid is billed at 1/'+(N(card.days)||26)+' of them, so a 30-day month is billed 30/'+(N(card.days)||26)+' of the amounts and a 31-day month 31/'+(N(card.days)||26)+'.':'')];
     if(N(card.washing)>0||N(card.special)>0) notes.push('Uniform, washing and special allowance are flat amounts per person per month.');
     return notes;
   }
@@ -5441,7 +5430,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     y+=h1;
     pb.rect(ML,y,CW,17,{fill:C.paper});
     pb.text(xp+6,y+12,pdfFit(pb,(card.revision||'Monthly amount per person (Rs.)')+(card.place?'  |  '+card.place:''),partW+basisW-10,8.4,true),8.4,{bold:true,color:C.goldDk});
-    roles.forEach(function(r,i){ pb.text(xa+i*aw+aw/2,y+12,pdfFit(pb,kaDutyLabel(card,r),aw-6,8.2,true),8.2,{bold:true,align:'center'}); });
+    roles.forEach(function(r,i){ var d=N(r.dutyHrs)||N(card.hours)||8; pb.text(xa+i*aw+aw/2,y+12,d+' Hrs. Duty',8.2,{bold:true,align:'center'}); });
     y+=17;
     // if the table, the notes and the signature would not fit on one page, the rows are made a little tighter (down to a floor)
     var rowsData=kaRows(card,roles), nRows=0, nSec=0, nExtra=0, notes=kaNotes(card,roles);
@@ -5653,7 +5642,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     document.getElementById('btnDownloadRc').addEventListener('click', downloadRateCard);
     document.getElementById('btnAddRole').addEventListener('click', function(){ addRoleBlock(null); });
     document.getElementById('btnRcToKa').addEventListener('click', function(){ copyRcToKa(document.getElementById('rcId').value); });
-    ['rcPf','rcEsic','rcBonus','rcEmpPf','rcEmpEsic','rcShowEmp','rcShowExtra','rcExtraHrs','rcService','rcGst','rcPfCeil','rcMedical','rcUniform','rcTraining','rcLeaveDays','rcNatHol','rcRelieve','rcPlace','rcRevision','rcName','rcHours','rcDays','rcState','rcEdli','rcBonusCeil','rcLeavePct','rcWashing','rcSpecial','rcBasis','rcDutyNote'].forEach(function(id){
+    ['rcPf','rcEsic','rcBonus','rcEmpPf','rcEmpEsic','rcShowEmp','rcShowExtra','rcExtraHrs','rcService','rcGst','rcPfCeil','rcMedical','rcUniform','rcTraining','rcLeaveDays','rcNatHol','rcRelieve','rcPlace','rcRevision','rcName','rcHours','rcDays','rcState','rcEdli','rcBonusCeil','rcLeavePct','rcWashing','rcSpecial','rcBasis'].forEach(function(id){
       document.getElementById(id).addEventListener('input', renderRcPreview);
     });
     document.getElementById('rcFormat').addEventListener('change', function(){
@@ -5693,7 +5682,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       var d=KA_DEFAULTS;
       set('rcPf',d.pfPct); set('rcEdli',d.edliPct); set('rcEsic',d.esicPct); set('rcBonus',d.bonusPct); set('rcBonusCeil',d.bonusCeiling); set('rcLeavePct',d.leavePct);
       set('rcPfCeil',0); set('rcUniform',d.uniform); set('rcWashing',d.washing); set('rcSpecial',d.special); set('rcService',d.servicePct); set('rcGst',d.gstPct);
-      set('rcMedical',0); set('rcTraining',0); set('rcLeaveDays',0); set('rcNatHol',0); set('rcRelieve',0); set('rcBasis','month'); set('rcDutyNote','');
+      set('rcMedical',0); set('rcTraining',0); set('rcLeaveDays',0); set('rcNatHol',0); set('rcRelieve',0); set('rcBasis','month');
     } else if(format==='costsheet'){
       set('rcPf',13); set('rcEsic',3.25); set('rcBonus',8.33); set('rcService',5); set('rcGst',18);
       set('rcPfCeil',(state.settings.pfCeilingEnabled===false)?0:pfCeilNow());
@@ -5746,7 +5735,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       showEmp: g('rcShowEmp').checked, showExtra: g('rcShowExtra').checked, extraHrs: Number(g('rcExtraHrs').value)||4,
       pfCeiling: n('rcPfCeil'), medical: n('rcMedical'), uniform: n('rcUniform'), training: n('rcTraining'),
       leaveDays: n('rcLeaveDays'), natHolPct: n('rcNatHol'), relievePct: n('rcRelieve'),
-      edliPct: n('rcEdli'), bonusCeiling: n('rcBonusCeil'), leavePct: n('rcLeavePct'), washing: n('rcWashing'), special: n('rcSpecial'), billBasis: (g('rcBasis').value==='perday')?'perday':'month', dutyNote: g('rcDutyNote').value.trim(),
+      edliPct: n('rcEdli'), bonusCeiling: n('rcBonusCeil'), leavePct: n('rcLeavePct'), washing: n('rcWashing'), special: n('rcSpecial'), billBasis: (g('rcBasis').value==='perday')?'perday':'month',
       servicePct: n('rcService'), gstPct: n('rcGst')
     };
   }
@@ -5758,7 +5747,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       var role={};
       wrap.querySelectorAll('.rc-f').forEach(function(inp){
         var f=inp.dataset.f;
-        role[f] = (f==='roleName'||f==='skill'||f==='dutyText') ? inp.value.trim() : (Number(inp.value)||0);
+        role[f] = (f==='roleName'||f==='skill') ? inp.value.trim() : (Number(inp.value)||0);
       });
       roles.push(role);
     });
@@ -5813,7 +5802,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var cs=card.format==='costsheet', ka=card.format==='ka', duty=(cs||ka);
     var computed = roles.map(function(r){ return computeRole(card,r); });
     var html = '<thead><tr>'+(cs?'':'<th>'+(ka?'Line':'S.No.')+'</th>')+'<th>'+(ka?'Customer billing structure (CTC breakup)':'Particulars')+'</th><th>'+(ka?'Calculation basis / rate':'% / Type')+'</th>'+roles.map(function(r){
-      return '<th class="right">'+escapeHtml(r.roleName||'Role')+(duty?'<br><span class="muted">'+escapeHtml(ka?kaDutyLabel(card,r):(Number(r.dutyHrs)||card.hours||8)+' Hrs. Duty')+'</span>':'')+'</th>'; }).join('')+'</tr></thead><tbody>';
+      return '<th class="right">'+escapeHtml(r.roleName||'Role')+(duty?'<br><span class="muted">'+(Number(r.dutyHrs)||card.hours||8)+' Hrs. Duty</span>':'')+'</th>'; }).join('')+'</tr></thead><tbody>';
     rateCardRows(card, roles).forEach(function(d){
       if(d[4]==='section'){ html += '<tr><td></td><td colspan="'+(2+roles.length)+'" style="font-weight:700;color:var(--muted)">'+escapeHtml(d[1])+'</td></tr>'; return; }
       var bold=!!d[4];
@@ -5852,7 +5841,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       setIf('rcPf',rc.pfPct); setIf('rcEsic',rc.esicPct); setIf('rcBonus',rc.bonusPct); setIf('rcService',rc.servicePct); setIf('rcGst',rc.gstPct);
       setIf('rcPfCeil',rc.pfCeiling); setIf('rcMedical',rc.medical); setIf('rcUniform',rc.uniform); setIf('rcTraining',rc.training);
       setIf('rcLeaveDays',rc.leaveDays); setIf('rcNatHol',rc.natHolPct); setIf('rcRelieve',rc.relievePct);
-      setIf('rcEdli',rc.edliPct); setIf('rcBonusCeil',rc.bonusCeiling); setIf('rcLeavePct',rc.leavePct); setIf('rcWashing',rc.washing); setIf('rcSpecial',rc.special); el('rcBasis').value=(rc.billBasis==='perday')?'perday':'month'; el('rcDutyNote').value=rc.dutyNote||'';
+      setIf('rcEdli',rc.edliPct); setIf('rcBonusCeil',rc.bonusCeiling); setIf('rcLeavePct',rc.leavePct); setIf('rcWashing',rc.washing); setIf('rcSpecial',rc.special); el('rcBasis').value=(rc.billBasis==='perday')?'perday':'month';
     }
     el('rcEmpPf').value = (rc && rc.empPfPct!=null) ? rc.empPfPct : (state.settings.pfRate||12);
     el('rcEmpEsic').value = (rc && rc.empEsicPct!=null) ? rc.empEsicPct : (state.settings.esiRate||0.75);
