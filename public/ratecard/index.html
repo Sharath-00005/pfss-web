@@ -1441,7 +1441,7 @@ async function saveCard(){
 function makePdf(forEmail){
   syncCardFromForm();
   var card=cardForPdf(), roles=rolesForPdf(), comp=roles.map(function(r){ return computeRole(card,r); });
-  return buildRateCardPdf(card,roles,comp,{client:(APP.card.clientName||'').trim(),date:pdfDate(isoToday()),computerGenerated:!!forEmail});
+  return buildRateCardPdf(card,roles,comp,{client:(APP.card.clientName||'').trim(),date:pdfDate(isoToday()),computerGenerated:true});   // no signature on any PDF made on the phone
 }
 function pdfFileName(){
   var base=(APP.card.clientName||APP.card.name||'RateCard').replace(/[^A-Za-z0-9]+/g,'-').replace(/^-+|-+$/g,'')||'RateCard';
