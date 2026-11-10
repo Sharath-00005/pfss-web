@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-Under the name at the top of the left menu a small line reads, for example, "Version: 9 Nov 2026, build 26". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+Under the name at the top of the left menu a small line reads, for example, "Version: 9 Nov 2026, build 27". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -975,4 +975,30 @@ Different clients get different services, so the SAC code (and the description o
 
 
 ## One version line
-The page used to show two version lines: an old one under the name ("Build 5 Nov 2026 · 44", which was never updated) and the real one at the bottom of the menu. The old one is removed. There is now a single line, **under "Public Force" at the top of the left menu**, such as "Version: 9 Nov 2026, build 26". It is the line to check after an upload (press Ctrl + Shift + R first): if it shows an older build, the new file is not live yet.
+The page used to show two version lines: an old one under the name ("Build 5 Nov 2026 · 44", which was never updated) and the real one at the bottom of the menu. The old one is removed. There is now a single line, **under "Public Force" at the top of the left menu**, such as "Version: 9 Nov 2026, build 27". It is the line to check after an upload (press Ctrl + Shift + R first): if it shows an older build, the new file is not live yet.
+
+
+## Paying the bonus at the year end (bonus ledger)
+The Bonus ledger (Compliance, Bonus ledger) now also records what has been paid, so it shows for each person the bonus, **Paid** and **Balance**, with a summary (bonus, paid, still to pay) above the table.
+- **One person:** the **Pay** button on their row opens a window with the date (today), the amount (the balance, which can be changed for a part payment), how it was paid (bank transfer, cash, cheque or UPI) and a note. A person with payments has a button "1 payment" that lists them, with **Remove** for a payment entered by mistake. A payment of more than the balance asks first.
+- **Everyone:** **Record the year-end payment** records each person with a balance as paid that balance on the date you choose (it asks to confirm the total).
+- **Download (CSV)** has Paid, Balance and Last paid on.
+- Payments are kept for each financial year and each person (collection `bonusPayments`), and are part of the backup. **Only Accounts or an administrator** can record or remove a payment (the database enforces it: **run `supabase/accounts_role.sql` once in the Supabase SQL Editor** for this and for the "Special allowance applicable" tick below).
+- Recording a payment here does not move money or make a bank file: it is the record of what was paid. The bonus is not shown on the payslip.
+
+## Special allowance paid with the payroll (automatic)
+For a person at a client whose rate card (new structure) has a **special allowance**, Payroll now **adds it by itself as additional pay (type Allowance, "Special allowance")**, for the days billed: the amount of the card times the days billed over the days of the month (or over the days per month of the card for a client billed per day), the same amount as in the wage register. It is not part of PF, ESI or professional tax, it is on the payslip as "Allowance - Special allowance", and **Check against payroll** now agrees with the wage register without anything typed by hand. This replaces the earlier advice to type it in as additional pay.
+- The Calculate step says how many people got it and the total.
+- **Settings, "Pay the special allowance of the client's rate card with the payroll"** switches it off for everyone, and the employee form has **"Special allowance applicable"** (ticked to begin with) to stop it for one person. Washing allowance and uniform are billing amounts only and are never added to pay.
+- **If you had already typed the special allowance in as additional pay, remove those lines**: the Validate step gives a warning for each person who has it both ways, because it would be paid twice. A month that was already calculated is not changed until it is calculated again.
+- The rate card's own take-home block still leaves it out.
+
+## Switching the people of a per-day client to a daily wage
+**Employees, Change pay for many employees** (the tool for dated pay changes, for the administrator) has two new choices in **Change**:
+- **Switch to a daily wage from the rate card (clients billed per day):** the daily wage is the wages of the rate card (Basic + VDA, and the extra hours of a 12-hour duty) divided by the days per month of the card (26), so Payroll and billing match.
+- **Switch to a daily wage from the present monthly pay:** the daily wage is the present monthly pay divided by the days per month of the card, so what a person earns for a full month stays the same.
+Only people at a client whose rate card is billed per day are listed (use the Site and Role boxes to narrow it). People already on a daily wage are listed without a tick box. Choose the date it starts from, the reason and a note, tick the boxes of the people, and apply. It is a normal **dated pay change**: the earlier months keep the monthly pay, the pay history shows "Pay type" (not a percentage), the daily wage is shown with paise, and a pay revision letter says the way the wages are calculated changes and that the pay for a full month is not reduced. A change of pay type with the same monthly total is now accepted by the pay change tool (it used to be refused as "the same as the present pay"), and a difference of less than a rupee in the monthly total is not treated as a pay cut.
+- **Basic + D.A. in the employee record is not part of a dated change**, so it is left as it is. Where it is empty, PF is worked out on 50% of the pay: the list says so in the last column. For a daily-wage person it should equal the daily wage.
+
+## Rate card PDFs made on the phone
+Every rate card PDF made in the phone app (download, share and email) is now the **computer-generated version**: no signature image, no signatory line, and the line "This is a computer-generated rate card and does not require a signature." The rate card downloaded in the main system still carries the signature.

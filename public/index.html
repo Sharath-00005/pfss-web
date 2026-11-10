@@ -365,7 +365,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 <body>
 <div class="appshell">
   <nav class="side" id="sideNav">
-    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="buildTag" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Version: 9 Nov 2026, build 26</small></div></div>
+    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="buildTag" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Version: 9 Nov 2026, build 27</small></div></div>
     <div class="grp">Menu</div>
     <button class="navbtn on" id="tabs-dashboard" data-tab="dashboard">Dashboard</button>
     <button class="navbtn" id="tabs-cycle" data-tab="cycle">Pay cycle</button>
@@ -807,6 +807,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         <div class="field"><label>Statutory bonus % (accrued with each payroll)</label><input type="number" step="0.01" min="0" id="setBonusPct"></div>
         <div class="field"><label>Bonus wage ceiling per month (₹), 0 for none</label><input type="number" step="1" min="0" id="setBonusCeil"></div>
         <div class="field"><label>Payslip layout</label><select id="setSlipLayout"><option value="form">Wage slip with grids (Form XIX style)</option><option value="simple">Simple payslip</option></select></div>
+        <div class="field"><label><input type="checkbox" id="setAutoSpecial" style="width:auto;margin-right:.4rem">Pay the special allowance of the client's rate card with the payroll (as additional pay)</label></div>
         <div class="field"><label>Heading of the wage slip</label><input type="text" id="setSlipHeading" placeholder="Wage Slip - Form XIX [See Rule 78 of the Contract Labour (Regulation and Abolition) Rules]"></div>
       </div>
       <div class="row" style="margin-top:.6rem"><label><input type="checkbox" id="setBillExtra" checked style="width:auto;margin-right:.4rem">Count extra duties (1.5 or 2 duties on one day) as days worked in client billing: the wage register, the attendance sheet and the man-days on invoices</label></div>
@@ -999,6 +1000,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       <div class="field"><label><input type="checkbox" id="fPfFull" style="width:auto;margin-right:.4rem">PF on the full Basic, above the ceiling</label></div>
       <div class="field"><label><input type="checkbox" id="fEsi" style="width:auto;margin-right:.4rem">ESI applicable</label></div>
       <div class="field"><label><input type="checkbox" id="fBonus" style="width:auto;margin-right:.4rem">Statutory bonus applicable</label></div>
+      <div class="field"><label><input type="checkbox" id="fSpecial" style="width:auto;margin-right:.4rem">Special allowance applicable</label><div class="muted" style="font-size:.78rem">If the client's rate card has one, it is paid with the payroll.</div></div>
       
     </div>
     <div class="row">
@@ -1369,7 +1371,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       <div class="field grow"><label>Role</label><select id="bkRole"></select></div>
     </div>
     <div class="row">
-      <div class="field grow"><label>Change</label><select id="bkMethod"><option value="pct+">Increase by a percentage</option><option value="amt+">Increase by an amount</option><option value="pct-">Decrease by a percentage</option><option value="amt-">Decrease by an amount</option><option value="min">Set to the current minimum wages (pay-structure staff)</option></select></div>
+      <div class="field grow"><label>Change</label><select id="bkMethod"><option value="pct+">Increase by a percentage</option><option value="amt+">Increase by an amount</option><option value="pct-">Decrease by a percentage</option><option value="amt-">Decrease by an amount</option><option value="min">Set to the current minimum wages (pay-structure staff)</option><option value="dailyrc">Switch to a daily wage from the rate card (clients billed per day)</option><option value="dailycur">Switch to a daily wage from the present monthly pay (clients billed per day)</option></select></div>
       <div class="field"><label id="bkValLabel">Percentage (%)</label><input type="number" id="bkVal" step="0.01"></div>
       <div class="field"><label>Starts from *</label><input type="date" id="bkFrom"></div>
     </div>
@@ -1377,6 +1379,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       <div class="field grow"><label>Reason *</label><select id="bkReason"></select></div>
       <div class="field grow"><label>Note (optional)</label><input id="bkNote"></div>
     </div>
+    <div class="muted" id="bkMethodNote" style="margin-bottom:.4rem"></div>
     <div class="muted">Amounts are per month. For daily-wage staff the amount is per day. For staff on the pay structure, a percentage changes Basic and D.A. together and an amount is added to or taken from Basic.</div>
     <label class="chk" id="bkConsentBox" style="display:none;align-items:center;gap:.5rem;margin-top:.5rem"><input type="checkbox" id="bkConsent" style="width:auto;min-height:0"> All of these employees have been told in writing and have agreed to the reduction</label>
     <label class="chk" style="display:flex;align-items:center;gap:.5rem;margin-top:.5rem"><input type="checkbox" id="bkArr" checked style="width:auto;min-height:0"> Pay arrears for months that are already approved, with the salary of <select id="bkArrMonth" style="width:auto"></select></label>
@@ -1384,6 +1387,23 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <div id="bkPreview" style="max-height:280px;overflow:auto;border:1px solid var(--line);border-radius:10px;margin-top:.4rem"></div>
     <div id="bkErr" style="color:var(--bad);min-height:1.3em;margin-top:.5rem" role="alert"></div>
     <div class="row"><button class="btn" id="btnBulkApply">Apply to the ticked employees</button></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="bonusPayModalBg">
+  <div class="modal" style="max-width:600px">
+    <button class="close-x" id="bonusPayClose">&times;</button>
+    <h3 id="bonusPayTitle">Bonus payment</h3>
+    <p class="muted" id="bonusPayInfo"></p>
+    <div class="row">
+      <div class="field"><label for="bonusPayDate">Date paid *</label><input type="date" id="bonusPayDate"></div>
+      <div class="field" id="bonusPayAmtBox"><label for="bonusPayAmt">Amount (₹) *</label><input type="number" step="0.01" id="bonusPayAmt"></div>
+      <div class="field"><label for="bonusPayMode">Paid by</label><select id="bonusPayMode"><option>Bank transfer</option><option>Cash</option><option>Cheque</option><option>UPI</option></select></div>
+    </div>
+    <div class="field"><label for="bonusPayNote">Note (optional)</label><input id="bonusPayNote" placeholder="e.g. Diwali bonus 2026"></div>
+    <div id="bonusPayHist"></div>
+    <div id="bonusPayErr" style="color:var(--bad);min-height:1.3em;margin-top:.4rem" role="alert"></div>
+    <div class="row"><button class="btn" id="btnBonusPaySave">Save the payment</button></div>
   </div>
 </div>
 
@@ -2047,6 +2067,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     setTimeout(function(){ syncBasicDa(); renderFormPayPreview(); },0);
     document.getElementById('fEsi').checked = e? !!e.esiApplicable : true;
     document.getElementById('fBonus').checked = e? e.bonusApplicable!==false : true;
+    document.getElementById('fSpecial').checked = e? e.specialApplicable!==false : true;
     document.getElementById('fWeeklyOff').value = (e && e.weeklyOff!=null) ? String(e.weeklyOff) : '';
     document.getElementById('fHolidayOff').checked = !!(e && e.holidayOff);
     document.getElementById('fDoj').value = e? (e.doj||'') : xToday();
@@ -2110,6 +2131,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       basicPct:null,
       esiApplicable:document.getElementById('fEsi').checked,
       bonusApplicable:document.getElementById('fBonus').checked,
+      specialApplicable:document.getElementById('fSpecial').checked,
       weeklyOff:document.getElementById('fWeeklyOff').value,
       holidayOff:document.getElementById('fHolidayOff').checked,
       active:!leftV,
@@ -2921,9 +2943,10 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     if(hs.length && from<=hs[hs.length-1].from) return 'There is already a pay change from '+pdfDate(hs[hs.length-1].from)+'. A new one must start after it, or cancel that one first.';
     if(f.payStd && f.basicAmt>0 ? !(f.basicAmt>0) : !(f.wageAmount>0)) return 'Enter the new pay.';
     var oldG=payGrossOf(payTermsOn(e,from)), newG=payGrossOf(f);
-    if(Math.round(oldG)===Math.round(newG)) return 'The new pay is the same as the present pay.';
+    var oT=payFieldsOf(payTermsOn(e,from));
+    if(Math.round(oldG)===Math.round(newG) && oT.wageType===f.wageType && payStructOf(oT)===payStructOf(f)) return 'The new pay is the same as the present pay.';
     if(!o.reason) return 'Choose the reason for the change.';
-    if(newG<oldG){
+    if(Math.round(newG)<Math.round(oldG)){
       if(lock && lock.firstOpen && from<lock.firstOpen+'-01') return 'A pay cut cannot start in a month whose payroll is already approved. The earliest date is '+pdfDate(lock.firstOpen+'-01')+'.';
       var below=minWageShortfall(e,f); if(below) return below+' Pay cannot be cut below the minimum wage.';
       if(!o.consent) return 'Tick the box to confirm that the employee has been told in writing and has agreed to the reduction.';
@@ -2954,7 +2977,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var lock=await payLockInfo(e), msg=validatePayRevision(e,T,o,lock); if(msg) throw new Error(msg);
     var f=payFieldsOf(T), oldG=payGrossOf(payTermsOn(e,o.from)), newG=payGrossOf(f), today=xToday();
     var entry={id:'p'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), from:o.from, terms:f, reason:o.reason, note:o.note||'', consent:!!o.consent,
-      kind:newG>oldG?'increase':'decrease', oldGross:Math.round(oldG), newGross:Math.round(newG), by:(me&&(me.name||me.email))||'', byId:(me&&me.id)||'', at:Date.now(), arrears:null};
+      kind:Math.round(newG)>Math.round(oldG)?'increase':(Math.round(newG)<Math.round(oldG)?'decrease':'change'), oldGross:Math.round(oldG), newGross:Math.round(newG), by:(me&&(me.name||me.email))||'', byId:(me&&me.id)||'', at:Date.now(), arrears:null};
     var base=e.payBase||payFieldsOf(e), eNew=Object.assign({}, e, {payBase:base, payHistory:(e.payHistory||[]).concat([entry])});
     var payYm=o.arrearsYm||thisMonth();
     if(newG>oldG && o.payArrears){
@@ -2999,7 +3022,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   }
   function payPendingTag(e){
     var today=xToday(), p=payEntries(e).filter(function(x){ return x.from>today; })[0];
-    return p ? '<div class="muted" style="font-size:.72rem">'+(p.kind==='decrease'?'Lower':'Higher')+' pay from '+pdfDate(p.from)+'</div>' : '';
+    return p ? '<div class="muted" style="font-size:.72rem">'+(p.kind==='decrease'?'Lower':(p.kind==='change'?'New':'Higher'))+' pay from '+pdfDate(p.from)+'</div>' : '';
   }
 
   /* ---------- pay changes: the windows and the letter ---------- */
@@ -3013,7 +3036,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   }
   function payDescribe(T){
     if(payStructOf(T)){ var A=Math.round((Number(T.basicAmt)||0)+(Number(T.daAmt)||0)), xh=Math.max(0,(Number(T.dutyHrs)||8)-8); return fmtMoney(payGrossOf(T))+' per month (Basic '+fmtMoney(T.basicAmt)+' + D.A. '+fmtMoney(T.daAmt)+(xh?' + '+xh+' extra hours '+fmtMoney(Math.round(A*xh/8)):'')+')'; }
-    return T.wageType==='daily' ? fmtMoney(T.wageAmount)+' per day' : fmtMoney(T.wageAmount)+' per month';
+    var wa=Math.round((Number(T.wageAmount)||0)*100)/100;
+    return T.wageType==='daily' ? '\u20b9'+wa.toLocaleString('en-IN',{minimumFractionDigits:(wa%1?2:0),maximumFractionDigits:2})+' per day' : fmtMoney(T.wageAmount)+' per month';
   }
   async function openPayModal(id){
     var e=state.employees.find(function(x){ return x.id===id; }); if(!e) return;
@@ -3063,7 +3087,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var rows=['<tr><td>Before the first change</td><td>'+escapeHtml(payDescribe(e.payBase||payFieldsOf(e)))+'</td><td></td><td></td><td></td><td></td><td></td></tr>'];
     h.forEach(function(x){
       var up=x.kind==='increase', pct=x.oldGross?(x.newGross-x.oldGross)/x.oldGross*100:0, status=x.from>today?'<span class="tag info">Starts '+pdfDate(x.from)+'</span>':(x.id===cur?'<span class="tag ok">In force</span>':'<span class="tag">Earlier</span>');
-      rows.push('<tr><td>'+pdfDate(x.from)+'</td><td>'+escapeHtml(payDescribe(x.terms))+'</td><td><span class="tag '+(up?'ok':'bad')+'">'+(up?'+':'-')+Math.abs(pct).toFixed(1)+'%</span></td><td>'+escapeHtml(x.reason||'')+(x.arrears?'<div class="muted" style="font-size:.74rem">Arrears '+fmtMoney(x.arrears.amount)+' with '+escapeHtml(xMonthLabel(x.arrears.payYm))+'</div>':'')+(x.kind==='decrease'?'<div class="muted" style="font-size:.74rem">Employee agreed</div>':'')+'</td><td>'+escapeHtml(x.by||'')+'<div class="muted" style="font-size:.74rem">'+(x.at?new Date(x.at).toLocaleDateString('en-GB'):'')+'</div></td><td>'+status+'</td>'+
+      rows.push('<tr><td>'+pdfDate(x.from)+'</td><td>'+escapeHtml(payDescribe(x.terms))+'</td><td>'+(x.kind==='change'?'<span class="tag info">Pay type</span>':'<span class="tag '+(up?'ok':'bad')+'">'+(up?'+':'-')+Math.abs(pct).toFixed(1)+'%</span>')+'</td><td>'+escapeHtml(x.reason||'')+(x.arrears?'<div class="muted" style="font-size:.74rem">Arrears '+fmtMoney(x.arrears.amount)+' with '+escapeHtml(xMonthLabel(x.arrears.payYm))+'</div>':'')+(x.kind==='decrease'?'<div class="muted" style="font-size:.74rem">Employee agreed</div>':'')+'</td><td>'+escapeHtml(x.by||'')+'<div class="muted" style="font-size:.74rem">'+(x.at?new Date(x.at).toLocaleDateString('en-GB'):'')+'</div></td><td>'+status+'</td>'+
         '<td style="white-space:nowrap"><button class="btn small ghost" data-payletter="'+x.id+'">Letter</button> <button class="btn small ghost" data-paycancel="'+x.id+'">Cancel</button></td></tr>');
     });
     el.innerHTML='<div class="scrollx"><table><thead><tr><th>From</th><th>Pay</th><th>Change</th><th>Reason</th><th>By</th><th>Status</th><th></th></tr></thead><tbody>'+rows.join('')+'</tbody></table></div>';
@@ -3110,7 +3134,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     y+=16; pb.text(ML,y+8,'Subject: Revision of your wages with effect from '+pdfDate(en.from),10.6,{bold:true}); y+=28;
     function para(t){ pb.wrap(t,CW,10,false).forEach(function(l){ pb.text(ML,y+8,l,10); y+=14; }); y+=8; }
     para('Dear '+(e.name||'Employee')+',');
-    para(up ? 'We are pleased to inform you that, with effect from '+pdfDate(en.from)+', your wages have been revised as shown below.'
+    para(en.kind==='change' ? 'With effect from '+pdfDate(en.from)+', the way your wages are calculated changes as shown below. Your pay for a full month is not reduced.'
+            : up ? 'We are pleased to inform you that, with effect from '+pdfDate(en.from)+', your wages have been revised as shown below.'
             : 'Further to our discussion, and with your agreement, your wages are revised with effect from '+pdfDate(en.from)+' as shown below.');
     var rows=[];
     if(payStructOf(oldT)||payStructOf(newT)){
@@ -3136,9 +3161,17 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   }
   // ---- many employees at once
   function bkMethod(){ return pfld('bkMethod').value; }
-  function bkEligible(){ var site=pfld('bkSite').value, role=pfld('bkRole').value; return state.employees.filter(function(e){ return e.active!==false && (!site||e.site===site) && (!role||e.role===role); }).sort(compareByEmpCode); }
+  function bkEligible(){ var site=pfld('bkSite').value, role=pfld('bkRole').value, daily=/^daily/.test(bkMethod()); return state.employees.filter(function(e){ if(daily){ var c=billingCardOf(e); if(!c || c.billBasis!=='perday') return false; } return e.active!==false && (!site||e.site===site) && (!role||e.role===role); }).sort(compareByEmpCode); }
   function bkNewTerms(e,T,method,val){
     var f=payFieldsOf(T), struct=payStructOf(f), sign=/-$/.test(method)?-1:1, kind=method.slice(0,3);
+    if(method==='dailyrc' || method==='dailycur'){
+      var card=billingCardOf(e); if(!card || card.billBasis!=='perday') return {skip:'Not at a client billed per day'};
+      if(f.wageType==='daily' && !struct) return {skip:'Already on a daily wage'};
+      var days=Number(card.days)||26, wageM;
+      if(method==='dailyrc'){ var rr=findRcRole(card,e.role,e.dutyHrs); if(!rr) return {skip:'The role is not on the rate card'}; wageM=computeKa(card,rr,1).wages; }
+      else wageM=payGrossOf(f);
+      f.wageType='daily'; f.payStd=false; f.basicAmt=0; f.daAmt=0; f.wageAmount=Math.round(wageM/days*100)/100; return {terms:f};
+    }
     if(method==='min'){
       if(!struct) return {skip:'Not on the pay structure'};
       var skill=f.skill||e.skill, zone=f.zone||e.zone, gw=skill?govWage(zone,skill):{basic:0,da:0};
@@ -3153,8 +3186,9 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   }
   async function bkRefresh(){
     var from=pfld('bkFrom').value, method=bkMethod(), val=Number(pfld('bkVal').value)||0, reason=pfld('bkReason').value, consent=pfld('bkConsent').checked, out=[];
-    pfld('bkValLabel').textContent=/^pct/.test(method)?'Percentage (%)':(method==='min'?'(not needed)':'Amount (₹)'); pfld('bkVal').disabled=(method==='min');
-    pfld('bkConsentBox').style.display=/-$/.test(method)?'':'none';
+    pfld('bkValLabel').textContent=/^pct/.test(method)?'Percentage (%)':(method==='min'?'(not needed)':'Amount (₹)'); pfld('bkVal').disabled=(method==='min'||/^daily/.test(method));
+    pfld('bkConsentBox').style.display=(/-$/.test(method)||/^daily/.test(method))?'':'none';
+    pfld('bkMethodNote').textContent=/^daily/.test(method)?(method==='dailyrc'?'Only people at a client whose rate card is billed per day are listed. The daily wage is the wages of the rate card (Basic + VDA, and the extra hours of a 12-hour duty) divided by the days per month of the card, so pay and billing match.':'Only people at a client whose rate card is billed per day are listed. The daily wage is the present monthly pay divided by the days per month of the card, so what a person earns for a full month stays the same.')+' Leave "Pay arrears" ticked only if the change should be paid back to its start date.':'';
     if(!bkLock) bkLock=await payLockInfo();
     bkEligible().forEach(function(e){
       var T=payTermsOn(e,from||xToday()), r=bkNewTerms(e,T,method,val), row={e:e,old:payGrossOf(T),nw:0,msg:'',terms:null,ok:false};
@@ -3164,13 +3198,14 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         if(err && /Choose the reason/.test(err)) err='';
         if(err && /Tick the box/.test(err)) err='Needs the "agreed" box ticked';
         row.msg=err; row.ok=!err;
+        if(row.ok && /^daily/.test(method)) row.msg='Daily wage '+(Math.round(r.terms.wageAmount*100)/100).toFixed(2)+(Number(e.basicDaAmt)>0?'':'. Basic + D.A. is not set in the record: PF is worked out on 50% of the pay until it is');
       }
       out.push(row);
     });
     bkRows=out;
     var okRows=out.filter(function(r){ return r.ok; }), delta=okRows.reduce(function(s,r){ return s+(r.nw-r.old); },0);
     pfld('bkPreview').innerHTML=out.length?('<table><thead><tr><th></th><th>ID</th><th>Name</th><th>Role</th><th>Site</th><th class="right">Now</th><th class="right">New</th><th class="right">Change</th><th></th></tr></thead><tbody>'+out.map(function(r,i){
-      var d=r.nw-r.old; return '<tr><td>'+(r.ok?'<input type="checkbox" data-bk="'+i+'" checked style="width:auto;min-height:0">':'')+'</td><td>'+escapeHtml(r.e.empCode||'')+'</td><td>'+escapeHtml(r.e.name||'')+'</td><td>'+escapeHtml(r.e.role||'')+'</td><td>'+escapeHtml(r.e.site||'')+'</td><td class="right">'+fmtMoney(r.old)+'</td><td class="right">'+(r.terms?fmtMoney(r.nw):'-')+'</td><td class="right">'+(r.terms?'<span class="tag '+(d>0?'ok':'bad')+'">'+(d>0?'+':'-')+fmtMoney(Math.abs(d))+'</span>':'')+'</td><td class="muted" style="font-size:.78rem">'+escapeHtml(r.msg||'')+'</td></tr>'; }).join('')+'</tbody></table>'):'<div class="muted" style="padding:.6rem">No employees match.</div>';
+      var d=r.nw-r.old; return '<tr><td>'+(r.ok?'<input type="checkbox" data-bk="'+i+'" checked style="width:auto;min-height:0">':'')+'</td><td>'+escapeHtml(r.e.empCode||'')+'</td><td>'+escapeHtml(r.e.name||'')+'</td><td>'+escapeHtml(r.e.role||'')+'</td><td>'+escapeHtml(r.e.site||'')+'</td><td class="right">'+fmtMoney(r.old)+'</td><td class="right">'+(r.terms?fmtMoney(r.nw):'-')+'</td><td class="right">'+(r.terms?(Math.abs(d)<0.5?'<span class="tag info">Same total</span>':'<span class="tag '+(d>0?'ok':'bad')+'">'+(d>0?'+':'-')+fmtMoney(Math.abs(d))+'</span>'):'')+'</td><td class="muted" style="font-size:.78rem">'+escapeHtml(r.msg||'')+'</td></tr>'; }).join('')+'</tbody></table>'):'<div class="muted" style="padding:.6rem">No employees match.</div>';
     pfld('bkSummary').textContent=okRows.length+' of '+out.length+' can be changed. Monthly wage bill changes by '+(delta>=0?'+':'-')+fmtMoney(Math.abs(delta))+'.';
   }
   async function openBulkPay(){
@@ -3302,7 +3337,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   // and a new pay typed in here replaces any dated pay changes (it is then used for every month not yet approved)
   function payForSave(data, existing){
     if(!existing) return {data:data, ok:true};
-    if(!canPay()){ PAY_FORM_KEYS.forEach(function(k){ delete data[k]; }); delete data.weeklyOff; delete data.holidayOff; return {data:data, ok:true}; }
+    if(!canPay()){ PAY_FORM_KEYS.forEach(function(k){ delete data[k]; }); delete data.weeklyOff; delete data.holidayOff; delete data.specialApplicable; return {data:data, ok:true}; }
     if((existing.payHistory||[]).length){
       var was=payFieldsOf(existing), now=payFieldsOf(data), changed=['wageType','wageAmount','payStd','basicAmt','daAmt','dutyHrs'].some(function(k){ return was[k]!==now[k]; });
       if(changed){
@@ -4668,6 +4703,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var nightPay = Math.round(nights * (st.nightAllowance==null?150:st.nightAllowance));
     var baseGross = gross, ar = arrearsDue(e, ym), arrears = ar.amount;
     var adds = addLinesOf(ex), addPay = 0, addStat = 0;
+    var autoSp=autoSpecialLine(e, ym, present+((st.billExtraDuty===false)?0:extraDuty+holidayDuty), dim); if(autoSp) adds=adds.concat([autoSp]);
     adds.forEach(function(a){ addPay += Number(a.amount); if(a.stat) addStat += Number(a.amount); });
     gross = baseGross + dutyPay + holidayPay + otPay + nightPay + arrears + addPay;
     var statGross = gross - (addPay - addStat);   // the pay that counts for ESI and professional tax
@@ -4689,7 +4725,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       struct:struct, basicPart:stdBasic, daPart:stdDa, extraPart:stdExtra, dutyHrs:stdDuty,
       dPresent:cPres+cHalf*0.5, dWO:cWO, dHol:cHol, dLeave:cLeave, dHalf:cHalf, dLop:lop+notEmployed, basicDays:basicDays, rateType:rateDaily?'day':'month', rateWage:rWage, rateBasic:rBasic, rateDa:rDa, rateExtra:rExtra,
       arrears:arrears, arrearsNote:ar.note, revNote:revNote, esiWages:statGross,
-      addPay:addPay, addLines:adds.map(function(a){ return {type:a.type, amount:Number(a.amount), note:a.note||'', stat:!!a.stat}; }),
+      addPay:addPay, addLines:adds.map(function(a){ return {type:a.type, amount:Number(a.amount), note:a.note||'', stat:!!a.stat, auto:!!a.auto}; }),
       pfWages:pfInfo?pfInfo.wages:0, epsEr:pfInfo?pfInfo.eps:0, epfEr:pfInfo?pfInfo.epf:0, edliWages:pfInfo?pfInfo.edliWages:0, edliEr:pfInfo?pfInfo.edli:0};
   }
 
@@ -5147,7 +5183,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         dPresent:x.r.dPresent, dWO:x.r.dWO, dHol:x.r.dHol, dLeave:x.r.dLeave, dHalf:x.r.dHalf, dLop:x.r.dLop, basicDays:Math.round((x.r.basicDays||0)*100)/100, rateType:x.r.rateType, rateWage:x.r.rateWage, rateBasic:x.r.rateBasic, rateDa:x.r.rateDa, rateExtra:x.r.rateExtra,
         bonusBase:bonusAccrual(x.emp,x.r).base, bonusAmt:bonusAccrual(x.emp,x.r).amt, bonusPct:bonusCfg().pct,
         extraDuty:x.r.extraDuty||0, dutyPay:Math.round(x.r.dutyPay||0), holidayDuty:x.r.holidayDuty||0, holidayPay:Math.round(x.r.holidayPay||0), holidayMult:x.r.holidayMult||1,
-        addPay:Math.round(x.r.addPay||0), addLines:(x.r.addLines||[]).map(function(a){ return {type:a.type, amount:Math.round(a.amount*100)/100, note:a.note||''}; }),
+        addPay:Math.round(x.r.addPay||0), addLines:(x.r.addLines||[]).map(function(a){ return {type:a.type, amount:Math.round(a.amount*100)/100, note:a.note||'', stat:!!a.stat, auto:!!a.auto}; }),
         esiWages:Math.round(x.r.esiWages||0), pfWages:Math.round(x.r.pfWages||0), epsEr:Math.round(x.r.epsEr||0), epfEr:Math.round(x.r.epfEr||0), edliWages:Math.round(x.r.edliWages||0), edliEr:Math.round(x.r.edliEr||0)};
     });
     var totalNet = rows.reduce(function(s,r){return s+r.net;},0);
@@ -7273,6 +7309,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     Object.keys(keys).forEach(function(k){ var r=cycRunByKey(k); if(r && r.status==='approved' && r.rows && ms.indexOf(r.ym)>-1) out.push(r); });
     return out;
   }
+  function bonusPaymentsOf(fy, empId){ var d=(state.bonusPay||{})[fy+'_'+empId]; return (d&&d.payments)||[]; }
+  function bonusPaidOf(fy, empId){ return bonusR2(bonusPaymentsOf(fy,empId).reduce(function(t,p){ return t+(Number(p.amount)||0); },0)); }
   function bonusLedger(fy){
     var months=bonusFyMonths(fy), runs=bonusApprovedRuns(fy), by={}, missing=0;
     runs.forEach(function(run){
@@ -7282,9 +7320,9 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         o.m[run.ym]=bonusR2((o.m[run.ym]||0)+Number(x.bonusAmt)); o.total=bonusR2(o.total+Number(x.bonusAmt));
       });
     });
-    var list=Object.keys(by).map(function(k){ return by[k]; }).sort(function(a,b){ return String(a.name).localeCompare(String(b.name)); }), tm={}, tt=0;
-    list.forEach(function(o){ months.forEach(function(ym){ tm[ym]=bonusR2((tm[ym]||0)+(o.m[ym]||0)); }); tt=bonusR2(tt+o.total); });
-    return {fy:fy, months:months, list:list, missing:missing, runs:runs.length, tm:tm, total:tt};
+    var list=Object.keys(by).map(function(k){ return by[k]; }).sort(function(a,b){ return String(a.name).localeCompare(String(b.name)); }), tm={}, tt=0, tp=0;
+    list.forEach(function(o){ o.paid=bonusPaidOf(fy,o.empId); o.balance=bonusR2(o.total-o.paid); months.forEach(function(ym){ tm[ym]=bonusR2((tm[ym]||0)+(o.m[ym]||0)); }); tt=bonusR2(tt+o.total); tp=bonusR2(tp+o.paid); });
+    return {fy:fy, months:months, list:list, missing:missing, runs:runs.length, tm:tm, total:tt, paid:tp, balance:bonusR2(tt-tp)};
   }
   function bonusFyOptions(){
     var set={}; set[fyCodeOf('')]=1;
@@ -7293,22 +7331,90 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   }
   function bonusLedgerCsv(L){
     var q=function(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; };
-    var rows=[['Employee ID','Name','Site'].concat(L.months.map(function(ym){ return xMonthShort(ym)+' '+ym.slice(0,4); })).concat(['Total for '+fyLabel(L.fy)])];
-    L.list.forEach(function(o){ rows.push([o.code,o.name,o.site].concat(L.months.map(function(ym){ return o.m[ym]!=null?o.m[ym].toFixed(2):''; })).concat([o.total.toFixed(2)])); });
-    rows.push(['','Total',''].concat(L.months.map(function(ym){ return (L.tm[ym]||0).toFixed(2); })).concat([L.total.toFixed(2)]));
+    var rows=[['Employee ID','Name','Site'].concat(L.months.map(function(ym){ return xMonthShort(ym)+' '+ym.slice(0,4); })).concat(['Total for '+fyLabel(L.fy),'Paid','Balance','Last paid on'])];
+    L.list.forEach(function(o){ var ps=bonusPaymentsOf(L.fy,o.empId).map(function(p){ return p.date; }).sort(); rows.push([o.code,o.name,o.site].concat(L.months.map(function(ym){ return o.m[ym]!=null?o.m[ym].toFixed(2):''; })).concat([o.total.toFixed(2),o.paid.toFixed(2),o.balance.toFixed(2),ps.length?ps[ps.length-1]:''])); });
+    rows.push(['','Total',''].concat(L.months.map(function(ym){ return (L.tm[ym]||0).toFixed(2); })).concat([L.total.toFixed(2),L.paid.toFixed(2),L.balance.toFixed(2),'']));
     return rows.map(function(r){ return r.map(q).join(','); }).join('\r\n');
   }
   function cmpBonusHtml(){
     var opts=bonusFyOptions(), fy=cmpBonusFy&&opts.indexOf(cmpBonusFy)>-1?cmpBonusFy:opts[0]; cmpBonusFy=fy;
-    var L=bonusLedger(fy), c=bonusCfg(), h='<p class="muted" style="margin-top:0">Statutory bonus is paid once a year. Every payroll adds <b>'+bonusM2(c.pct).replace(/\.00$/,'')+'%</b> of the Basic + D.A. earned'+(c.ceiling>0?' (up to <b>'+c.ceiling.toLocaleString('en-IN')+'</b> a month, for the days paid)':'')+' for each person, and the figure is saved in that payroll when it is approved. This is the total for each person over the financial year (April to March). Change the percentage and ceiling in Settings.</p>';
-    h+='<div class="row" style="align-items:flex-end;gap:.8rem"><div class="field" style="max-width:190px"><label for="bonusFy">Financial year</label><select id="bonusFy">'+opts.map(function(o){ return '<option value="'+o+'"'+(o===fy?' selected':'')+'>'+fyLabel(o)+'</option>'; }).join('')+'</select></div>'+(L.list.length?'<button class="btn ghost" data-act="bonusCsv" type="button">Download (CSV)</button>':'')+'</div>';
+    var L=bonusLedger(fy), c=bonusCfg(), h='<p class="muted" style="margin-top:0">Statutory bonus is paid once a year. Every payroll adds <b>'+bonusM2(c.pct).replace(/\.00$/,'')+'%</b> of the Basic + D.A. earned'+(c.ceiling>0?' (up to <b>'+c.ceiling.toLocaleString('en-IN')+'</b> a month, for the days paid)':'')+' for each person, and the figure is saved in that payroll when it is approved. This is the total for each person over the financial year (April to March), what has been paid, and what is still to be paid. Change the percentage and ceiling in Settings.</p>';
+    var may=canPay();
+    h+='<div class="row" style="align-items:flex-end;gap:.8rem"><div class="field" style="max-width:190px"><label for="bonusFy">Financial year</label><select id="bonusFy">'+opts.map(function(o){ return '<option value="'+o+'"'+(o===fy?' selected':'')+'>'+fyLabel(o)+'</option>'; }).join('')+'</select></div>'+(L.list.length?'<button class="btn ghost" data-act="bonusCsv" type="button">Download (CSV)</button>':'')+((may && L.list.some(function(o){ return o.balance>0.005; }))?'<button class="btn" data-act="bonusPayAll" type="button">Record the year-end payment</button>':'')+'</div>';
     if(L.missing) h+='<div class="banner" style="border-color:#B07A10;background:var(--warn-soft,#FFF4DA);margin-top:.6rem"><div><b>'+L.missing+' line'+(L.missing>1?'s':'')+' of approved payrolls in this year '+(L.missing>1?'have':'has')+' no bonus figure</b>, because '+(L.missing>1?'they were':'it was')+' approved before this was added. They can be worked out now from the records as they stand, and are saved in those payrolls.</div><button class="btn small" data-act="bonusFill" type="button">Work them out and save</button></div>';
     if(!L.list.length){ return h+'<p class="muted" style="margin-top:.8rem">'+(L.runs?'No bonus figures yet for '+fyLabel(fy)+'.':'No approved payroll yet in '+fyLabel(fy)+'. The figures appear here as payrolls are approved.')+'</p>'; }
-    h+='<div class="scrollx" style="margin-top:.6rem"><table><thead><tr><th>Employee</th><th>Site</th>'+L.months.map(function(ym){ return '<th class="right">'+xMonthShort(ym)+'</th>'; }).join('')+'<th class="right">Total</th></tr></thead><tbody>';
-    L.list.forEach(function(o){ h+='<tr><td><b>'+escapeHtml(o.name)+'</b><br><span class="muted">'+escapeHtml(o.code)+'</span></td><td>'+escapeHtml(o.site||'-')+'</td>'+L.months.map(function(ym){ return '<td class="right">'+(o.m[ym]!=null?bonusM2(o.m[ym]):'<span class="muted">-</span>')+'</td>'; }).join('')+'<td class="right"><b>'+bonusM2(o.total)+'</b></td></tr>'; });
-    h+='</tbody><tfoot><tr><td>Total</td><td></td>'+L.months.map(function(ym){ return '<td class="right">'+(L.tm[ym]?bonusM2(L.tm[ym]):'-')+'</td>'; }).join('')+'<td class="right">'+bonusM2(L.total)+'</td></tr></tfoot></table></div>';
+    h+='<div class="stat-grid" style="margin-top:.6rem"><div class="stat"><b>'+bonusM2(L.total)+'</b><span>Bonus for '+fyLabel(fy)+'</span></div><div class="stat"><b>'+bonusM2(L.paid)+'</b><span>Paid</span></div><div class="stat"><b>'+bonusM2(L.balance)+'</b><span>Still to pay</span></div></div>';
+    h+='<div class="scrollx" style="margin-top:.6rem"><table><thead><tr><th>Employee</th><th>Site</th>'+L.months.map(function(ym){ return '<th class="right">'+xMonthShort(ym)+'</th>'; }).join('')+'<th class="right">Total</th><th class="right">Paid</th><th class="right">Balance</th><th></th></tr></thead><tbody>';
+    L.list.forEach(function(o){
+      var np=bonusPaymentsOf(fy,o.empId).length;
+      h+='<tr><td><b>'+escapeHtml(o.name)+'</b><br><span class="muted">'+escapeHtml(o.code)+'</span></td><td>'+escapeHtml(o.site||'-')+'</td>'+L.months.map(function(ym){ return '<td class="right">'+(o.m[ym]!=null?bonusM2(o.m[ym]):'<span class="muted">-</span>')+'</td>'; }).join('')+'<td class="right"><b>'+bonusM2(o.total)+'</b></td><td class="right">'+(o.paid?bonusM2(o.paid):'<span class="muted">-</span>')+'</td><td class="right"><b'+(o.balance>0.005?' style="color:var(--bad)"':'')+'>'+bonusM2(o.balance)+'</b></td><td style="white-space:nowrap">'+((may&&o.balance>0.005)?'<button class="btn small" data-act="bonusPay" data-emp="'+escapeHtml(o.empId)+'" type="button">Pay</button> ':'')+(np?'<button class="btn small ghost" data-act="bonusHist" data-emp="'+escapeHtml(o.empId)+'" type="button">'+np+' payment'+(np>1?'s':'')+'</button>':'')+'</td></tr>';
+    });
+    h+='</tbody><tfoot><tr><td>Total</td><td></td>'+L.months.map(function(ym){ return '<td class="right">'+(L.tm[ym]?bonusM2(L.tm[ym]):'-')+'</td>'; }).join('')+'<td class="right">'+bonusM2(L.total)+'</td><td class="right">'+bonusM2(L.paid)+'</td><td class="right">'+bonusM2(L.balance)+'</td><td></td></tr></tfoot></table></div>';
     return h;
   }
+  // ---- paying the bonus: one person, or everyone with a balance
+  var bpMode=null;   // {emp: id} for one person, or {all: true}
+  function bpFy(){ return cmpBonusFy||fyCodeOf(''); }
+  function openBonusPay(mode){
+    if(!canPay()){ toast('Only Accounts or an administrator can record bonus payments.'); return; }
+    bpMode=mode; var fy=bpFy(), L=bonusLedger(fy), el=function(i){ return document.getElementById(i); };
+    el('bonusPayErr').textContent=''; el('bonusPayDate').value=xToday(); el('bonusPayMode').value='Bank transfer'; el('bonusPayNote').value='';
+    if(mode.all){
+      var due=L.list.filter(function(o){ return o.balance>0.005; }), tot=due.reduce(function(t,o){ return bonusR2(t+o.balance); },0);
+      el('bonusPayTitle').textContent='Record the year-end payment, '+fyLabel(fy); el('bonusPayInfo').textContent=due.length+' people have a balance, '+bonusM2(tot)+' in all. Each person is recorded as paid their balance on the date below.';
+      el('bonusPayAmtBox').style.display='none'; el('bonusPayHist').innerHTML=''; el('btnBonusPaySave').textContent='Record '+due.length+' payments ('+bonusM2(tot)+')';
+    } else {
+      var o=L.list.find(function(x){ return x.empId===mode.emp; }); if(!o) return;
+      el('bonusPayTitle').textContent='Bonus, '+o.name+' ('+o.code+'), '+fyLabel(fy); el('bonusPayInfo').textContent='Bonus '+bonusM2(o.total)+', paid '+bonusM2(o.paid)+', balance '+bonusM2(o.balance)+'.';
+      el('bonusPayAmtBox').style.display=''; el('bonusPayAmt').value=o.balance>0.005?o.balance:''; el('btnBonusPaySave').textContent='Save the payment';
+      renderBonusPayHist(fy,o.empId);
+    }
+    el('bonusPayModalBg').classList.add('show');
+  }
+  function renderBonusPayHist(fy, empId){
+    var ps=bonusPaymentsOf(fy,empId).slice().sort(function(a,b){ return a.date<b.date?-1:1; }), box=document.getElementById('bonusPayHist');
+    box.innerHTML=ps.length?('<div style="margin-top:.6rem"><b>Paid so far</b><table style="margin-top:.2rem"><thead><tr><th>Date</th><th class="right">Amount</th><th>By</th><th>Note</th><th></th></tr></thead><tbody>'+ps.map(function(p){ return '<tr><td>'+escapeHtml(pdfDate(p.date))+'</td><td class="right">'+bonusM2(p.amount)+'</td><td>'+escapeHtml(p.mode||'')+'</td><td>'+escapeHtml(p.note||'')+'</td><td>'+(canPay()?'<button class="btn small danger" data-bprem="'+escapeHtml(p.id)+'" type="button" aria-label="Remove this payment">Remove</button>':'')+'</td></tr>'; }).join('')+'</tbody></table></div>'):'';
+  }
+  async function bonusWritePayments(fy, o, list){
+    var id=fy+'_'+o.empId, doc={fy:fy, empId:o.empId, empCode:o.code||'', name:o.name||'', payments:list};
+    await db.doc('bonusPayments/'+id).set(doc); state.bonusPay=state.bonusPay||{}; state.bonusPay[id]=doc;
+  }
+  async function saveBonusPay(){
+    var el=function(i){ return document.getElementById(i); }, err=el('bonusPayErr'); err.textContent='';
+    if(!db){ err.textContent='Storage is not available, so nothing was saved.'; return; }
+    var fy=bpFy(), date=el('bonusPayDate').value, mode=el('bonusPayMode').value, note=el('bonusPayNote').value.trim(), L=bonusLedger(fy), who=(me&&(me.name||me.email))||'';
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){ err.textContent='Choose the date paid.'; return; }
+    var mk=function(amt){ return {id:'bp'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), date:date, amount:bonusR2(amt), mode:mode, note:note, by:who, at:Date.now()}; };
+    var btn=el('btnBonusPaySave'), old=btn.textContent; btn.disabled=true;
+    try{
+      if(bpMode.all){
+        var due=L.list.filter(function(o){ return o.balance>0.005; });
+        if(!due.length){ err.textContent='Nobody has a balance.'; btn.disabled=false; return; }
+        if(!confirm('Record '+due.length+' bonus payments of '+bonusM2(due.reduce(function(t,o){ return t+o.balance; },0))+' as paid on '+pdfDate(date)+'?')){ btn.disabled=false; return; }
+        for(var i=0;i<due.length;i++){ btn.textContent='Saving '+(i+1)+' of '+due.length+'...'; await bonusWritePayments(fy,due[i],bonusPaymentsOf(fy,due[i].empId).concat([mk(due[i].balance)])); }
+        toast(due.length+' payments recorded.');
+      } else {
+        var o=L.list.find(function(x){ return x.empId===bpMode.emp; }), amt=Number(el('bonusPayAmt').value);
+        if(!(amt>0)){ err.textContent='Enter the amount paid.'; btn.disabled=false; return; }
+        if(amt>o.balance+0.5 && !confirm('This is '+bonusM2(amt-o.balance)+' more than the balance of '+bonusM2(o.balance)+'. Record it anyway?')){ btn.disabled=false; return; }
+        await bonusWritePayments(fy,o,bonusPaymentsOf(fy,o.empId).concat([mk(amt)])); toast('Payment recorded.');
+      }
+      el('bonusPayModalBg').classList.remove('show'); renderCompliance();
+    }catch(e){ err.textContent=(e&&e.code==='42501')?'Only Accounts or an administrator can record bonus payments.':'Could not save the payment.'; }
+    btn.disabled=false; btn.textContent=old;
+  }
+  async function removeBonusPay(payId){
+    if(!canPay() || !bpMode || !bpMode.emp) return; var fy=bpFy(), L=bonusLedger(fy), o=L.list.find(function(x){ return x.empId===bpMode.emp; }); if(!o) return;
+    if(!confirm('Remove this payment from the record?')) return;
+    try{ await bonusWritePayments(fy,o,bonusPaymentsOf(fy,o.empId).filter(function(p){ return p.id!==payId; })); toast('Payment removed.'); openBonusPay({emp:o.empId}); renderCompliance(); }
+    catch(e){ toast('Could not remove the payment.'); }
+  }
+  (function(){
+    var c=document.getElementById('bonusPayClose'); if(!c) return;
+    c.addEventListener('click', function(){ document.getElementById('bonusPayModalBg').classList.remove('show'); });
+    document.getElementById('btnBonusPaySave').addEventListener('click', saveBonusPay);
+    document.getElementById('bonusPayHist').addEventListener('click', function(ev){ var b=ev.target.closest('[data-bprem]'); if(b) removeBonusPay(b.dataset.bprem); });
+  })();
   async function bonusFill(){
     var fy=cmpBonusFy||fyCodeOf(''), runs=bonusApprovedRuns(fy), done=0;
     for(var i=0;i<runs.length;i++){
@@ -7455,6 +7561,9 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       if(t.dataset.act==='editLic') openLicModal(t.dataset.id);
       if(t.dataset.act==='seedLic') seedLicences();
       if(t.dataset.act==='bonusFill') bonusFill();
+      if(t.dataset.act==='bonusPay') openBonusPay({emp:t.dataset.emp});
+      if(t.dataset.act==='bonusHist') openBonusPay({emp:t.dataset.emp});
+      if(t.dataset.act==='bonusPayAll') openBonusPay({all:true});
       if(t.dataset.act==='bonusCsv'){ var bl=bonusLedger(cmpBonusFy||fyCodeOf('')); saveCsvFile('bonus-ledger-'+bl.fy+'.csv', bonusLedgerCsv(bl)); }
       if(t.dataset.act==='gstCsv') saveCsvFile('gstr1-'+curGstMonth()+'.csv', gstr1Csv(gstr1Data(curGstMonth(),invoices,clients)));
     });
@@ -9464,6 +9573,10 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         var o={}; snap.docs.forEach(function(d){ var x=d.data(); if(x && x.ym) o[x.ym]={ym:x.ym, days:x.days||{}}; });
         state.holidays=o; var tb=document.getElementById('tab-attendance'); if(tb && tb.style.display!=='none') renderAttendance();
       }, function(){});
+      db.collection('bonusPayments').onSnapshot(function(snap){
+        var o={}; snap.docs.forEach(function(d){ var x=d.data(); if(x && x.fy && x.empId) o[d.id]=x; });
+        state.bonusPay=o; var tb=document.getElementById('tab-compliance'); if(tb && tb.style.display!=='none' && cmpTab==='bonus') renderCompliance();
+      }, function(){});
       db.collection('payslipLog').onSnapshot(function(snap){
         var o={}; snap.docs.forEach(function(d){ var x=d.data(); if(x && x.empId && x.ym && x.channel==='whatsapp') o[x.empId+'|'+x.ym]=x; });
         slipLog=o; cycRefresh();
@@ -9536,6 +9649,20 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     for(var i=0;i<ks.length;i++){ var rc=rateCards.find(function(r){ return r.id===ks[i].rateCardId; }); if(rc && rc.format==='ka' && findRcRole(rc,e.role,e.dutyHrs)) return rc; }
     return null;
   }
+  // the special allowance of the client's rate card (new structure), for the days billed: paid with the payroll as an additional pay line, so that Payroll and the wage register agree
+  function autoSpecialLine(e, ym, bdays, dim){
+    var st=state.settings||{}; if(st.autoSpecial===false || e.specialApplicable===false) return null;
+    var card=billingCardOf(e); if(!card) return null; var sp=Number(card.special)||0; if(!(sp>0)) return null;
+    var div=(card.billBasis==='perday')?(Number(card.days)||26):dim, amt=kaR2(sp*(bdays/div)); if(!(amt>0)) return null;
+    return {type:'Allowance', amount:amt, note:'Special allowance', stat:false, auto:true};
+  }
+  // a person who gets it automatically and also has it typed in as additional pay would be paid twice
+  function autoSpecialDup(e, ym){
+    var st=state.settings||{}; if(st.autoSpecial===false || e.specialApplicable===false) return '';
+    var card=billingCardOf(e); if(!card || !(Number(card.special)>0)) return '';
+    var dup=addLinesOf(extrasMap[e.id+'|'+ym]||{}).filter(function(a){ return /special/i.test(String(a.type||'')+' '+String(a.note||'')); })[0];
+    return dup?('The special allowance of the client\'s rate card is added automatically, and this person also has the additional pay "'+addPayLabel(dup)+'". Remove one of them, or the allowance is paid twice.'):'';
+  }
   // a person whose pay type does not follow how the client is billed: per day needs a daily wage, a fixed monthly amount needs a monthly wage
   function payBasisMismatch(e){
     var rc=billingCardOf(e); if(!rc) return '';
@@ -9559,6 +9686,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       var basicEarned=r.struct ? ((r.basicPay||0)+(r.daPay||0)) : ((r.gross||0)-(r.otPay||0)-(r.nightPay||0)-(r.addPay||0))*empBasicPct(e,st)/100;
       if(e.pfApplicable && st.pfCeilingEnabled && basicEarned>pfCeilNow()) add('warn','Basic pay is above the PF wage ceiling. PF is limited to '+fmtMoney(pfCeilNow()*(st.pfRate||12)/100)+'.');
       var bm=payBasisMismatch(e); if(bm) add('warn',bm);
+      var sd=autoSpecialDup(e,ym); if(sd) add('warn',sd);
       if((r.otHrs||0)>(st.otWarnHours||50)) add('warn','Overtime of '+r.otHrs+' hours is unusually high.');
       if(((r.extraDuty||0)+(r.holidayDuty||0))>XD_WARN) add('warn','Extra duty and holiday work of '+dutyNum((r.extraDuty||0)+(r.holidayDuty||0))+' duties in the month is unusually high. Please check the days marked.');
       var acct=String(e.bankAcc||'').replace(/\s/g,''); if(acct) (seen[acct]=seen[acct]||[]).push(r.name);
@@ -9637,6 +9765,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     h+='<div class="card"><div class="row" style="justify-content:space-between;align-items:center"><p class="muted" style="margin:0;max-width:64ch">Pay is worked out from each wage amount and the attendance, plus overtime and night shifts. PF, ESI and professional tax rates come from Settings.</p>'+
       (closed?'':'<button class="btn" data-cyc="calc">'+(r&&r.rows?'Recalculate payroll':'Calculate payroll for '+escapeHtml(xMonthLabel(ym)))+'</button>')+'</div></div>';
     if(!(r&&r.rows&&r.rows.length)) return h+'<div class="card"><p class="muted" style="margin:0"><b>Payroll not calculated yet.</b> Calculate to see gross pay, deductions and net pay for each employee.</p></div>';
+    var spN=0, spT=0; r.rows.forEach(function(x){ (x.addLines||[]).forEach(function(a){ if(a.auto){ spN++; spT+=Number(a.amount)||0; } }); });
+    if(spN) h+='<div class="banner"><div><b>Special allowance added for '+spN+' '+(spN>1?'people':'person')+', '+fmtMoney(spT)+' in all.</b> It comes from the rate card of their client and is paid as additional pay, for the days billed, so that Payroll and the wage register agree. It is not part of PF, ESI or professional tax. To stop it for one person, untick "Special allowance applicable" in the employee record; to stop it for everyone, untick it in Settings.</div></div>';
     return h+'<div class="card">'+cycRowsTable(r.rows,cycTotals(r.rows))+'</div>';
   };
 
@@ -9909,7 +10039,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     document.getElementById('setBillExtra').checked=s.billExtraDuty!==false;
     document.getElementById('setHolidayMult').value=s.holidayMult>0?s.holidayMult:1;
     document.getElementById('setBonusPct').value=bonusCfg().pct; document.getElementById('setBonusCeil').value=bonusCfg().ceiling;
-    document.getElementById('setSlipLayout').value=(s.payslipLayout==='simple')?'simple':'form'; document.getElementById('setSlipHeading').value=s.slipHeading||'';
+    document.getElementById('setSlipLayout').value=(s.payslipLayout==='simple')?'simple':'form'; document.getElementById('setSlipHeading').value=s.slipHeading||''; document.getElementById('setAutoSpecial').checked=(s.autoSpecial!==false);
   }
   function setupCycleSettings(){
     var b=document.getElementById('btnSaveCycSettings'); if(!b) return;
@@ -9922,7 +10052,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       s.billExtraDuty=document.getElementById('setBillExtra').checked;
       s.holidayMult=Number(document.getElementById('setHolidayMult').value)>0?Number(document.getElementById('setHolidayMult').value):1;
       var bp=document.getElementById('setBonusPct').value, bc=document.getElementById('setBonusCeil').value; s.bonus={pct:bp===''?8.33:Math.max(0,Number(bp)||0), ceiling:bc===''?15000:Math.max(0,Number(bc)||0)};
-      s.payslipLayout=(document.getElementById('setSlipLayout').value==='simple')?'simple':'form'; s.slipHeading=document.getElementById('setSlipHeading').value.trim();
+      s.payslipLayout=(document.getElementById('setSlipLayout').value==='simple')?'simple':'form'; s.slipHeading=document.getElementById('setSlipHeading').value.trim(); s.autoSpecial=document.getElementById('setAutoSpecial').checked;
       if(!db){ toast('Storage unavailable.'); return; }
       try{ await db.doc('settings/config').set(s); toast('Saved. Recalculate payroll to apply.'); }catch(e){ toast('Could not save: '+(e&&e.code||'')); }
     });
