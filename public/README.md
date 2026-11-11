@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-Under the name at the top of the left menu a small line reads, for example, "Version: 9 Nov 2026, build 27". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+Under the name at the top of the left menu a small line reads, for example, "Version: 10 Nov 2026, build 28". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -975,7 +975,7 @@ Different clients get different services, so the SAC code (and the description o
 
 
 ## One version line
-The page used to show two version lines: an old one under the name ("Build 5 Nov 2026 · 44", which was never updated) and the real one at the bottom of the menu. The old one is removed. There is now a single line, **under "Public Force" at the top of the left menu**, such as "Version: 9 Nov 2026, build 27". It is the line to check after an upload (press Ctrl + Shift + R first): if it shows an older build, the new file is not live yet.
+The page used to show two version lines: an old one under the name ("Build 5 Nov 2026 · 44", which was never updated) and the real one at the bottom of the menu. The old one is removed. There is now a single line, **under "Public Force" at the top of the left menu**, such as "Version: 10 Nov 2026, build 28". It is the line to check after an upload (press Ctrl + Shift + R first): if it shows an older build, the new file is not live yet.
 
 
 ## Paying the bonus at the year end (bonus ledger)
@@ -1002,3 +1002,29 @@ Only people at a client whose rate card is billed per day are listed (use the Si
 
 ## Rate card PDFs made on the phone
 Every rate card PDF made in the phone app (download, share and email) is now the **computer-generated version**: no signature image, no signatory line, and the line "This is a computer-generated rate card and does not require a signature." The rate card downloaded in the main system still carries the signature.
+
+
+## Site locations, Map and Directions links, and the Dashboard map
+
+### Giving a site its location
+**Dashboard, the "By site" table, column Location: "Set location"** (or **Edit** once it has one). The window accepts any of these, and shows what it understood before you save:
+- a **Google Maps link** that has the place in it (the address bar of a place opened in Google Maps: it contains an @ and two numbers, or !3d..!4d.., or ?q=latitude,longitude);
+- **coordinates**, for example `13.0827, 77.5877` (in Google Maps, right-click the place and click the numbers to copy them);
+- the phone's own position: **Use my location**, pressed on a phone standing at the site;
+- an **address**: the Map and Directions links then work, but there is no pin on the map until coordinates are added.
+A short link (maps.app.goo.gl) cannot be read: the window says how to get the full one. An optional **address or landmark** is shown on the pin. **Remove the location** deletes it. Anyone who can edit can set a location. Locations are kept in the collection `siteLocations` and are part of the backup.
+
+### Map and Directions links
+Wherever a site is shown, a small **Map · Directions** pair appears when the site has a location: the Dashboard table, the Employees list, the Contracts list, and under the Site box of Attendance and of the Duty Roster. They open Google Maps (the place, or the route to it) in a new tab. This needs no account, no key and costs nothing.
+
+### The Dashboard map
+A **Site map** card (OpenStreetMap, free, no key, no billing) shows a pin for every site that has coordinates, for people who can edit. **Click a pin** for the site, its client, the note, how it is staffed, the overdue amount if any, and Directions and Open in Google Maps. Colours: **green** fully staffed, **amber** short of staff, **red** nobody deployed, **grey** no requirement set; a **dark ring** means the client has an overdue invoice. A line under the map names the sites that have no pin yet.
+- **"Required"** for a site is the day plus night requirement set for the Duty Roster (Settings), or if there is none the number of people in the positions of its contracts. **Deployed** is the number of active employees at the site (it is not today's attendance). The "By site" table now lists every site, also those with nobody deployed, with a coloured dot, the Required number and the location links.
+- **The ring is by client**, because invoices are not made per site: every site of a client with an overdue invoice has it. The rule is the one of the Overdue count (not paid, due date passed).
+- The map libraries and the map tiles are loaded from the internet only when the Dashboard is shown, so the map needs internet access. Without it the card says so and the table still works. It does not appear in the preview made inside Claude, only on your own site.
+
+### Upload `public/_headers` too
+Your site's `_headers` file had **`geolocation=()`**, which stops "Use my location" from working. It is now **`geolocation=(self)`**, which allows it for your own site only. Upload `public/_headers` with `public/index.html`, or the button will say the location was not allowed (pasting a link or coordinates still works). The map tiles send only the site's address as the referrer, as OpenStreetMap requires.
+
+### Please note
+Client premises and where guards are posted are sensitive. The map and the location boxes are for people who can edit only, and the site stays behind the sign-in. OpenStreetMap's servers see which part of the map is looked at, and the address of the viewer, as any website that shows a map.

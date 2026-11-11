@@ -365,7 +365,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 <body>
 <div class="appshell">
   <nav class="side" id="sideNav">
-    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="buildTag" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Version: 9 Nov 2026, build 27</small></div></div>
+    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="buildTag" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Version: 10 Nov 2026, build 28</small></div></div>
     <div class="grp">Menu</div>
     <button class="navbtn on" id="tabs-dashboard" data-tab="dashboard">Dashboard</button>
     <button class="navbtn" id="tabs-cycle" data-tab="cycle">Pay cycle</button>
@@ -403,6 +403,11 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         <div class="stat"><b id="statMonth">—</b><span>Current payroll month</span></div>
       </div>
       <div class="banner">This tool gives simplified PF/ESI/Professional Tax estimates for planning. Always confirm exact figures with your CA or the official EPFO/ESIC/state portals before finalizing real payroll and filings.</div>
+    </div>
+    <div class="card" id="siteMapCard" style="display:none">
+      <div class="row" style="justify-content:space-between;align-items:center;gap:1rem"><h2 style="margin:0">Site map</h2><div class="muted" id="siteMapLegend" style="font-size:.8rem"></div></div>
+      <div id="siteMap" style="height:380px;margin-top:.6rem;border-radius:12px;overflow:hidden;background:var(--bg)"></div>
+      <p class="muted" id="siteMapNote" style="margin:.5rem 0 0;font-size:.8rem"></p>
     </div>
     <div class="card">
       <h2>By site</h2>
@@ -453,7 +458,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       <h2>Attendance</h2>
       <div class="row">
         <div class="field"><label>Month</label><input type="month" id="attMonth"></div>
-        <div class="field"><label>Site</label><select id="attSiteFilter"><option value="">All sites</option></select></div>
+        <div class="field"><label>Site</label><select id="attSiteFilter"><option value="">All sites</option></select><div id="attSiteMap" class="muted" style="font-size:.8rem;min-height:1.1em"></div></div>
       </div>
       <p class="muted">Click a day cell to cycle: Present → Absent (unpaid) → Half-day → Paid Leave → 1.5 duties → 2 duties → Present. Unmarked days count as Present. Use Paid Leave for approved vacation/earned leave that should NOT cut their pay. Use 1.5 or 2 duties when someone worked more than one duty that day: each extra duty is paid as an extra day at the normal daily rate, and shows as a violet cell with the number of duties. Days that are a person's weekly off, or a company holiday for them, show with stripes and are paid as part of the wage. On those days click once for worked (the holiday is paid and one extra duty is added, shown as "Holiday work" on the payslip), twice for half a day worked, three times for absent (the holiday is not paid), and again to go back to a paid day off.</p>
       <div id="attKey" class="muted" style="display:flex;flex-wrap:wrap;gap:.9rem;align-items:center;margin:.2rem 0 .7rem;font-size:.8rem"><span><span class="daycell P" style="cursor:default">P</span> present</span><span><span class="daycell A" style="cursor:default">A</span> absent</span><span><span class="daycell H" style="cursor:default">H</span> half day</span><span><span class="daycell L" style="cursor:default">L</span> paid leave</span><span><span class="daycell D" data-duty="2" style="cursor:default">D</span> extra duty</span><span><span class="daycell hol" style="cursor:default">2</span> company holiday (red mark)</span><span><span class="daycell off" style="cursor:default">4</span> weekly off or holiday that is a paid day off for the person</span></div>
@@ -506,7 +511,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       <p class="muted">Plan who's on duty before the day happens — separate from Attendance, which records who actually showed up. Click a cell to cycle: Unscheduled → Day shift → Night shift → Off → Unscheduled.</p>
       <div class="row">
         <div class="field"><label>Month</label><input type="month" id="rosterMonth"></div>
-        <div class="field"><label>Site *</label><select id="rosterSite"></select></div>
+        <div class="field"><label>Site *</label><select id="rosterSite"></select><div id="rosterSiteMap" class="muted" style="font-size:.8rem;min-height:1.1em"></div></div>
       </div>
       <div class="scrollx" id="rosterContainer"></div>
       <div class="empty-state" id="rosterEmpty" style="display:none">Add employees to this site first, or choose a different site.</div>
@@ -1407,6 +1412,19 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   </div>
 </div>
 
+<div class="modal-bg" id="siteLocModalBg">
+  <div class="modal" style="max-width:620px">
+    <button class="close-x" id="siteLocClose">&times;</button>
+    <h3 id="siteLocTitle">Location of the site</h3>
+    <p class="muted">Paste a Google Maps link, or the coordinates (for example 13.0827, 77.5877), or an address. With coordinates the site gets a pin on the map; with an address only, the Map and Directions links work but there is no pin. On a phone, standing at the site, press <b>Use my location</b>.</p>
+    <div class="field"><label for="siteLocText">Location</label><textarea id="siteLocText" rows="2" placeholder="https://www.google.com/maps/place/.../@13.0827,77.5877,17z   or   13.0827, 77.5877   or   an address"></textarea></div>
+    <div class="row" style="gap:.5rem;align-items:center"><button class="btn small ghost" id="btnSiteLocGps" type="button">Use my location</button><span id="siteLocPreview" class="muted" style="font-size:.84rem"></span></div>
+    <div class="field" style="margin-top:.6rem"><label for="siteLocAddr">Address or landmark (optional, shown on the pin)</label><input id="siteLocAddr" placeholder="e.g. Gate 2, Devanahalli, contact: Mr Rao"></div>
+    <div id="siteLocErr" style="color:var(--bad);min-height:1.3em;margin-top:.4rem" role="alert"></div>
+    <div class="row" style="justify-content:space-between"><button class="btn danger ghost" id="btnSiteLocRemove" type="button">Remove the location</button><button class="btn" id="btnSiteLocSave" type="button">Save the location</button></div>
+  </div>
+</div>
+
 <div class="modal-bg" id="mailModalBg">
   <div class="modal" style="max-width:660px">
     <button class="close-x" id="mailModalClose">&times;</button>
@@ -1854,8 +1872,136 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         document.body.classList.remove('menu');
         if(b.dataset.tab==='cycle'){ renderCycle(); }
         if(b.dataset.tab==='payroll'){ renderPayroll(); }   // so changes made in Attendance show up when the tab is opened
+        if(b.dataset.tab==='dashboard'){ drawSiteMap(); }
+        refreshSiteLinks();
       });
     });
+  }
+
+  /* ---------- where the sites are: a location for each site, links to Google Maps, and a map on the Dashboard ---------- */
+  var SITE_COLORS={ok:'#2E9E6A', short:'#E5A00D', none:'#D64545', unknown:'#8A8F98'};
+  var slSite='', siteMapObj=null, leafletP=null;
+  function siteKey(site){ return encodeURIComponent(String(site||'')).replace(/%/g,'_').slice(0,150); }
+  function siteLocOf(site){ return (state.siteLoc||{})[site]||null; }
+  // what was typed or pasted: a Google Maps link, "lat, lng", or an address
+  function parseSiteLocation(text){
+    var t=String(text||'').trim(); if(!t) return {empty:true};
+    var num=function(x){ return Math.round(Number(x)*1e6)/1e6; }, ok=function(a,b){ return isFinite(a)&&isFinite(b)&&Math.abs(a)<=90&&Math.abs(b)<=180; };
+    if(/^https?:\/\//i.test(t)){
+      var u=t, dec=u; try{ dec=decodeURIComponent(u); }catch(e){}
+      var m=/@(-?\d+(?:\.\d+)?),(-?\d+(?:\.\d+)?)/.exec(dec)||/!3d(-?\d+(?:\.\d+)?)!4d(-?\d+(?:\.\d+)?)/.exec(dec)||/[?&](?:q|query|ll|destination|center)=(-?\d+(?:\.\d+)?)[,+ ]\s*(-?\d+(?:\.\d+)?)/.exec(dec);
+      if(m && ok(Number(m[1]),Number(m[2]))) return {lat:num(m[1]), lng:num(m[2])};
+      if(/(^|\/\/)(maps\.app\.goo\.gl|goo\.gl)\//i.test(u)) return {error:'A short link cannot be read here. Open it in your browser, then copy the full address from the address bar (it contains an @ and two numbers), or right-click the place in Google Maps and click the numbers to copy them.'};
+      var q=/[?&](?:q|query)=([^&]+)/.exec(u); if(q){ try{ return {address:decodeURIComponent(q[1].replace(/\+/g,' '))}; }catch(e){} }
+      return {error:'No coordinates were found in this link. Open the place in Google Maps and copy the address from the address bar, or paste the coordinates.'};
+    }
+    var c=/^(-?\d{1,3}(?:\.\d+)?)\s*[, ]\s*(-?\d{1,3}(?:\.\d+)?)$/.exec(t);
+    if(c){ if(ok(Number(c[1]),Number(c[2]))) return {lat:num(c[1]), lng:num(c[2])}; return {error:'These numbers are not a latitude and a longitude (latitude is between -90 and 90, longitude between -180 and 180).'}; }
+    return {address:t};
+  }
+  function siteMapUrl(loc){ if(!loc) return ''; if(loc.lat!=null) return 'https://www.google.com/maps/search/?api=1&query='+loc.lat+','+loc.lng; return loc.address?'https://www.google.com/maps/search/?api=1&query='+encodeURIComponent(loc.address):''; }
+  function siteDirUrl(loc){ if(!loc) return ''; if(loc.lat!=null) return 'https://www.google.com/maps/dir/?api=1&destination='+loc.lat+','+loc.lng; return loc.address?'https://www.google.com/maps/dir/?api=1&destination='+encodeURIComponent(loc.address):''; }
+  // "Map · Directions" next to a site name, when the site has a location
+  function siteLinksHtml(site){
+    var loc=siteLocOf(site), a=siteMapUrl(loc); if(!a) return '';
+    return ' <span class="muted" style="font-size:.78rem;white-space:nowrap"><a href="'+a+'" target="_blank" rel="noopener" title="Open in Google Maps">Map</a> &middot; <a href="'+siteDirUrl(loc)+'" target="_blank" rel="noopener" title="Directions in Google Maps">Directions</a></span>';
+  }
+  function refreshSiteLinks(){
+    [['attSiteFilter','attSiteMap'],['rosterSite','rosterSiteMap']].forEach(function(p){
+      var sel=document.getElementById(p[0]), box=document.getElementById(p[1]); if(!sel||!box) return;
+      var v=sel.value; box.innerHTML=v?siteLinksHtml(v).replace(/^ /,''):'';
+    });
+  }
+  // ---- the window for one site
+  function openSiteLoc(site){
+    if(!(me && me.canEdit)){ toast('Only people who can edit can set a site location.'); return; }
+    slSite=site; var loc=siteLocOf(site)||{}, el=function(i){ return document.getElementById(i); };
+    el('siteLocTitle').textContent='Location of '+site; el('siteLocText').value=loc.lat!=null?(loc.lat+', '+loc.lng):(loc.address||''); el('siteLocAddr').value=(loc.lat!=null&&loc.address)?loc.address:'';
+    el('siteLocErr').textContent=''; el('btnSiteLocRemove').style.display=siteLocOf(site)?'':'none'; siteLocPreview(); el('siteLocModalBg').classList.add('show');
+  }
+  function siteLocPreview(){
+    var r=parseSiteLocation(document.getElementById('siteLocText').value), box=document.getElementById('siteLocPreview'), esc=escapeHtml;
+    if(r.empty) box.innerHTML=''; else if(r.error) box.innerHTML='<span style="color:var(--bad)">'+esc(r.error)+'</span>';
+    else if(r.lat!=null) box.innerHTML='Found: <b>'+r.lat+', '+r.lng+'</b> &middot; <a href="'+siteMapUrl(r)+'" target="_blank" rel="noopener">check it in Google Maps</a>';
+    else box.innerHTML='An address only: the Map and Directions links work, but there is no pin on the map until coordinates are added.';
+  }
+  async function saveSiteLoc(){
+    var el=function(i){ return document.getElementById(i); }, err=el('siteLocErr'); err.textContent='';
+    if(!db){ err.textContent='Storage is not available, so nothing was saved.'; return; }
+    var r=parseSiteLocation(el('siteLocText').value); if(r.empty){ err.textContent='Enter the location, or use "Remove the location".'; return; } if(r.error){ err.textContent=r.error; return; }
+    var addr=el('siteLocAddr').value.trim(), doc={site:slSite, address:r.lat!=null?addr:(r.address||''), by:(me&&(me.name||me.email))||'', at:Date.now()};
+    if(r.lat!=null){ doc.lat=r.lat; doc.lng=r.lng; }
+    try{ await db.doc('siteLocations/'+siteKey(slSite)).set(doc); state.siteLoc=state.siteLoc||{}; state.siteLoc[slSite]=doc; el('siteLocModalBg').classList.remove('show'); toast('Location saved.'); siteViewsRefresh(); }
+    catch(e){ err.textContent='Could not save the location.'; }
+  }
+  async function removeSiteLoc(){
+    if(!db || !slSite) return; if(!confirm('Remove the location of '+slSite+'?')) return;
+    try{ await db.doc('siteLocations/'+siteKey(slSite)).delete(); if(state.siteLoc) delete state.siteLoc[slSite]; document.getElementById('siteLocModalBg').classList.remove('show'); toast('Location removed.'); siteViewsRefresh(); }
+    catch(e){ toast('Could not remove the location.'); }
+  }
+  function siteViewsRefresh(){ renderDashboard(); if(typeof renderEmployeeTable==='function') renderEmployeeTable(); if(typeof renderContracts==='function') renderContracts(); refreshSiteLinks(); }
+  (function(){
+    var c=document.getElementById('siteLocClose'); if(!c) return;
+    c.addEventListener('click', function(){ document.getElementById('siteLocModalBg').classList.remove('show'); });
+    document.getElementById('siteLocText').addEventListener('input', siteLocPreview);
+    ['attSiteFilter','rosterSite'].forEach(function(id){ var x=document.getElementById(id); if(x) x.addEventListener('change', function(){ setTimeout(refreshSiteLinks,0); }); });
+    document.getElementById('btnSiteLocSave').addEventListener('click', saveSiteLoc);
+    document.getElementById('btnSiteLocRemove').addEventListener('click', removeSiteLoc);
+    document.getElementById('btnSiteLocGps').addEventListener('click', function(){
+      var err=document.getElementById('siteLocErr'); err.textContent='';
+      if(!navigator.geolocation){ err.textContent='This device cannot give its location. Paste a link or the coordinates instead.'; return; }
+      navigator.geolocation.getCurrentPosition(function(pos){ document.getElementById('siteLocText').value=pos.coords.latitude.toFixed(6)+', '+pos.coords.longitude.toFixed(6); siteLocPreview(); },
+        function(){ err.textContent='The location was not allowed or could not be found. Allow location for this site in the browser, or paste a link or the coordinates.'; }, {enableHighAccuracy:true, timeout:15000});
+    });
+  })();
+  // ---- the status of each site, for the colour of its pin and its row
+  function siteStatusData(){
+    var today=new Date().toISOString().slice(0,10), req=(state.settings&&state.settings.siteRequirements)||{}, out={};
+    allSites().forEach(function(site){
+      var deployed=state.employees.filter(function(e){ return e.active!==false && e.site===site; }).length, cs=contracts.filter(function(k){ return k.site===site; });
+      var r=req[site]||{}, need=(Number(r.day)||0)+(Number(r.night)||0);
+      if(!need) need=cs.reduce(function(t,k){ return t+(k.positions||[]).reduce(function(a,x){ return a+(Number(x.count)||0); },0); },0);
+      var cids={}, names={}; cs.forEach(function(k){ cids[k.clientId]=1; var c=clients.find(function(x){ return x.id===k.clientId; }); if(c&&c.name) names[c.name]=1; });
+      var overdue=invoices.filter(function(i){ return cids[i.clientId] && i.status!=='paid' && i.dueDate && i.dueDate<today; }).reduce(function(t,i){ return t+(Number(i.total)||0); },0);
+      var st=!need?'unknown':(deployed===0?'none':(deployed<need?'short':'ok'));
+      out[site]={site:site, deployed:deployed, need:need, status:st, color:SITE_COLORS[st], clients:Object.keys(names), overdue:overdue};
+    });
+    return out;
+  }
+  var SITE_STATUS_TEXT={ok:'Fully staffed', short:'Short of staff', none:'Nobody deployed', unknown:'No requirement set'};
+  function siteDot(color){ return '<span style="display:inline-block;width:.7rem;height:.7rem;border-radius:50%;background:'+color+';margin-right:.4rem;vertical-align:-1px"></span>'; }
+  // Leaflet and OpenStreetMap are loaded only when the map is shown, and only on a site with internet access
+  function ensureLeaflet(){
+    if(window.L && window.L.map) return Promise.resolve(window.L);
+    if(leafletP) return leafletP;
+    leafletP=new Promise(function(res,rej){
+      var css=document.createElement('link'); css.rel='stylesheet'; css.href='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css'; document.head.appendChild(css);
+      var sc=document.createElement('script'); sc.src='https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js'; var t=setTimeout(function(){ rej(new Error('timeout')); },10000);
+      sc.onload=function(){ clearTimeout(t); window.L&&window.L.map?res(window.L):rej(new Error('no map')); }; sc.onerror=function(){ clearTimeout(t); rej(new Error('blocked')); }; document.head.appendChild(sc);
+    }).catch(function(e){ leafletP=null; throw e; });
+    return leafletP;
+  }
+  function drawSiteMap(){
+    var card=document.getElementById('siteMapCard'); if(!card) return;
+    var allowed=!!(me && me.canEdit) && allSites().length>0; card.style.display=allowed?'':'none'; if(!allowed) return;
+    var dash=document.getElementById('tab-dashboard'); if(dash && dash.style.display==='none') return;
+    var data=siteStatusData(), located=allSites().filter(function(s){ var l=siteLocOf(s); return l && l.lat!=null; }), el=document.getElementById('siteMap'), note=document.getElementById('siteMapNote');
+    document.getElementById('siteMapLegend').innerHTML=[['ok','Fully staffed'],['short','Short of staff'],['none','Nobody deployed'],['unknown','No requirement set']].map(function(x){ return siteDot(SITE_COLORS[x[0]])+x[1]; }).join(' &nbsp; ')+' &nbsp; <span style="border:2px solid #222;border-radius:50%;display:inline-block;width:.7rem;height:.7rem;vertical-align:-2px"></span> client has an overdue invoice';
+    var missing=allSites().filter(function(s){ return !(siteLocOf(s)&&siteLocOf(s).lat!=null); });
+    note.textContent=missing.length?(missing.length+' site'+(missing.length>1?'s have':' has')+' no pin yet: '+missing.slice(0,6).join(', ')+(missing.length>6?', ...':'')+'. Use "Set location" in the table below.'):'';
+    if(!located.length){ if(siteMapObj){ siteMapObj.remove(); siteMapObj=null; } el.innerHTML='<p class="muted" style="padding:1rem">No site has a location yet. Use "Set location" in the table below: paste a Google Maps link, coordinates, or press "Use my location" at the site.</p>'; return; }
+    ensureLeaflet().then(function(L){
+      if(siteMapObj){ siteMapObj.remove(); siteMapObj=null; } el.innerHTML=''; var map=siteMapObj=L.map(el,{scrollWheelZoom:false}), pts=[];
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19, referrerPolicy:'strict-origin-when-cross-origin', attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}   /* OpenStreetMap asks for a referrer: only the site's address is sent */).addTo(map);
+      located.forEach(function(site){
+        var loc=siteLocOf(site), d=data[site], ring=d.overdue>0;
+        var m=L.circleMarker([loc.lat,loc.lng],{radius:10, color:ring?'#111':'#fff', weight:ring?4:2, fillColor:d.color, fillOpacity:.95}).addTo(map);
+        m.bindPopup('<b>'+escapeHtml(site)+'</b><br>'+(d.clients.length?escapeHtml(d.clients.join(', '))+'<br>':'')+(loc.address?escapeHtml(loc.address)+'<br>':'')+siteDot(d.color)+SITE_STATUS_TEXT[d.status]+(d.need?': '+d.deployed+' of '+d.need:' ('+d.deployed+' deployed)')+(ring?'<br>Overdue invoices of the client: '+fmtMoney(d.overdue):'')+'<br><a href="'+siteDirUrl(loc)+'" target="_blank" rel="noopener">Directions</a> &middot; <a href="'+siteMapUrl(loc)+'" target="_blank" rel="noopener">Open in Google Maps</a>');
+        pts.push([loc.lat,loc.lng]);
+      });
+      if(pts.length===1) map.setView(pts[0],15); else map.fitBounds(pts,{padding:[30,30],maxZoom:16});
+      setTimeout(function(){ try{ map.invalidateSize(); }catch(e){} },200);
+    }).catch(function(){ el.innerHTML='<p class="muted" style="padding:1rem">The map could not be loaded here: it needs internet access to the map libraries and to OpenStreetMap. The table below still has every site, with its Map and Directions links.</p>'; });
   }
 
   // ---------- DASHBOARD ----------
@@ -1872,17 +2018,20 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     document.getElementById('statWageBill').textContent = fmtMoney(bill);
     document.getElementById('statMonth').textContent = thisMonth();
 
-    var html = '<table><thead><tr><th>Site</th><th class="right">Employees</th><th class="right">Est. wage bill</th></tr></thead><tbody>';
-    Object.keys(sites).sort().forEach(function(s){
-      var siteEmps = active.filter(function(e){return (e.site||'Unassigned')===s;});
+    var sd=siteStatusData(), names={}; Object.keys(sites).forEach(function(k){ names[k]=1; }); allSites().forEach(function(k){ names[k]=1; });
+    var html = '<table><thead><tr><th>Site</th><th class="right">Employees</th><th class="right">Required</th><th class="right">Est. wage bill</th><th>Location</th></tr></thead><tbody>';
+    Object.keys(names).sort().forEach(function(s){
+      var siteEmps = active.filter(function(e){return (e.site||'Unassigned')===s;}), d=sd[s];
       var siteBill = siteEmps.reduce(function(sum,e){
         if(e.wageType==='daily') return sum+(Number(e.wageAmount)||0)*26;
         return sum+(Number(e.wageAmount)||0);
-      },0);
-      html += '<tr><td>'+escapeHtml(s)+'</td><td class="right">'+sites[s]+'</td><td class="right">'+fmtMoney(siteBill)+'</td></tr>';
+      },0), loc=siteLocOf(s), canSet=!!(me&&me.canEdit)&&s!=='Unassigned';
+      html += '<tr><td>'+(d?siteDot(d.color):'')+escapeHtml(s)+'</td><td class="right">'+(sites[s]||0)+'</td><td class="right">'+(d&&d.need?d.need:'<span class="muted">-</span>')+'</td><td class="right">'+fmtMoney(siteBill)+'</td><td>'+(loc?siteLinksHtml(s).replace(/^ /,''):'')+(canSet?(loc?' ':'')+'<button class="btn small ghost" data-siteloc="'+escapeHtml(s)+'" type="button">'+(loc?'Edit':'Set location')+'</button>':'')+'</td></tr>';
     });
     html += '</tbody></table>';
-    document.getElementById('siteBreakdown').innerHTML = Object.keys(sites).length? html : '<p class="muted">No employees yet.</p>';
+    var box=document.getElementById('siteBreakdown'); box.innerHTML = Object.keys(names).length? html : '<p class="muted">No employees yet.</p>';
+    box.querySelectorAll('[data-siteloc]').forEach(function(b){ b.addEventListener('click', function(){ openSiteLoc(b.dataset.siteloc); }); });
+    drawSiteMap();
   }
 
   function escapeHtml(s){ var d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
@@ -1912,7 +2061,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     return Object.keys(set).sort();
   }
 
-  function renderSiteFilters(){
+  function renderSiteFilters(){ setTimeout(refreshSiteLinks,0);
     var sites = allSites();
     ['empSiteFilter','attSiteFilter'].forEach(function(id){
       var el=document.getElementById(id);
@@ -1961,7 +2110,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       var tr=document.createElement('tr');
       tr.innerHTML = '<td style="font-weight:700;color:var(--accent)">'+escapeHtml(e.empCode||'—')+'</td>'+
         '<td>'+escapeHtml(e.name)+(e.doj?'<div class="muted">Joined '+new Date(e.doj+'T00:00:00').toLocaleDateString('en-IN',{day:'2-digit',month:'short',year:'numeric'})+'</div>':'')+'</td>'+
-        '<td>'+escapeHtml(e.site||'—')+'</td>'+
+        '<td>'+escapeHtml(e.site||'—')+siteLinksHtml(e.site)+'</td>'+
         '<td>'+escapeHtml(e.state||'—')+'</td>'+
         '<td>'+escapeHtml(e.role||'—')+'</td>'+
         '<td>'+fmtMoney(e.wageAmount)+' / '+(e.wageType==='daily'?'day':'mo')+(e.payStd&&e.dutyHrs>8?'<div class="muted">'+e.dutyHrs+' hr duty</div>':'')+payPendingTag(e)+'</td>'+
@@ -6898,7 +7047,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       var st=contractStatus(k), need=contractNeed(k), vacn=contractVacancies(k), rc=rateCards.find(function(r){return r.id===k.rateCardId;});
       var tr=document.createElement('tr');
       tr.innerHTML='<td>'+escapeHtml(k.title||'')+'<div class="muted">'+escapeHtml(clientName(k.clientId))+'</div>'+((k.documents&&k.documents.length)?'<div class="muted">'+k.documents.length+' document'+(k.documents.length>1?'s':'')+' attached</div>':'')+'</td>'+
-        '<td>'+escapeHtml(k.site||'\u2014')+'</td>'+
+        '<td>'+escapeHtml(k.site||'\u2014')+siteLinksHtml(k.site)+'</td>'+
         '<td>'+xFmt(k.start)+'<div class="muted">to '+xFmt(k.end)+'</div></td>'+
         '<td>'+xTag((need-vacn)+' of '+need+' filled', vacn?'bad':'ok')+'</td>'+
         '<td>'+(Number(k.terms)||0)+' days<div class="muted">'+((k.billingBasis||'rate')==='costplus'?'Cost plus':'Per-post rate')+(rc?' \u00b7 '+escapeHtml(rc.name):'')+'</div></td>'+
@@ -9572,6 +9721,10 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       db.collection('holidays').onSnapshot(function(snap){
         var o={}; snap.docs.forEach(function(d){ var x=d.data(); if(x && x.ym) o[x.ym]={ym:x.ym, days:x.days||{}}; });
         state.holidays=o; var tb=document.getElementById('tab-attendance'); if(tb && tb.style.display!=='none') renderAttendance();
+      }, function(){});
+      db.collection('siteLocations').onSnapshot(function(snap){
+        var o={}; snap.docs.forEach(function(d){ var x=d.data(); if(x && x.site) o[x.site]=x; });
+        state.siteLoc=o; siteViewsRefresh();
       }, function(){});
       db.collection('bonusPayments').onSnapshot(function(snap){
         var o={}; snap.docs.forEach(function(d){ var x=d.data(); if(x && x.fy && x.empId) o[d.id]=x; });
