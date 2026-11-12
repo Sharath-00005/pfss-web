@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-Under the name at the top of the left menu a small line reads, for example, "Version: 10 Nov 2026, build 29". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+Under the name at the top of the left menu a small line reads, for example, "Version: 10 Nov 2026, build 31". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -975,7 +975,7 @@ Different clients get different services, so the SAC code (and the description o
 
 
 ## One version line
-The page used to show two version lines: an old one under the name ("Build 5 Nov 2026 · 44", which was never updated) and the real one at the bottom of the menu. The old one is removed. There is now a single line, **under "Public Force" at the top of the left menu**, such as "Version: 10 Nov 2026, build 29". It is the line to check after an upload (press Ctrl + Shift + R first): if it shows an older build, the new file is not live yet.
+The page used to show two version lines: an old one under the name ("Build 5 Nov 2026 · 44", which was never updated) and the real one at the bottom of the menu. The old one is removed. There is now a single line, **under "Public Force" at the top of the left menu**, such as "Version: 10 Nov 2026, build 31". It is the line to check after an upload (press Ctrl + Shift + R first): if it shows an older build, the new file is not live yet.
 
 
 ## Paying the bonus at the year end (bonus ledger)
@@ -1049,3 +1049,16 @@ A menu item **Monthly summary**: choose the month and read, or press **Download 
 - **Needs attention:** a plain list of what to check or fix: no payroll calculated for the month, a payroll not approved, invoices still in draft, a client with staff cost but **no invoice yet**, a client at a **loss or with a margin below 5%**, staff at a site not linked to any client, overdue invoices (the largest client and the oldest age), sites with **nobody deployed** or **short of staff**.
 - **Billing and margin by client:** as in Profit per client. **People and payroll:** people paid, gross, deductions, net pay, employer PF and ESI, the bonus accrued this month and for the year so far, and the status of each payroll. **Unpaid invoices today:** the ageing, and the clients with overdue invoices. **Cover at the sites:** the sites that are short.
 - **Limits:** the unpaid and overdue figures are as of today, because the system records whether an invoice is paid but not the date or the amount of the payment, so **what was collected in a particular month is not shown**. The figures for a month that has no calculated payroll are marked as not real yet.
+
+
+## Invoices of GST-exempt clients carry no GST
+For a client marked **GST exempt** (the client's window), an invoice now has **no GST anywhere**:
+- **In the invoice window** the GST % is 0 and locked, and the totals are the amount before tax, also when an invoice made before the client was marked exempt is opened again (it used to keep its 18%, and saving it stored a total with GST).
+- **Everywhere an invoice total is shown or added up** it is the amount without GST: the Invoices list (with a small "GST exempt" under the total), Outstanding and this month's total, the overdue and ageing figures, the search results, the Monthly summary, the amount named in the e-mail to the client, and the Invoice value and Rate in the GST return (Table 8, nil-rated or exempt). The PDF already did this.
+- **An invoice that was saved with GST** before the client was marked exempt is therefore shown without GST at once. Open it and press Save once to correct the stored amounts too (GST % 0, GST 0, total = the amount before tax).
+- The exemption is the client's **present** setting and applies to **all** of its invoices, as it already did on the PDF. If a client paid GST earlier and became exempt later, its earlier invoices also show without GST: tell me if the exemption should apply only from a date.
+- Invoices with the amounts typed by you are not changed: they show exactly what was typed.
+
+
+### Search results: clicking them works in every look (correction)
+The search results were shown, but a click on them did not always reach them. In the **Horizon** look the top bar clips what drops out of it, so most of the list could not be reached, and in the **Register** look the layers of the map on the Dashboard lay over the list. The list is now placed on the page itself, directly under the search box, above everything else and inside the screen, also on a phone, and the map keeps its layers inside its own card. Choosing a result opens that person, client, invoice, contract or rate card, or takes you to the site's row on the Dashboard, which is highlighted and brought into view.
