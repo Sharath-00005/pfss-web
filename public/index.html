@@ -181,6 +181,22 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
    Each look sets its own tokens, then the shared rules below use them.
    =================================================================================================== */
 .looksel{flex:none;display:flex;align-items:center;gap:8px}
+.gsearch{position:relative;flex:0 1 380px;min-width:160px}
+.gsearch input{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);font:inherit;font-size:14px}
+.gsearch input:focus{outline:2px solid var(--brand);outline-offset:1px;background:var(--surface)}
+.gsearch-list{position:absolute;left:0;right:0;top:calc(100% + 6px);max-height:70vh;overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;box-shadow:0 14px 40px rgba(17,27,46,.22);z-index:30;padding:6px}
+.gs-group{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);padding:8px 10px 3px;font-weight:700}
+.gs-item{display:block;width:100%;text-align:left;padding:7px 10px;border:0;border-radius:8px;background:transparent;color:var(--ink);cursor:pointer;font:inherit}
+.gs-item small{display:block;color:var(--muted);font-size:12px}
+.gs-item.on,.gs-item:hover{background:var(--brand-soft)}
+.gs-empty{padding:12px;color:var(--muted);font-size:14px}
+.trend-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1.2rem;margin-top:.8rem}
+.trend-grid h3{font-size:.95rem;margin:0 0 .3rem}
+.age-row{display:grid;grid-template-columns:110px 1fr 90px;gap:.5rem;align-items:center;font-size:.85rem;margin:.28rem 0}
+.age-bar{height:14px;border-radius:7px;background:var(--line2);overflow:hidden}.age-bar i{display:block;height:100%;border-radius:7px}
+.hl-row{animation:hlrow 2.4s ease-out}@keyframes hlrow{0%,60%{background:var(--signal)}100%{background:transparent}}
+.sum-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:.8rem}
+.sum-kpi{border:1px solid var(--line);border-radius:12px;padding:.8rem 1rem;background:var(--surface)}.sum-kpi b{display:block;font-size:1.35rem}.sum-kpi span{color:var(--muted);font-size:.82rem}.sum-kpi em{font-style:normal;font-size:.78rem}
 .looksel::before{content:"Look";font-size:12.5px;font-weight:600;color:var(--muted)}
 @media (max-width:900px){.looksel::before{display:none}}
 :root[data-look="horizon"]:not([data-look="register"]) .top .looksel::before{display:none}
@@ -365,7 +381,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 <body>
 <div class="appshell">
   <nav class="side" id="sideNav">
-    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="buildTag" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Version: 10 Nov 2026, build 28</small></div></div>
+    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="buildTag" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Version: 10 Nov 2026, build 29</small></div></div>
     <div class="grp">Menu</div>
     <button class="navbtn on" id="tabs-dashboard" data-tab="dashboard">Dashboard</button>
     <button class="navbtn" id="tabs-cycle" data-tab="cycle">Pay cycle</button>
@@ -378,6 +394,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <button class="navbtn" id="tabs-contracts" data-tab="contracts">Contracts</button>
     <button class="navbtn" id="tabs-invoicing" data-tab="invoicing">Invoicing</button>
     <button class="navbtn" id="tabs-compliance" data-tab="compliance">Compliance</button>
+    <button class="navbtn" id="tabs-summary" data-tab="summary" style="display:none">Monthly summary</button>
     <button class="navbtn" id="tabs-settings" data-tab="settings">Settings</button>
     <div class="grp" id="railTitle">Pay cycle</div>
     <ul class="rail" id="workflowRail"></ul>
@@ -387,6 +404,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <div class="top">
       <button class="burger" onclick="document.body.classList.toggle('menu')">&#9776;</button>
       <h1 id="pageTitle">Dashboard</h1>
+      <div class="gsearch"><input id="gsearch" type="search" placeholder="Search people, invoices, clients, sites   ( / )" autocomplete="off" aria-label="Search everything" role="combobox" aria-expanded="false" aria-controls="gsearchList"><div id="gsearchList" class="gsearch-list" role="listbox" style="display:none"></div></div>
       <div class="looksel"><select id="lookSel" aria-label="Choose a look" title="Choose a look"><option value="register">Register</option><option value="aurora">Aurora</option><option value="horizon">Horizon</option><option value="executive">Executive</option></select></div>
       <script>(function(){var s=document.getElementById("lookSel"),k="pfssLook",ok=["register","aurora","horizon","executive"];function set(v){if(ok.indexOf(v)<0)v="register";document.documentElement.setAttribute("data-look",v);s.value=v;}set(document.documentElement.getAttribute("data-look")||"aurora");s.addEventListener("change",function(){set(s.value);try{localStorage.setItem(k,s.value);}catch(e){}});})();</script>
     </div>
@@ -403,6 +421,16 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         <div class="stat"><b id="statMonth">—</b><span>Current payroll month</span></div>
       </div>
       <div class="banner">This tool gives simplified PF/ESI/Professional Tax estimates for planning. Always confirm exact figures with your CA or the official EPFO/ESIC/state portals before finalizing real payroll and filings.</div>
+    </div>
+    <div class="card" id="trendsCard" style="display:none">
+      <div class="row" style="justify-content:space-between;align-items:center;gap:1rem"><h2 style="margin:0">Trends</h2><div class="field" style="margin:0;max-width:160px"><select id="trendRange" aria-label="Months shown"><option value="6">Last 6 months</option><option value="12" selected>Last 12 months</option></select></div></div>
+      <div class="trend-grid">
+        <div><h3>Billing and staff cost</h3><div id="trendBill"></div></div>
+        <div><h3>Headcount</h3><div id="trendHead"></div></div>
+        <div><h3>Unpaid invoices by age</h3><div id="trendAge"></div></div>
+      </div>
+      <details style="margin-top:.8rem"><summary class="muted" style="cursor:pointer">Show the numbers</summary><div id="trendTable" class="scrollx" style="margin-top:.4rem"></div></details>
+      <p class="muted" id="trendNote" style="margin:.6rem 0 0;font-size:.8rem"></p>
     </div>
     <div class="card" id="siteMapCard" style="display:none">
       <div class="row" style="justify-content:space-between;align-items:center;gap:1rem"><h2 style="margin:0">Site map</h2><div class="muted" id="siteMapLegend" style="font-size:.8rem"></div></div>
@@ -717,6 +745,16 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       </div>
       <div id="cmpBody" style="margin-top:14px"></div>
     </div>
+  </section>
+
+  <section id="tab-summary" style="display:none">
+    <div class="card">
+      <div class="row" style="justify-content:space-between;align-items:flex-end;gap:1rem">
+        <div><h2 style="margin:0">Monthly summary</h2><p class="muted" style="margin:.2rem 0 0">Billing, cost, margin, people, unpaid invoices and what needs attention, on one page.</p></div>
+        <div class="row" style="gap:.6rem;align-items:flex-end"><div class="field" style="margin:0"><label for="sumMonth">Month</label><input type="month" id="sumMonth"></div><button class="btn" id="btnSumPdf" type="button">Download PDF</button></div>
+      </div>
+    </div>
+    <div id="sumOut"></div>
   </section>
 
   <section id="tab-settings" style="display:none">
@@ -1858,7 +1896,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   }
 
   // ---------- TABS ----------
-  var TAB_TITLES = {dashboard:'Dashboard', employees:'Employees', attendance:'Attendance', roster:'Duty Roster', payroll:'Payroll', advances:'Advances', ratecard:'Rate Card', invoicing:'Invoicing', contracts:'Contracts', compliance:'Compliance', settings:'Settings', cycle:'Pay cycle'};
+  var TAB_TITLES = {summary:'Monthly summary', dashboard:'Dashboard', employees:'Employees', attendance:'Attendance', roster:'Duty Roster', payroll:'Payroll', advances:'Advances', ratecard:'Rate Card', invoicing:'Invoicing', contracts:'Contracts', compliance:'Compliance', settings:'Settings', cycle:'Pay cycle'};
   function setupTabs(){
     var btns=document.querySelectorAll('.side .navbtn');
     btns.forEach(function(b){
@@ -1866,13 +1904,14 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         btns.forEach(function(x){x.classList.remove('on');});
         b.classList.add('on');
         document.getElementById('pageTitle').textContent = TAB_TITLES[b.dataset.tab]||'';
-        ['dashboard','cycle','employees','attendance','roster','payroll','advances','ratecard','invoicing','contracts','compliance','settings'].forEach(function(t){
+        ['dashboard','cycle','employees','attendance','roster','payroll','advances','ratecard','invoicing','contracts','compliance','summary','settings'].forEach(function(t){
           document.getElementById('tab-'+t).style.display = (t===b.dataset.tab)?'':'none';
         });
         document.body.classList.remove('menu');
         if(b.dataset.tab==='cycle'){ renderCycle(); }
         if(b.dataset.tab==='payroll'){ renderPayroll(); }   // so changes made in Attendance show up when the tab is opened
-        if(b.dataset.tab==='dashboard'){ drawSiteMap(); }
+        if(b.dataset.tab==='dashboard'){ drawSiteMap(); renderTrends(); }
+        if(b.dataset.tab==='summary'){ renderSummary(); }
         refreshSiteLinks();
       });
     });
@@ -2004,6 +2043,211 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     }).catch(function(){ el.innerHTML='<p class="muted" style="padding:1rem">The map could not be loaded here: it needs internet access to the map libraries and to OpenStreetMap. The table below still has every site, with its Map and Directions links.</p>'; });
   }
 
+  /* ---------- search everything ---------- */
+  var gsItems=[], gsIdx=-1;
+  function gsGo(tab){ var b=document.getElementById('tabs-'+tab); if(b) b.click(); }
+  function gsSearch(q){
+    var raw=String(q||'').trim(), t=raw.toLowerCase(), d=raw.replace(/\D/g,''), out=[];
+    if(t.length<2) return out;
+    var hit=function(v){ var h=String(v==null?'':v).toLowerCase(); return h&&h.indexOf(t)>-1?(h.indexOf(t)===0?2:1):0; };
+    var dig=function(v){ if(d.length<4) return false; var x=String(v||'').replace(/\D/g,''); return !!x && x.indexOf(d)>-1; };
+    var add=function(group,score,label,sub,go){ out.push({group:group,score:score,label:String(label||''),sub:sub||'',go:go}); };
+    state.employees.forEach(function(e){
+      var sc=Math.max(hit(e.name)*3,hit(e.empCode)*3,hit(e.role),hit(e.site),hit(e.fatherName)), hint='';
+      if(!sc){
+        if(dig(e.uan)){ sc=1; hint='UAN '+e.uan; } else if(dig(e.esic)){ sc=1; hint='ESIC '+e.esic; } else if(dig(e.phone)){ sc=1; hint='Phone '+e.phone; }
+        else if(hit(e.pan)){ sc=1; hint='PAN '+e.pan; } else if(dig(e.aadhar)){ sc=1; hint='Aadhaar '+maskAadhar(e.aadhar); } else if(dig(e.bankAcc)){ sc=1; hint='Account ending '+String(e.bankAcc).slice(-4); }
+      }
+      if(sc) add('People',sc,e.name,[e.empCode,e.role,e.site].filter(Boolean).join(' \u00b7 ')+(e.active===false?' \u00b7 left':'')+(hint?' \u00b7 '+hint:''),function(){ gsGo('employees'); openEmpModal(e.id); });
+    });
+    clients.forEach(function(c){
+      var sc=Math.max(hit(c.name)*3,hit(c.gstin),hit(c.email),hit(c.contact),dig(c.phone)?1:0); if(!sc) return;
+      add('Clients',sc,c.name,[c.gstin,c.contact,c.phone].filter(Boolean).join(' \u00b7 '),function(){ gsGo('invoicing'); openClientModal(c.id); });
+    });
+    invoices.forEach(function(i){
+      var sc=Math.max(hit(i.invoiceNo)*3,hit(i.clientName),hit(i.month),hit(i.month?xMonthLabel(i.month):''),(d.length>=4&&String(Math.round(Number(i.total)||0)).indexOf(d)>-1)?1:0); if(!sc) return;
+      add('Invoices',sc,(i.invoiceNo||'Invoice')+(i.clientName?'  \u2022  '+i.clientName:''),[i.month?xMonthLabel(i.month):'',fmtMoney(Number(i.total)||0),i.status].filter(Boolean).join(' \u00b7 '),function(){ gsGo('invoicing'); openInvoiceModal(i.id); });
+    });
+    contracts.forEach(function(k){
+      var cn=(clients.find(function(c){ return c.id===k.clientId; })||{}).name||'', sc=Math.max(hit(k.title)*2,hit(k.site),hit(cn)); if(!sc) return;
+      add('Contracts',sc,k.title||'Contract',[cn,k.site].filter(Boolean).join(' \u00b7 '),function(){ gsGo('contracts'); openContractModal(k.id); });
+    });
+    rateCards.forEach(function(r){ var sc=hit(r.name)*2||hit(r.clientName); if(sc) add('Rate cards',sc,r.name||'Rate card',r.billBasis==='perday'?'billed per day':'',function(){ gsGo('ratecard'); openRcModal(r.id); }); });
+    allSites().forEach(function(site){ var sc=hit(site)*2; if(sc) add('Sites',sc,site,siteLocOf(site)?'has a location':'',function(){ gsGo('dashboard'); setTimeout(function(){ gsFlashSite(site); },250); }); });
+    var order=['People','Clients','Invoices','Contracts','Rate cards','Sites'], res=[];
+    order.forEach(function(g){ out.filter(function(x){ return x.group===g; }).sort(function(a,b){ return b.score-a.score || a.label.localeCompare(b.label); }).slice(0,6).forEach(function(x){ res.push(x); }); });
+    return res;
+  }
+  function gsFlashSite(site){
+    var rows=document.querySelectorAll('#siteBreakdown tbody tr');
+    for(var i=0;i<rows.length;i++){ if(rows[i].firstElementChild && rows[i].firstElementChild.textContent.trim()===site){ rows[i].classList.add('hl-row'); rows[i].scrollIntoView({block:'center',behavior:'smooth'}); (function(r){ setTimeout(function(){ r.classList.remove('hl-row'); },2600); })(rows[i]); break; } }
+  }
+  function gsRender(){
+    var box=document.getElementById('gsearchList'), inp=document.getElementById('gsearch'), q=inp.value.trim();
+    if(q.length<2){ box.style.display='none'; inp.setAttribute('aria-expanded','false'); gsItems=[]; gsIdx=-1; return; }
+    gsItems=gsSearch(q); gsIdx=gsItems.length?0:-1; var h='', last='';
+    gsItems.forEach(function(x,i){ if(x.group!==last){ h+='<div class="gs-group">'+x.group+'</div>'; last=x.group; } h+='<button type="button" class="gs-item'+(i===gsIdx?' on':'')+'" role="option" data-gs="'+i+'"><b>'+escapeHtml(x.label)+'</b>'+(x.sub?'<small>'+escapeHtml(x.sub)+'</small>':'')+'</button>'; });
+    box.innerHTML=h||'<div class="gs-empty">Nothing found for "'+escapeHtml(q)+'".</div>'; box.style.display=''; inp.setAttribute('aria-expanded','true');
+  }
+  function gsMove(n){ if(!gsItems.length) return; gsIdx=(gsIdx+n+gsItems.length)%gsItems.length; document.querySelectorAll('#gsearchList .gs-item').forEach(function(b,i){ b.classList.toggle('on',i===gsIdx); if(i===gsIdx) b.scrollIntoView({block:'nearest'}); }); }
+  function gsOpen(i){ var x=gsItems[i]; if(!x) return; var inp=document.getElementById('gsearch'); inp.value=''; gsRender(); inp.blur(); x.go(); }
+  (function(){
+    var inp=document.getElementById('gsearch'); if(!inp) return; var tm=null;
+    inp.addEventListener('input', function(){ clearTimeout(tm); tm=setTimeout(gsRender,120); });
+    inp.addEventListener('focus', function(){ if(inp.value.trim().length>=2) gsRender(); });
+    inp.addEventListener('keydown', function(ev){
+      if(ev.key==='ArrowDown'){ ev.preventDefault(); gsMove(1); } else if(ev.key==='ArrowUp'){ ev.preventDefault(); gsMove(-1); }
+      else if(ev.key==='Enter'){ ev.preventDefault(); clearTimeout(tm); if(!gsItems.length) gsRender(); if(gsIdx>=0) gsOpen(gsIdx); }
+      else if(ev.key==='Escape'){ inp.value=''; gsRender(); inp.blur(); }
+    });
+    document.getElementById('gsearchList').addEventListener('mousedown', function(ev){ var b=ev.target.closest('[data-gs]'); if(b){ ev.preventDefault(); gsOpen(Number(b.dataset.gs)); } });
+    document.addEventListener('click', function(ev){ if(!ev.target.closest('.gsearch')){ document.getElementById('gsearchList').style.display='none'; inp.setAttribute('aria-expanded','false'); } });
+    document.addEventListener('keydown', function(ev){
+      var tg=(document.activeElement&&document.activeElement.tagName)||'', typing=/INPUT|TEXTAREA|SELECT/.test(tg)||(document.activeElement&&document.activeElement.isContentEditable);
+      if((ev.key==='/' && !typing && !ev.ctrlKey && !ev.metaKey) || ((ev.ctrlKey||ev.metaKey) && String(ev.key).toLowerCase()==='k')){ ev.preventDefault(); document.body.classList.remove('menu'); inp.focus(); inp.select(); }
+    });
+  })();
+
+  /* ---------- trends on the Dashboard ---------- */
+  function trendMonths(n){ var end=xAddMonth(thisMonth(),-1), out=[], m=end; for(var i=0;i<n;i++){ out.unshift(m); m=xAddMonth(m,-1); } return out; }
+  function headcountAt(ym){
+    var last=ym+'-'+String(daysInMonth(ym)).padStart(2,'0');
+    return state.employees.filter(function(e){ if(e.doj && e.doj>last) return false; return e.dol ? e.dol>last : e.active!==false; }).length;
+  }
+  function fmtShortMoney(v){ v=Number(v)||0; var a=Math.abs(v); return (v<0?'-':'')+(a>=1e7?(Math.round(a/1e5)/100)+' Cr':(a>=1e5?(Math.round(a/1e4)/10)+' L':(a>=1e3?(Math.round(a/100)/10)+'K':String(Math.round(a))))); }
+  function niceMax(v){ if(!(v>0)) return 1; var p=Math.pow(10,Math.floor(Math.log10(v))), n=v/p; return (n<=1?1:n<=2?2:n<=5?5:10)*p; }
+  function trendBarsSvg(ms, A, B){
+    var W=640,H=250,L=56,R=8,T=14,Bt=34, max=niceMax(Math.max.apply(null,A.concat(B).concat([1]))), pw=W-L-R, ph=H-T-Bt, g=pw/ms.length, bw=Math.min(22,g/2.6), sv='';
+    sv+='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Billing and staff cost by month" style="max-width:720px;display:block">';
+    for(var k=0;k<=4;k++){ var yv=max*k/4, y=T+ph-ph*k/4; sv+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y+'" y2="'+y+'" style="stroke:var(--line2)"/><text x="'+(L-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="11" style="fill:var(--muted)">'+fmtShortMoney(yv)+'</text>'; }
+    ms.forEach(function(m,i){
+      var cx=L+g*i+g/2, ha=A[i]/max*ph, hb=B[i]/max*ph, lab=xMonthLabel(m);
+      if(A[i]>0) sv+='<rect x="'+(cx-bw-1)+'" y="'+(T+ph-ha)+'" width="'+bw+'" height="'+ha+'" rx="3" style="fill:var(--brand)"><title>'+lab+': billed '+fmtMoney(A[i])+'</title></rect>';
+      if(B[i]>0) sv+='<rect x="'+(cx+1)+'" y="'+(T+ph-hb)+'" width="'+bw+'" height="'+hb+'" rx="3" style="fill:var(--signal)"><title>'+lab+': staff and other costs '+fmtMoney(B[i])+'</title></rect>';
+      sv+='<text x="'+cx+'" y="'+(H-14)+'" text-anchor="middle" font-size="11" style="fill:var(--muted)">'+xMonthShort(m)+'</text>'+(m.slice(5)==='01'||i===0?'<text x="'+cx+'" y="'+(H-2)+'" text-anchor="middle" font-size="10" style="fill:var(--muted)">'+m.slice(0,4)+'</text>':'');
+    });
+    return sv+'</svg><div class="muted" style="font-size:.8rem"><span style="display:inline-block;width:.7rem;height:.7rem;border-radius:3px;background:var(--brand);vertical-align:-1px"></span> Billed (before GST) &nbsp; <span style="display:inline-block;width:.7rem;height:.7rem;border-radius:3px;background:var(--signal);vertical-align:-1px"></span> Staff and other costs</div>';
+  }
+  function trendLineSvg(ms, V){
+    var W=640,H=250,L=44,R=14,T=16,Bt=34, hi=Math.max.apply(null,V.concat([1])), lo=Math.min.apply(null,V), max=niceMax(hi), min=0, pw=W-L-R, ph=H-T-Bt, n=ms.length, sv='';
+    var X=function(i){ return n===1?L+pw/2:L+pw*i/(n-1); }, Y=function(v){ return T+ph-(v-min)/(max-min)*ph; };
+    sv+='<svg viewBox="0 0 '+W+' '+H+'" width="100%" role="img" aria-label="Headcount by month" style="max-width:720px;display:block">';
+    for(var k=0;k<=4;k++){ var yv=max*k/4, y=Y(yv); sv+='<line x1="'+L+'" x2="'+(W-R)+'" y1="'+y+'" y2="'+y+'" style="stroke:var(--line2)"/><text x="'+(L-6)+'" y="'+(y+4)+'" text-anchor="end" font-size="11" style="fill:var(--muted)">'+Math.round(yv)+'</text>'; }
+    sv+='<polyline fill="none" stroke-width="2.5" style="stroke:var(--brand)" points="'+V.map(function(v,i){ return X(i)+','+Y(v); }).join(' ')+'"/>';
+    ms.forEach(function(m,i){ sv+='<circle cx="'+X(i)+'" cy="'+Y(V[i])+'" r="4" style="fill:var(--brand)"><title>'+xMonthLabel(m)+': '+V[i]+' people</title></circle><text x="'+X(i)+'" y="'+(H-14)+'" text-anchor="middle" font-size="11" style="fill:var(--muted)">'+xMonthShort(m)+'</text>'; });
+    sv+='<text x="'+X(n-1)+'" y="'+(Y(V[n-1])-9)+'" text-anchor="end" font-size="12" font-weight="700" style="fill:var(--ink)">'+V[n-1]+'</text>';
+    return sv+'</svg>';
+  }
+  // unpaid invoices (not drafts, not paid) by how long past the due date; no due date counts as not yet due
+  function ageingData(){
+    var today=new Date().toISOString().slice(0,10), b=[{k:'Not yet due',n:0,v:0,c:'var(--ok)'},{k:'1 to 30 days',n:0,v:0,c:'var(--info)'},{k:'31 to 60 days',n:0,v:0,c:'var(--warn)'},{k:'61 to 90 days',n:0,v:0,c:'var(--bad)'},{k:'Over 90 days',n:0,v:0,c:'var(--bad)'}], byClient={};
+    invoices.forEach(function(i){
+      if(i.status==='paid' || i.status==='draft') return; var amt=Number(i.total)||0, late=(i.dueDate&&i.dueDate<today)?Math.round((new Date(today)-new Date(i.dueDate))/86400000):0;
+      var k=late<=0?0:(late<=30?1:(late<=60?2:(late<=90?3:4))); b[k].n++; b[k].v+=amt;
+      if(late>0){ var c=byClient[i.clientId]||(byClient[i.clientId]={id:i.clientId,name:i.clientName||((clients.find(function(x){ return x.id===i.clientId; })||{}).name)||'Client',v:0,n:0,oldest:0}); c.v+=amt; c.n++; if(late>c.oldest) c.oldest=late; }
+    });
+    var tot=b.reduce(function(t,x){ return t+x.v; },0), over=b.slice(1).reduce(function(t,x){ return t+x.v; },0), overN=b.slice(1).reduce(function(t,x){ return t+x.n; },0);
+    return {buckets:b, total:tot, overdue:over, overdueN:overN, clients:Object.keys(byClient).map(function(k){ return byClient[k]; }).sort(function(a,b){ return b.v-a.v; })};
+  }
+  function renderTrends(){
+    var card=document.getElementById('trendsCard'); if(!card) return;
+    var allowed=canPay(); card.style.display=allowed?'':'none'; if(!allowed) return;
+    var dash=document.getElementById('tab-dashboard'); if(dash && dash.style.display==='none') return;
+    var n=Number(document.getElementById('trendRange').value)||12, ms=trendMonths(n), A=[], B=[], V=[], rows=[];
+    ms.forEach(function(m){ var d=profitData(m); A.push(Math.round(d.total.invoiced)); B.push(Math.round(d.total.payroll+d.total.other)); V.push(d.anyPayroll?d.total.employees:headcountAt(m)); rows.push({m:m,d:d}); });
+    document.getElementById('trendBill').innerHTML=(A.some(function(x){ return x>0; })||B.some(function(x){ return x>0; }))?trendBarsSvg(ms,A,B):'<p class="muted">No invoices or payroll in these months yet.</p>';
+    document.getElementById('trendHead').innerHTML=trendLineSvg(ms,V);
+    var ag=ageingData(), mx=Math.max.apply(null,ag.buckets.map(function(x){ return x.v; }).concat([1]));
+    document.getElementById('trendAge').innerHTML=ag.total>0?(ag.buckets.map(function(x){ return '<div class="age-row"><span>'+x.k+'</span><span class="age-bar"><i style="width:'+Math.max(x.v>0?3:0,x.v/mx*100)+'%;background:'+x.c+'"></i></span><span style="text-align:right">'+fmtMoney(x.v)+'</span></div>'; }).join('')+'<p class="muted" style="margin:.5rem 0 0;font-size:.8rem">'+fmtMoney(ag.total)+' unpaid, of which '+fmtMoney(ag.overdue)+' is overdue ('+ag.overdueN+' invoice'+(ag.overdueN===1?'':'s')+').</p>'):'<p class="muted">No unpaid invoices.</p>';
+    document.getElementById('trendTable').innerHTML='<table><thead><tr><th>Month</th><th class="right">Billed (before GST)</th><th class="right">Staff and other costs</th><th class="right">Profit</th><th class="right">Margin</th><th class="right">Headcount</th></tr></thead><tbody>'+rows.map(function(r,i){ var t=r.d.total, has=t.invoiced>0||t.payroll>0; return '<tr><td>'+escapeHtml(xMonthLabel(r.m))+'</td><td class="right">'+(has?fmtMoney(t.invoiced):'-')+'</td><td class="right">'+(has?fmtMoney(t.payroll+t.other):'-')+'</td><td class="right">'+(has?fmtMoney(t.profit):'-')+'</td><td class="right">'+(has?profitPct(t.margin):'-')+'</td><td class="right">'+V[i]+'</td></tr>'; }).join('')+'</tbody></table>';
+    document.getElementById('trendNote').textContent='Months are service months. Billing is the invoices of the month before GST (drafts left out). Costs are the pay plus the employer share of PF and ESI for months with a calculated payroll, as in Profit per client. Headcount is the people on the payroll, or from joining and leaving dates when there is no payroll. The current month appears once it is over.';
+  }
+  document.addEventListener('change', function(ev){ if(ev.target && ev.target.id==='trendRange') renderTrends(); });
+
+  /* ---------- the monthly summary for the owner ---------- */
+  function summaryData(ym){
+    var today=new Date().toISOString().slice(0,10), prof=profitData(ym), prev=profitData(xAddMonth(ym,-1)), runs=monthRuns(ym).filter(function(m){ return m.run && m.run.rows && m.run.rows.length; });
+    var rows=[]; runs.forEach(function(m){ rows=rows.concat(m.run.rows); }); var tot=cycTotals(rows), bonusM=rows.reduce(function(t,r){ return t+(Number(r.bonusAmt)||0); },0);
+    var fy=fyCodeOf(ym+'-01'), L=bonusLedger(fy), bonusY=L.months.filter(function(m){ return m<=ym; }).reduce(function(t,m){ return t+(L.tm[m]||0); },0);
+    var inv=invoices.filter(function(i){ return i.month===ym && i.status!=='draft'; }), gst=inv.reduce(function(t,i){ return t+(Number(i.gstAmt)||0); },0), invTotal=inv.reduce(function(t,i){ return t+(Number(i.total)||0); },0);
+    var first=ym+'-01', last=ym+'-'+String(daysInMonth(ym)).padStart(2,'0'), pm=xAddMonth(ym,-1);
+    var joined=state.employees.filter(function(e){ return e.doj && e.doj>=first && e.doj<=last; }).length, left=state.employees.filter(function(e){ return e.dol && e.dol>=first && e.dol<=last; }).length;
+    var ag=ageingData(), sd=siteStatusData(), short=[], none=[]; Object.keys(sd).forEach(function(k){ var x=sd[k]; if(x.status==='short') short.push(x); else if(x.status==='none') none.push(x); });
+    var alerts=[];
+    if(!prof.anyPayroll) alerts.push({lv:'bad',t:'No payroll has been calculated for '+xMonthLabel(ym)+', so the cost and profit figures are not real yet.'});
+    runs.filter(function(m){ return m.run.status!=='approved'; }).forEach(function(m){ alerts.push({lv:'warn',t:'The payroll of '+m.name+' for '+xMonthLabel(ym)+' is not approved yet (status: '+m.run.status+').'}); });
+    if(prof.drafts) alerts.push({lv:'warn',t:prof.drafts+' invoice'+(prof.drafts>1?'s':'')+' for '+xMonthLabel(ym)+(prof.drafts>1?' are':' is')+' still in draft and not counted.'});
+    prof.rows.forEach(function(c){ if(c.invoiced<=0 && c.payroll>0) alerts.push({lv:'bad',t:'No invoice yet for '+c.name+', although the staff cost is '+fmtMoney(c.payroll)+'.'}); else if(c.profit<0) alerts.push({lv:'bad',t:c.name+' is at a loss: '+fmtMoney(c.profit)+' ('+profitPct(c.margin)+').'}); else if(c.margin!==null && c.margin<5) alerts.push({lv:'warn',t:c.name+' has a thin margin: '+profitPct(c.margin)+'.'}); });
+    if(prof.unassigned.n) alerts.push({lv:'warn',t:prof.unassigned.n+' employee'+(prof.unassigned.n>1?'s are':' is')+' at a site not linked to any client ('+fmtMoney(prof.unassigned.cost)+' cost not charged to a client).'});
+    if(ag.overdueN) alerts.push({lv:'warn',t:ag.overdueN+' invoice'+(ag.overdueN>1?'s are':' is')+' overdue, '+fmtMoney(ag.overdue)+' in all; the largest is '+ag.clients[0].name+' ('+fmtMoney(ag.clients[0].v)+', oldest '+ag.clients[0].oldest+' days).'});
+    if(none.length) alerts.push({lv:'bad',t:'Nobody is deployed at '+none.map(function(x){ return x.site+' (needs '+x.need+')'; }).join(', ')+'.'});
+    if(short.length) alerts.push({lv:'warn',t:'Short of staff: '+short.map(function(x){ return x.site+' ('+x.deployed+' of '+x.need+')'; }).join(', ')+'.'});
+    return {ym:ym, prof:prof, prev:prev, prevYm:pm, runs:runs, tot:tot, bonusM:bonusM, bonusY:bonusY, fy:fy, inv:inv, invN:inv.length, gst:gst, invTotal:invTotal, head:{start:headcountAt(pm), end:headcountAt(ym), joined:joined, left:left}, ag:ag, short:short, none:none, alerts:alerts, today:today};
+  }
+  function sumChange(now, before){ if(!(before>0)) return ''; var p=(now-before)/before*100; return (p>=0?'+':'')+(Math.round(p*10)/10)+'% on '+'last month'; }
+  function renderSummary(){
+    var out=document.getElementById('sumOut'); if(!out) return; var mi=document.getElementById('sumMonth'); if(!mi.value) mi.value=cycMonth(); var ym=mi.value;
+    if(!canPay()){ out.innerHTML='<div class="card"><div class="banner">Only Accounts or an administrator can see the monthly summary.</div></div>'; return; }
+    var d=summaryData(ym), P=d.prof, t=P.total, h='', money=fmtMoney;
+    h+='<div class="card"><div class="sum-kpis">'+
+      '<div class="sum-kpi"><b>'+money(t.invoiced)+'</b><span>Billed, before GST</span><br><em class="muted">'+d.invN+' invoice'+(d.invN===1?'':'s')+' &middot; GST '+money(d.gst)+' &middot; with GST '+money(d.invTotal)+'</em></div>'+
+      '<div class="sum-kpi"><b>'+money(t.payroll+t.other)+'</b><span>Staff and other costs</span><br><em class="muted">'+sumChange(t.payroll+t.other,d.prev.total.payroll+d.prev.total.other)+'</em></div>'+
+      '<div class="sum-kpi"><b style="color:'+(t.profit<0?'var(--bad)':'inherit')+'">'+money(t.profit)+'</b><span>Profit ('+profitPct(t.margin)+')</span><br><em class="muted">'+(d.prev.total.margin!==null?'last month '+profitPct(d.prev.total.margin):'')+'</em></div>'+
+      '<div class="sum-kpi"><b>'+d.head.end+'</b><span>People at the end of the month</span><br><em class="muted">'+d.head.joined+' joined &middot; '+d.head.left+' left &middot; '+d.head.start+' at the start</em></div>'+
+      '<div class="sum-kpi"><b>'+money(d.tot.net)+'</b><span>Net pay'+(d.runs.length?'':' (no payroll yet)')+'</span><br><em class="muted">gross '+money(d.tot.gross)+' &middot; PF '+money(d.tot.pf+d.tot.pfEr)+' &middot; ESI '+money(d.tot.esi+d.tot.esiEr)+'</em></div>'+
+      '<div class="sum-kpi"><b>'+money(d.ag.total)+'</b><span>Unpaid invoices today</span><br><em class="muted">'+money(d.ag.overdue)+' overdue ('+d.ag.overdueN+')</em></div>'+
+      '</div></div>';
+    h+='<div class="card"><h2>Needs attention</h2>'+(d.alerts.length?'<ul style="margin:.2rem 0 0 1.1rem;padding:0;line-height:1.6">'+d.alerts.map(function(a){ return '<li><span style="color:'+(a.lv==='bad'?'var(--bad)':'var(--warn)')+';font-weight:700">'+(a.lv==='bad'?'Fix':'Check')+'</span> '+escapeHtml(a.t)+'</li>'; }).join('')+'</ul>':'<p class="muted" style="margin:0">Nothing needs attention for '+escapeHtml(xMonthLabel(ym))+'.</p>')+'</div>';
+    h+='<div class="card"><h2>Billing and margin by client</h2>'+(P.rows.length?'<div class="scrollx"><table><thead><tr><th>Client</th><th class="right">Employees</th><th class="right">Billed (before GST)</th><th class="right">Staff cost</th><th class="right">Other costs</th><th class="right">Profit</th><th class="right">Margin</th></tr></thead><tbody>'+P.rows.map(function(c){ return '<tr><td><b>'+escapeHtml(c.name)+'</b></td><td class="right">'+c.employees+'</td><td class="right">'+money(c.invoiced)+'</td><td class="right">'+money(c.payroll)+'</td><td class="right">'+money(c.other)+'</td><td class="right"><b style="color:'+(c.profit<0?'var(--bad)':'inherit')+'">'+money(c.profit)+'</b></td><td class="right">'+profitPct(c.margin)+'</td></tr>'; }).join('')+(P.unassigned.n?'<tr><td><b>Staff not linked to a client</b></td><td class="right">'+P.unassigned.n+'</td><td class="right">-</td><td class="right">'+money(P.unassigned.cost)+'</td><td class="right">-</td><td class="right"><b style="color:var(--bad)">'+money(-P.unassigned.cost)+'</b></td><td class="right">-</td></tr>':'')+'</tbody><tfoot><tr><td>Total</td><td class="right">'+t.employees+'</td><td class="right">'+money(t.invoiced)+'</td><td class="right">'+money(t.payroll)+'</td><td class="right">'+money(t.other)+'</td><td class="right">'+money(t.profit)+'</td><td class="right">'+profitPct(t.margin)+'</td></tr></tfoot></table></div>':'<p class="muted" style="margin:0">No invoices or payroll for '+escapeHtml(xMonthLabel(ym))+' yet.</p>')+'<p class="muted" style="margin:.6rem 0 0;font-size:.8rem">The same figures as Profit per client in Invoicing.</p></div>';
+    h+='<div class="card"><h2>People and payroll</h2><div class="scrollx"><table><tbody>'+
+      '<tr><td>People on the payroll</td><td class="right">'+d.tot.n+'</td></tr><tr><td>Gross pay</td><td class="right">'+money(d.tot.gross)+'</td></tr><tr><td>Deductions: PF, ESI, professional tax, advances and others</td><td class="right">'+money(d.tot.gross-d.tot.net)+'</td></tr><tr><td><b>Net pay</b></td><td class="right"><b>'+money(d.tot.net)+'</b></td></tr>'+
+      '<tr><td>Employer PF and ESI</td><td class="right">'+money(d.tot.pfEr+d.tot.esiEr)+'</td></tr><tr><td>Bonus accrued this month ('+fyLabel(d.fy)+' so far '+money(d.bonusY)+')</td><td class="right">'+money(d.bonusM)+'</td></tr>'+
+      d.runs.map(function(m){ return '<tr><td>Payroll of '+escapeHtml(m.name)+'</td><td class="right"><span class="tag '+(m.run.status==='approved'?'ok':'warn')+'">'+escapeHtml(m.run.status)+'</span></td></tr>'; }).join('')+'</tbody></table></div></div>';
+    h+='<div class="card"><h2>Unpaid invoices today</h2>'+(d.ag.total>0?'<div class="scrollx"><table><thead><tr><th>Age past the due date</th><th class="right">Invoices</th><th class="right">Amount</th></tr></thead><tbody>'+d.ag.buckets.map(function(x){ return '<tr><td>'+x.k+'</td><td class="right">'+x.n+'</td><td class="right">'+money(x.v)+'</td></tr>'; }).join('')+'</tbody><tfoot><tr><td>Total</td><td class="right">'+d.ag.buckets.reduce(function(a,x){ return a+x.n; },0)+'</td><td class="right">'+money(d.ag.total)+'</td></tr></tfoot></table></div>'+(d.ag.clients.length?'<p style="margin:.7rem 0 .2rem"><b>Overdue by client</b></p><div class="scrollx"><table><tbody>'+d.ag.clients.slice(0,5).map(function(c){ return '<tr><td>'+escapeHtml(c.name)+'</td><td class="right">'+c.n+' invoice'+(c.n>1?'s':'')+'</td><td class="right">oldest '+c.oldest+' days</td><td class="right">'+money(c.v)+'</td></tr>'; }).join('')+'</tbody></table></div>':''):'<p class="muted" style="margin:0">No unpaid invoices.</p>')+'<p class="muted" style="margin:.6rem 0 0;font-size:.8rem">As of today. The system records whether an invoice is paid but not the date or the amount, so what was collected in a particular month is not shown.</p></div>';
+    h+='<div class="card"><h2>Cover at the sites</h2>'+((d.short.length||d.none.length)?'<div class="scrollx"><table><thead><tr><th>Site</th><th class="right">Deployed</th><th class="right">Required</th></tr></thead><tbody>'+d.none.concat(d.short).map(function(x){ return '<tr><td>'+siteDot(x.color)+escapeHtml(x.site)+'</td><td class="right">'+x.deployed+'</td><td class="right">'+x.need+'</td></tr>'; }).join('')+'</tbody></table></div>':'<p class="muted" style="margin:0">Every site with a requirement has the people it needs.</p>')+'</div>';
+    out.innerHTML=h;
+  }
+  function buildSummaryPdf(d){
+    var pb=pdfNew(false), ML=36, CW=pb.W-72, MR=ML+CW, LIMIT=pb.H-78, C=PDFC, y=pdfHead(pb), t=d.prof.total;
+    function need(h){ if(y+h>LIMIT){ y=pdfHead(pb); } }
+    y+=14; pb.text(pb.W/2,y,'Monthly summary',16,{bold:true,align:'center'}); y+=17; pb.text(pb.W/2,y,xMonthLabel(d.ym),11,{bold:true,align:'center',color:C.goldDk}); y+=13; pb.text(pb.W/2,y,'Prepared on '+pdfDate(xToday())+(me&&(me.name||me.email)?' by '+(me.name||me.email):''),8.2,{align:'center',color:C.mute}); y+=16;
+    var kp=[['Billed, before GST',pdfMoney(t.invoiced),d.invN+' invoice'+(d.invN===1?'':'s')+', GST '+pdfMoney(d.gst)],['Staff and other costs',pdfMoney(t.payroll+t.other),'pay plus employer PF and ESI'],['Profit',pdfMoney(t.profit),'margin '+(t.margin===null?'-':(Math.round(t.margin*10)/10)+'%')],['People at month end',String(d.head.end),d.head.joined+' joined, '+d.head.left+' left'],['Net pay',pdfMoney(d.tot.net),'gross '+pdfMoney(d.tot.gross)],['Unpaid invoices today',pdfMoney(d.ag.total),pdfMoney(d.ag.overdue)+' overdue']], bw=(CW-16)/3;
+    kp.forEach(function(k,i){ var x=ML+(i%3)*(bw+8), yy=y+Math.floor(i/3)*56; pb.rect(x,yy,bw,50,{fill:C.paper}); pb.text(x+8,yy+14,k[0],7.6,{color:C.mute}); pb.text(x+8,yy+31,k[1],13,{bold:true}); pb.text(x+8,yy+43,pdfFit(pb,k[2],bw-14,7.2,false),7.2,{color:C.mute}); });
+    y+=118;
+    function head(txt){ need(40); pb.text(ML,y,txt,10.5,{bold:true,color:C.goldDk}); y+=5; pb.line(ML,y,MR,y,0.6,C.goldDk); y+=14; }
+    head('Needs attention');
+    if(!d.alerts.length){ pb.text(ML,y,'Nothing needs attention for '+xMonthLabel(d.ym)+'.',9,{color:C.mute}); y+=16; }
+    d.alerts.forEach(function(a){ var ls=pb.wrap(a.t,CW-44,8.8,false); need(ls.length*11+4); pb.text(ML,y,a.lv==='bad'?'FIX':'CHECK',7.6,{bold:true,color:a.lv==='bad'?'#B42323':C.goldDk}); ls.forEach(function(l,i){ pb.text(ML+40,y+i*11,l,8.8); }); y+=ls.length*11+4; });
+    y+=12; head('Billing and margin by client');
+    var cw=[CW-5*64-0, 64,64,64,64,64]; cw[0]=CW-5*64; var xs=[ML]; cw.forEach(function(w,i){ xs.push(xs[i]+w); });
+    function th(){ pb.rect(ML,y,CW,15,{fill:C.ink}); ['Client','Billed','Staff cost','Other','Profit','Margin'].forEach(function(h,i){ pb.text(i?xs[i+1]-4:xs[0]+4,y+10.5,h,7.6,{bold:true,color:C.white,align:i?'right':'left'}); }); y+=15; }
+    need(40); th();
+    var body=d.prof.rows.map(function(c){ return [c.name,pdfMoney(c.invoiced),pdfMoney(c.payroll),pdfMoney(c.other),pdfMoney(c.profit),c.margin===null?'-':(Math.round(c.margin*10)/10)+'%',c.profit<0]; });
+    if(d.prof.unassigned.n) body.push(['Staff not linked to a client','-',pdfMoney(d.prof.unassigned.cost),'-',pdfMoney(-d.prof.unassigned.cost),'-',true]);
+    body.push(['Total',pdfMoney(t.invoiced),pdfMoney(t.payroll),pdfMoney(t.other),pdfMoney(t.profit),t.margin===null?'-':(Math.round(t.margin*10)/10)+'%',t.profit<0,true]);
+    body.forEach(function(r){ if(y+15>LIMIT){ y=pdfHead(pb); th(); } if(r[7]) pb.rect(ML,y,CW,15,{fill:C.goldLt}); pb.text(xs[0]+4,y+10.5,pdfFit(pb,r[0],cw[0]-8,8.4,!!r[7]),8.4,{bold:!!r[7]}); for(var i=1;i<6;i++) pb.text(xs[i+1]-4,y+10.5,r[i],8.4,{align:'right',bold:!!r[7]||i===4,color:(i===4&&r[6])?'#B42323':C.ink}); y+=15; pb.line(ML,y,MR,y,0.3,C.line); });
+    y+=18; head('People and payroll');
+    [['People on the payroll',String(d.tot.n)],['Gross pay',pdfMoney(d.tot.gross)],['Deductions',pdfMoney(d.tot.gross-d.tot.net)],['Net pay',pdfMoney(d.tot.net)],['Employer PF and ESI',pdfMoney(d.tot.pfEr+d.tot.esiEr)],['Bonus accrued this month (year so far '+pdfMoney(d.bonusY)+')',pdfMoney(d.bonusM)]].concat(d.runs.map(function(m){ return ['Payroll of '+m.name,m.run.status]; })).forEach(function(r){ need(15); pb.text(ML,y+10,r[0],8.8); pb.text(MR,y+10,r[1],8.8,{align:'right',bold:true}); y+=15; pb.line(ML,y,MR,y,0.3,C.line); });
+    y+=18; head('Unpaid invoices today');
+    if(d.ag.total>0){ d.ag.buckets.forEach(function(x){ need(15); pb.text(ML,y+10,x.k,8.8); pb.text(MR-110,y+10,x.n+' invoice'+(x.n===1?'':'s'),8.8,{align:'right'}); pb.text(MR,y+10,pdfMoney(x.v),8.8,{align:'right',bold:true}); y+=15; pb.line(ML,y,MR,y,0.3,C.line); }); need(15); pb.text(ML,y+10,'Total',8.8,{bold:true}); pb.text(MR,y+10,pdfMoney(d.ag.total),8.8,{align:'right',bold:true}); y+=18;
+      d.ag.clients.slice(0,5).forEach(function(c){ need(14); pb.text(ML,y+9,'Overdue: '+pdfFit(pb,c.name,CW-230,8.4,false),8.4,{color:C.mute}); pb.text(MR-80,y+9,'oldest '+c.oldest+' days',8.4,{align:'right',color:C.mute}); pb.text(MR,y+9,pdfMoney(c.v),8.4,{align:'right'}); y+=13; });
+      need(24); pb.wrap('As of the date of this summary. Payment dates are not recorded in the system, so what was collected in the month is not shown.',CW,7.4,false).forEach(function(l){ pb.text(ML,y+9,l,7.4,{color:C.mute}); y+=10; });
+    } else { pb.text(ML,y+9,'No unpaid invoices.',8.8,{color:C.mute}); y+=16; }
+    if(d.short.length||d.none.length){ y+=18; head('Cover at the sites'); d.none.concat(d.short).forEach(function(x){ need(15); pb.text(ML,y+10,x.site,8.8); pb.text(MR,y+10,x.deployed+' deployed, '+x.need+' required',8.8,{align:'right',bold:true}); y+=15; pb.line(ML,y,MR,y,0.3,C.line); }); }
+    pdfFoot(pb,'Computer-generated summary');
+    return pb.build();
+  }
+  async function downloadSummaryPdf(){
+    if(!canPay()){ toast('Only Accounts or an administrator can download the summary.'); return; }
+    var ym=document.getElementById('sumMonth').value||cycMonth(), blob;
+    try{ blob=buildSummaryPdf(summaryData(ym)); }catch(e){ toast('Could not build the summary.'); return; }
+    await pdfSave(blob,'monthly-summary-'+ym+'.pdf');
+  }
+  (function(){
+    var m=document.getElementById('sumMonth'); if(!m) return;
+    m.addEventListener('change', renderSummary); document.getElementById('btnSumPdf').addEventListener('click', downloadSummaryPdf);
+  })();
+
   // ---------- DASHBOARD ----------
   function renderDashboard(){
     var active = state.employees.filter(function(e){return e.active!==false;});
@@ -2031,7 +2275,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     html += '</tbody></table>';
     var box=document.getElementById('siteBreakdown'); box.innerHTML = Object.keys(names).length? html : '<p class="muted">No employees yet.</p>';
     box.querySelectorAll('[data-siteloc]').forEach(function(b){ b.addEventListener('click', function(){ openSiteLoc(b.dataset.siteloc); }); });
-    drawSiteMap();
+    drawSiteMap(); renderTrends();
+    var sb=document.getElementById('tabs-summary'); if(sb) sb.style.display=canPay()?'':'none';
   }
 
   function escapeHtml(s){ var d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }
@@ -6201,7 +6446,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     document.getElementById('invStatOverdue').textContent = overdueCount;
     document.getElementById('invStatThisMonth').textContent = fmtMoney(thisMonthTotal);
     document.getElementById('invStatClients').textContent = clients.length;
-    renderContracts(); renderAttention();
+    renderContracts(); renderAttention(); if(typeof renderTrends==='function') renderTrends();
   }
 
   /* ---------- invoice numbers: PFSS/26-27/0001, with a new series every financial year (April to March) ---------- */
@@ -9716,7 +9961,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       }, function(){});
       db.collection('payrollRuns').onSnapshot(function(snap){
         var o={}; snap.docs.forEach(function(d){ o[d.id]=d.data(); runCache[d.id]=d.data(); });
-        allRuns=o; cycRefresh();
+        allRuns=o; cycRefresh(); if(typeof renderTrends==='function') renderTrends();
       }, function(){});
       db.collection('holidays').onSnapshot(function(snap){
         var o={}; snap.docs.forEach(function(d){ var x=d.data(); if(x && x.ym) o[x.ym]={ym:x.ym, days:x.days||{}}; });

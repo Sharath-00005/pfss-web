@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-Under the name at the top of the left menu a small line reads, for example, "Version: 10 Nov 2026, build 28". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+Under the name at the top of the left menu a small line reads, for example, "Version: 10 Nov 2026, build 29". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -975,7 +975,7 @@ Different clients get different services, so the SAC code (and the description o
 
 
 ## One version line
-The page used to show two version lines: an old one under the name ("Build 5 Nov 2026 · 44", which was never updated) and the real one at the bottom of the menu. The old one is removed. There is now a single line, **under "Public Force" at the top of the left menu**, such as "Version: 10 Nov 2026, build 28". It is the line to check after an upload (press Ctrl + Shift + R first): if it shows an older build, the new file is not live yet.
+The page used to show two version lines: an old one under the name ("Build 5 Nov 2026 · 44", which was never updated) and the real one at the bottom of the menu. The old one is removed. There is now a single line, **under "Public Force" at the top of the left menu**, such as "Version: 10 Nov 2026, build 29". It is the line to check after an upload (press Ctrl + Shift + R first): if it shows an older build, the new file is not live yet.
 
 
 ## Paying the bonus at the year end (bonus ledger)
@@ -1028,3 +1028,24 @@ Your site's `_headers` file had **`geolocation=()`**, which stops "Use my locati
 
 ### Please note
 Client premises and where guards are posted are sensitive. The map and the location boxes are for people who can edit only, and the site stays behind the sign-in. OpenStreetMap's servers see which part of the map is looked at, and the address of the viewer, as any website that shows a map.
+
+
+## Search everything
+The **search box in the top bar** (press **/** or **Ctrl + K** to jump into it, **Esc** to clear it) looks across the whole tool as you type, from two letters. Results are in groups; **arrow keys and Enter**, or a click, open the item.
+- **People:** name, employee code, role, site, father's name, and also **UAN, ESIC number, phone, PAN, Aadhaar and bank account** (for the numbers, type at least four digits; the Aadhaar and the account are never shown in full: the result says "Aadhaar XXXX XXXX 7656" or "Account ending 4321"). A person who has left is marked "left". Opens the person's record.
+- **Clients** (name, GSTIN, contact, email, phone), **Invoices** (invoice number, client, month, amount; opens the invoice), **Contracts** (title, site, client), **Rate cards** (name) and **Sites** (goes to the Dashboard and highlights the site's row).
+- Capital letters do not matter. At most six results are shown per group.
+
+## Trends on the Dashboard
+A **Trends** card (for Accounts and the administrator) with **Last 6 months / Last 12 months**:
+- **Billing and staff cost:** bars for each service month. Billing is the invoices of the month before GST (drafts left out). The cost is the pay plus the employer share of PF and ESI, plus the other costs entered for clients, for months with a calculated payroll: **the same figures as Profit per client in Invoicing**. Hover a bar for the amount.
+- **Headcount:** the people on the payroll of each month, or, for a month without a payroll, the people found from the joining and leaving dates.
+- **Unpaid invoices by age:** not yet due, then 1 to 30, 31 to 60, 61 to 90 and over 90 days past the due date, with the amounts, the total unpaid and the overdue part.
+- **Show the numbers** lists the figures behind the charts (billed, cost, profit, margin and headcount for each month). The months end with last month: a month appears once it is over.
+
+## Monthly summary (for Accounts and the administrator)
+A menu item **Monthly summary**: choose the month and read, or press **Download PDF** (one or two pages, with the letterhead) to keep or send:
+- **Headline boxes:** billed before GST (with the number of invoices and the GST), staff and other costs (against last month), profit and margin, people at the end of the month (joined, left), net pay (with gross, PF and ESI), and unpaid invoices today (and what is overdue).
+- **Needs attention:** a plain list of what to check or fix: no payroll calculated for the month, a payroll not approved, invoices still in draft, a client with staff cost but **no invoice yet**, a client at a **loss or with a margin below 5%**, staff at a site not linked to any client, overdue invoices (the largest client and the oldest age), sites with **nobody deployed** or **short of staff**.
+- **Billing and margin by client:** as in Profit per client. **People and payroll:** people paid, gross, deductions, net pay, employer PF and ESI, the bonus accrued this month and for the year so far, and the status of each payroll. **Unpaid invoices today:** the ageing, and the clients with overdue invoices. **Cover at the sites:** the sites that are short.
+- **Limits:** the unpaid and overdue figures are as of today, because the system records whether an invoice is paid but not the date or the amount of the payment, so **what was collected in a particular month is not shown**. The figures for a month that has no calculated payroll are marked as not real yet.
