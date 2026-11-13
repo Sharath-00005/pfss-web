@@ -183,7 +183,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 .looksel{flex:none;display:flex;align-items:center;gap:8px}
 /* the map keeps its own layers inside its card */
 #siteMap{position:relative;z-index:0;isolation:isolate}
-.td-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:1rem}@media(max-width:900px){.td-grid{grid-template-columns:1fr}}
+.td-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:1rem;margin-top:1rem;align-items:start}.td-grid>.card{margin:0}@media(max-width:900px){.td-grid{grid-template-columns:1fr}}
+#tdStats{grid-template-columns:repeat(auto-fit,minmax(170px,1fr))}
 .td-need{display:flex;justify-content:space-between;align-items:center;gap:.6rem;padding:.55rem 0;border-bottom:1px solid var(--line2);font-size:.9rem}
 .gsearch{position:relative;flex:0 1 380px;min-width:160px}
 .gsearch input{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);font:inherit;font-size:14px}
@@ -362,6 +363,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 :root[data-look]:not([data-look="register"]) #tabs-roster{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3.5 2'/%3E%3C/svg%3E");--ic:#0EA5C9}
 :root[data-look]:not([data-look="register"]) #tabs-contracts{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z'/%3E%3Cpath d='M14 3v5h5M9 13h6M9 17h6'/%3E%3C/svg%3E");--ic:#6C5CE7}
 :root[data-look]:not([data-look="register"]) #tabs-invoicing{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3h12v18l-3-2-3 2-3-2-3 2z'/%3E%3Cpath d='M9 8h6M9 12h6'/%3E%3C/svg%3E");--ic:#E8590C}
+:root[data-look]:not([data-look="register"]) #tabs-summary{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20V11M10 20V4M16 20v-8M21 20H3'/%3E%3C/svg%3E");--ic:#7C5CE6}
 :root[data-look]:not([data-look="register"]) #tabs-compliance{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V6z'/%3E%3Cpath d='M8.5 12l2.5 2.5 4.5-5'/%3E%3C/svg%3E");--ic:#2B9A66}
 :root[data-look]:not([data-look="register"]) #tabs-settings{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 7h10M18 7h2M4 17h2M10 17h10'/%3E%3Ccircle cx='16' cy='7' r='2'/%3E%3Ccircle cx='8' cy='17' r='2'/%3E%3C/svg%3E");--ic:#64748B}
 
@@ -385,7 +387,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 <body>
 <div class="appshell">
   <nav class="side" id="sideNav">
-    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="buildTag" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Version: 13 Nov 2026, build 32</small></div></div>
+    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="buildTag" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Version: 13 Nov 2026, build 33</small></div></div>
     <div class="grp">Menu</div>
     <button class="navbtn on" id="tabs-dashboard" data-tab="dashboard">Dashboard</button>
     <button class="navbtn" id="tabs-cycle" data-tab="cycle">Pay cycle</button>
