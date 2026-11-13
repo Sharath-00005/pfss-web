@@ -363,6 +363,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 :root[data-look]:not([data-look="register"]) #tabs-roster{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3.5 2'/%3E%3C/svg%3E");--ic:#0EA5C9}
 :root[data-look]:not([data-look="register"]) #tabs-contracts{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z'/%3E%3Cpath d='M14 3v5h5M9 13h6M9 17h6'/%3E%3C/svg%3E");--ic:#6C5CE7}
 :root[data-look]:not([data-look="register"]) #tabs-invoicing{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 3h12v18l-3-2-3 2-3-2-3 2z'/%3E%3Cpath d='M9 8h6M9 12h6'/%3E%3C/svg%3E");--ic:#E8590C}
+:root[data-look]:not([data-look="register"]) #tabs-history{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Ccircle cx='12' cy='12' r='9'/%3E%3Cpath d='M12 7v5l3 2'/%3E%3C/svg%3E");--ic:#8B7355}
 :root[data-look]:not([data-look="register"]) #tabs-summary{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20V11M10 20V4M16 20v-8M21 20H3'/%3E%3C/svg%3E");--ic:#7C5CE6}
 :root[data-look]:not([data-look="register"]) #tabs-compliance{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l8 3v6c0 4.5-3.2 7.8-8 9-4.8-1.2-8-4.5-8-9V6z'/%3E%3Cpath d='M8.5 12l2.5 2.5 4.5-5'/%3E%3C/svg%3E");--ic:#2B9A66}
 :root[data-look]:not([data-look="register"]) #tabs-settings{--ico:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 7h10M18 7h2M4 17h2M10 17h10'/%3E%3Ccircle cx='16' cy='7' r='2'/%3E%3Ccircle cx='8' cy='17' r='2'/%3E%3C/svg%3E");--ic:#64748B}
@@ -387,7 +388,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 <body>
 <div class="appshell">
   <nav class="side" id="sideNav">
-    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="buildTag" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Version: 13 Nov 2026, build 33</small></div></div>
+    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="buildTag" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Version: 13 Nov 2026, build 34</small></div></div>
     <div class="grp">Menu</div>
     <button class="navbtn on" id="tabs-dashboard" data-tab="dashboard">Dashboard</button>
     <button class="navbtn" id="tabs-cycle" data-tab="cycle">Pay cycle</button>
@@ -401,6 +402,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <button class="navbtn" id="tabs-invoicing" data-tab="invoicing">Invoicing</button>
     <button class="navbtn" id="tabs-compliance" data-tab="compliance">Compliance</button>
     <button class="navbtn" id="tabs-summary" data-tab="summary" style="display:none">Monthly summary</button>
+    <button class="navbtn" id="tabs-history" data-tab="history" style="display:none">History</button>
     <button class="navbtn" id="tabs-settings" data-tab="settings">Settings</button>
     <div class="grp" id="railTitle">Pay cycle</div>
     <ul class="rail" id="workflowRail"></ul>
@@ -795,6 +797,21 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       </div>
     </div>
     <div id="sumOut"></div>
+  </section>
+
+  <section id="tab-history" style="display:none">
+    <div class="card"><div class="row" style="gap:.5rem;align-items:center"><button class="btn small" id="hsBtnLog" type="button">Change log</button><button class="btn small ghost" id="hsBtnBin" type="button">Deleted items <span id="hsBinCount"></span></button></div></div>
+    <div id="hsLogBox" class="card">
+      <h2 style="margin-top:0">Change log</h2>
+      <p class="muted" style="margin-top:0">Who changed what, and when: pay, attendance, invoices, payments, clients, contracts, rate cards, advances and settings. It starts from the day it was switched on, is kept for 13 months, and cannot be edited.</p>
+      <div class="row" style="align-items:flex-end;gap:.8rem"><div class="field grow"><label for="hsSearch">Search</label><input id="hsSearch" placeholder="a person, an invoice number, a client, a field..."></div><div class="field"><label for="hsAction">Kind</label><select id="hsAction"><option value="">All</option><option value="create">Created</option><option value="update">Changed</option><option value="delete">Deleted</option><option value="restore">Restored</option></select></div><div class="field"><label for="hsDays">Period</label><select id="hsDays"><option value="7">Last 7 days</option><option value="30" selected>Last 30 days</option><option value="90">Last 90 days</option><option value="0">All</option></select></div><button class="btn ghost" id="btnHsCsv" type="button">Download (CSV)</button></div>
+      <div id="hsLogOut" class="scrollx" style="margin-top:.6rem"></div>
+    </div>
+    <div id="hsBinBox" class="card" style="display:none">
+      <h2 style="margin-top:0">Deleted items</h2>
+      <p class="muted" style="margin-top:0">Anything deleted is kept here for 30 days. Restore puts it back exactly as it was; after 30 days it is removed for good.</p>
+      <div id="hsBinOut" class="scrollx"></div>
+    </div>
   </section>
 
   <section id="tab-settings" style="display:none">
@@ -1883,10 +1900,140 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     siteRequirements:{}
   };
 
+  /* ---------- history: a change log (who changed what) and a recycle bin (deleted records are kept for 30 days) ---------- */
+  var dbRaw=null;
+  var LOG_COLS={employees:1,invoices:1,invoicePayments:1,clients:1,contracts:1,rateCards:1,advances:1,payrollRuns:1,bonusPayments:1,attendance:1,settings:1};
+  var BIN_COLS={employees:'Employee',invoices:'Invoice',invoicePayments:'Payment',clients:'Client',contracts:'Contract',rateCards:'Rate card',advances:'Advance'};
+  var LOG_NOISE={emailedAt:1,emailedTo:1,emailKind:1,emailedFiles:1,fingerprints:1,numberHistory:1,updatedAt:1};
+  var BIN_DAYS=30, LOG_DAYS=400;
+  function histWho(){ return (me&&(me.name||me.email))||''; }
+  function histLabel(col,d,id){
+    d=d||{};
+    if(col==='employees') return 'Employee '+(d.name||id)+(d.empCode?' ('+d.empCode+')':'');
+    if(col==='invoices') return 'Invoice '+(d.invoiceNo||id)+(d.clientName?' · '+d.clientName:'');
+    if(col==='invoicePayments') return 'Payment of '+fmtMoney(Number(d.amount)||0)+(d.tds?' + TDS '+fmtMoney(Number(d.tds)):'')+' on invoice '+(d.invoiceNo||'')+' ('+(d.date||'')+')';
+    if(col==='clients') return 'Client '+(d.name||id);
+    if(col==='contracts') return 'Contract '+(d.title||id);
+    if(col==='rateCards') return 'Rate card '+(d.name||id);
+    if(col==='advances') return 'Advance '+(d.name||d.empName||id);
+    if(col==='payrollRuns') return 'Payroll '+(d.ym||id)+(d.status?' ('+d.status+')':'');
+    if(col==='bonusPayments') return 'Bonus payments '+(d.name||id);
+    if(col==='attendance'){ var eid=String(id).split('_')[0], e=(state.employees||[]).find(function(x){ return x.id===eid; }); return 'Attendance '+(e?e.name:eid)+' '+(String(id).split('_')[1]||'').replace(/^(\d{4})(\d{2})$/,'$1-$2'); }
+    if(col==='settings') return 'Settings';
+    return col+'/'+id;
+  }
+  function histShow(v){ if(v===undefined||v===null||v==='') return ''; if(typeof v==='object'){ var j=JSON.stringify(v); return j.length>70?(Array.isArray(v)?v.length+' entries':'changed'):j; } return String(v).slice(0,70); }
+  function histDiff(a,b){
+    var out=[], keys={}; Object.keys(a||{}).concat(Object.keys(b||{})).forEach(function(k){ keys[k]=1; });
+    Object.keys(keys).forEach(function(k){ if(LOG_NOISE[k]) return; var x=a&&a[k], y=b&&b[k], nx=(x===undefined||x===null||x==='')?'':JSON.stringify(x), ny=(y===undefined||y===null||y==='')?'':JSON.stringify(y); if(nx===ny) return; out.push({f:k, from:histShow(x), to:histShow(y)}); });   // not set and empty are the same
+    return out;
+  }
+  function histAttDiff(a,b){
+    var out=[], da=(a&&a.days)||{}, db2=(b&&b.days)||{}, ks={}; Object.keys(da).concat(Object.keys(db2)).forEach(function(k){ ks[k]=1; });
+    Object.keys(ks).sort(function(x,y){ return Number(x)-Number(y); }).forEach(function(k){ if((da[k]||'P')!==(db2[k]||'P')) out.push({f:'day '+k, from:da[k]||'P', to:db2[k]||'P'}); });
+    var ua=(a&&a.duty)||{}, ub=(b&&b.duty)||{}, kk={}; Object.keys(ua).concat(Object.keys(ub)).forEach(function(k){ kk[k]=1; });
+    Object.keys(kk).forEach(function(k){ if(String(ua[k]||'')!==String(ub[k]||'')) out.push({f:'duties on day '+k, from:String(ua[k]||'1'), to:String(ub[k]||'1')}); });
+    return out;
+  }
+  async function histPeek(ref){ try{ var sn=await ref.get(); return (sn&&sn.exists)?(sn.data?sn.data():snapData(sn)):undefined; }catch(e){ return undefined; } }
+  async function histLog(col,id,action,old,neu){
+    try{
+      if(!LOG_COLS[col] || !dbRaw) return; var ch=[];
+      if(action==='update'||action==='create'){ ch=(col==='attendance')?histAttDiff(old,neu):(action==='update'?histDiff(old,neu):[]); if((action==='update'||col==='attendance') && !ch.length) return; }
+      var d=neu||old||{};
+      await dbRaw.collection('changeLog').add({at:Date.now(), by:histWho(), coll:col, docId:String(id), action:action, label:histLabel(col,d,id), changes:ch.slice(0,14), more:Math.max(0,ch.length-14)});
+    }catch(e){}
+  }
+  async function histBinPut(col,id,data){
+    await dbRaw.collection('recycleBin').add({coll:col, docId:String(id), kind:BIN_COLS[col], label:histLabel(col,data,id), data:data, at:Date.now(), by:histWho(), expires:Date.now()+BIN_DAYS*86400000});
+  }
+  // everything the page writes goes through here: a record is logged after it is saved, and copied to the bin before it is deleted. A failure of the log never stops the work.
+  function wrapDbForHistory(raw){
+    if(!raw || raw.__hist) return raw; dbRaw=raw;
+    function wrapRef(ref,col,id){
+      var o=Object.create(ref);
+      o.set=async function(data,opts){ var old=LOG_COLS[col]?await histPeek(ref):undefined, r=await ref.set(data,opts); histLog(col,id,old?'update':'create',old,data); return r; };
+      o.update=async function(data){ var old=LOG_COLS[col]?await histPeek(ref):undefined, r=await ref.update(data); histLog(col,id,'update',old,Object.assign({},old||{},data)); return r; };
+      o.delete=async function(){ var old=(LOG_COLS[col]||BIN_COLS[col])?await histPeek(ref):undefined; if(old && BIN_COLS[col]){ try{ await histBinPut(col,id,old); }catch(e){} } var r=await ref.delete(); if(old) histLog(col,id,'delete',old,null); return r; };
+      return o;
+    }
+    var w=Object.create(raw); w.__hist=true;
+    w.collection=function(name){ var c=raw.collection(name), o=Object.create(c);
+      o.add=async function(data){ var r=await c.add(data); if(LOG_COLS[name]) histLog(name,(r&&r.id)||'',(name==='attendance'?'update':'create'),null,data); return r; };
+      o.doc=function(id){ return wrapRef(c.doc(id),name,id); }; return o; };
+    w.doc=function(path){ var p=String(path).split('/'); return wrapRef(raw.doc(path),p[0],p.slice(1).join('/')); };
+    return w;
+  }
+  var hsLog=[], hsBin=[], hsShown=200, hsTab='log';
+  function histFetch(col){
+    return new Promise(function(res){ if(!dbRaw){ res([]); return; } var done=false, un=null; try{ un=dbRaw.collection(col).onSnapshot(function(snap){ if(done) return; done=true; try{ if(un) un(); }catch(e){} res(snap.docs.map(function(d){ return Object.assign({id:d.id}, d.data()); })); }, function(){ if(!done){ done=true; res([]); } }); }catch(e){ res([]); } });
+  }
+  async function openHistory(){
+    if(!(me&&me.isOwner)){ document.getElementById('hsLogOut').innerHTML='<p class="muted">Only an administrator can see the history.</p>'; return; }
+    showHistTab(hsTab); await Promise.all([loadChangeLog(), loadBin()]); renderHistory();
+  }
+  async function loadChangeLog(){
+    hsLog=(await histFetch('changeLog')).sort(function(a,b){ return (b.at||0)-(a.at||0); });
+    var cut=Date.now()-LOG_DAYS*86400000, old=hsLog.filter(function(x){ return (x.at||0)<cut; }).slice(0,100);
+    for(var i=0;i<old.length;i++){ try{ await dbRaw.doc('changeLog/'+old[i].id).delete(); }catch(e){ break; } } if(old.length) hsLog=hsLog.filter(function(x){ return (x.at||0)>=cut; });
+  }
+  async function loadBin(){
+    hsBin=(await histFetch('recycleBin')).sort(function(a,b){ return (b.at||0)-(a.at||0); });
+    var gone=hsBin.filter(function(x){ return (x.expires||0)<Date.now(); }).slice(0,100);
+    for(var i=0;i<gone.length;i++){ try{ await dbRaw.doc('recycleBin/'+gone[i].id).delete(); }catch(e){ break; } } if(gone.length) hsBin=hsBin.filter(function(x){ return (x.expires||0)>=Date.now(); });
+  }
+  function showHistTab(t){
+    hsTab=t; document.getElementById('hsLogBox').style.display=t==='log'?'':'none'; document.getElementById('hsBinBox').style.display=t==='bin'?'':'none';
+    document.getElementById('hsBtnLog').className='btn small'+(t==='log'?'':' ghost'); document.getElementById('hsBtnBin').className='btn small'+(t==='bin'?'':' ghost');
+  }
+  var HS_ACT={create:['Created','ok'], update:['Changed','info'], delete:['Deleted','bad'], restore:['Restored','warn']};
+  function hsFiltered(){
+    var q=String(document.getElementById('hsSearch').value||'').toLowerCase().trim(), act=document.getElementById('hsAction').value, days=Number(document.getElementById('hsDays').value)||0, cut=days?Date.now()-days*86400000:0;
+    return hsLog.filter(function(x){
+      if(act && x.action!==act) return false; if(cut && (x.at||0)<cut) return false; if(!q) return true;
+      var hay=(String(x.label||'')+' '+String(x.by||'')+' '+(x.changes||[]).map(function(c){ return c.f+' '+c.from+' '+c.to; }).join(' ')).toLowerCase(); return hay.indexOf(q)>-1;
+    });
+  }
+  function hsWhen(t){ var d=new Date(t); return d.toLocaleDateString('en-GB')+' '+d.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'}); }
+  function renderHistory(){
+    var rows=hsFiltered(), shown=rows.slice(0,hsShown);
+    document.getElementById('hsLogOut').innerHTML=rows.length?('<table><thead><tr><th>When</th><th>Who</th><th>What</th><th>Changes</th></tr></thead><tbody>'+shown.map(function(x){ var a=HS_ACT[x.action]||[x.action,'mute'];
+      return '<tr><td style="white-space:nowrap">'+escapeHtml(hsWhen(x.at))+'</td><td>'+escapeHtml(x.by||'-')+'</td><td><span class="tag '+a[1]+'">'+a[0]+'</span> '+escapeHtml(x.label||'')+'</td><td style="font-size:.84rem">'+((x.changes||[]).slice(0,5).map(function(c){ return '<div><span class="muted">'+escapeHtml(c.f)+':</span> '+(c.from!==''?escapeHtml(c.from)+' <b>&rarr;</b> ':'')+'<b>'+escapeHtml(c.to===''?'(empty)':c.to)+'</b></div>'; }).join('')+(((x.changes||[]).length>5||x.more)?'<div class="muted">and '+(Math.max(0,(x.changes||[]).length-5)+(x.more||0))+' more</div>':''))+'</td></tr>'; }).join('')+'</tbody></table>'+(rows.length>shown.length?'<p style="margin:.6rem 0 0"><button class="btn small ghost" id="hsMore" type="button">Show more ('+(rows.length-shown.length)+' older)</button></p>':'')):'<p class="muted">Nothing recorded for these filters yet.</p>';
+    var more=document.getElementById('hsMore'); if(more) more.addEventListener('click', function(){ hsShown+=200; renderHistory(); });
+    document.getElementById('hsBinCount').textContent=hsBin.length?'('+hsBin.length+')':'';
+    document.getElementById('hsBinOut').innerHTML=hsBin.length?('<table><thead><tr><th>Item</th><th>Kind</th><th>Deleted by</th><th>When</th><th>Removed for good in</th><th></th></tr></thead><tbody>'+hsBin.map(function(x){ var left=Math.max(0,Math.ceil(((x.expires||0)-Date.now())/86400000));
+      return '<tr><td><b>'+escapeHtml(x.label||'')+'</b></td><td>'+escapeHtml(x.kind||x.coll)+'</td><td>'+escapeHtml(x.by||'-')+'</td><td style="white-space:nowrap">'+escapeHtml(hsWhen(x.at))+'</td><td>'+left+' day'+(left===1?'':'s')+'</td><td style="white-space:nowrap"><button class="btn small" data-hsrest="'+escapeHtml(x.id)+'" type="button">Restore</button> <button class="btn small danger" data-hsforever="'+escapeHtml(x.id)+'" type="button">Delete for good</button></td></tr>'; }).join('')+'</tbody></table>'):'<p class="muted">Nothing deleted in the last 30 days.</p>';
+  }
+  async function histRestore(binId){
+    var x=hsBin.find(function(b){ return b.id===binId; }); if(!x) return;
+    var live=false; try{ var sn=await dbRaw.doc(x.coll+'/'+x.docId).get(); live=!!(sn&&sn.exists); }catch(e){}
+    if(live){ toast('A record with the same identity already exists, so this one was not restored.'); return; }
+    if(x.coll==='invoices'){ var pr=invNoProblem((x.data||{}).invoiceNo,x.docId); if(pr){ toast('Not restored. '+pr+' Change that other invoice first, or restore this one later.'); return; } }
+    if(x.coll==='employees' && (x.data||{}).empCode && state.employees.some(function(e){ return e.empCode===x.data.empCode; })){ toast('Not restored: another employee now has the code '+x.data.empCode+'.'); return; }
+    try{ await dbRaw.doc(x.coll+'/'+x.docId).set(x.data); await dbRaw.doc('recycleBin/'+x.id).delete(); histLog(x.coll,x.docId,'restore',null,x.data); hsBin=hsBin.filter(function(b){ return b.id!==binId; }); toast(x.label+' restored.'); await loadChangeLog(); renderHistory(); }
+    catch(e){ toast('Could not restore it: '+((e&&(e.code||e.message))||'error')); }
+  }
+  async function histForever(binId){
+    var x=hsBin.find(function(b){ return b.id===binId; }); if(!x || !confirm('Delete "'+x.label+'" for good? It cannot be restored afterwards.')) return;
+    try{ await dbRaw.doc('recycleBin/'+x.id).delete(); hsBin=hsBin.filter(function(b){ return b.id!==binId; }); renderHistory(); toast('Deleted for good.'); }catch(e){ toast('Could not delete it.'); }
+  }
+  async function histCsv(){
+    var q=function(v){ return '"'+String(v==null?'':v).replace(/"/g,'""')+'"'; }, rows=[['When','Who','Kind','What','Field','Before','After']];
+    hsFiltered().forEach(function(x){ var ch=(x.changes&&x.changes.length)?x.changes:[{f:'',from:'',to:''}]; ch.forEach(function(c){ rows.push([hsWhen(x.at),x.by||'',(HS_ACT[x.action]||[x.action])[0],x.label||'',c.f,c.from,c.to]); }); });
+    await pdfSave(new Blob([rows.map(function(r){ return r.map(q).join(','); }).join('\r\n')],{type:'text/csv'}),'change-log-'+xToday()+'.csv');
+  }
+  (function(){
+    var b=document.getElementById('hsBtnLog'); if(!b) return;
+    b.addEventListener('click', function(){ showHistTab('log'); }); document.getElementById('hsBtnBin').addEventListener('click', function(){ showHistTab('bin'); });
+    ['hsSearch','hsAction','hsDays'].forEach(function(id){ document.getElementById(id).addEventListener('input', function(){ hsShown=200; renderHistory(); }); document.getElementById(id).addEventListener('change', function(){ hsShown=200; renderHistory(); }); });
+    document.getElementById('btnHsCsv').addEventListener('click', histCsv);
+    document.getElementById('hsBinOut').addEventListener('click', function(ev){ var r=ev.target.closest('[data-hsrest]'), f=ev.target.closest('[data-hsforever]'); if(r) histRestore(r.dataset.hsrest); else if(f) histForever(f.dataset.hsforever); });
+  })();
+
   // ---------- INIT ----------
   async function init(){
     try{
-      db = await claude.use("db");
+      db = await claude.use("db"); if(db) db=wrapDbForHistory(db);
     }catch(e){ db=null; }
     if(!db){ toast('Could not connect to shared storage — changes will not be saved.'); }
     try{ userCap = await claude.use("user"); }catch(e){ userCap=null; }
@@ -2007,7 +2154,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   }
 
   // ---------- TABS ----------
-  var TAB_TITLES = {summary:'Monthly summary', dashboard:'Dashboard', employees:'Employees', attendance:'Attendance', roster:'Duty Roster', payroll:'Payroll', advances:'Advances', ratecard:'Rate Card', invoicing:'Invoicing', contracts:'Contracts', compliance:'Compliance', settings:'Settings', cycle:'Pay cycle'};
+  var TAB_TITLES = {history:'History', summary:'Monthly summary', dashboard:'Dashboard', employees:'Employees', attendance:'Attendance', roster:'Duty Roster', payroll:'Payroll', advances:'Advances', ratecard:'Rate Card', invoicing:'Invoicing', contracts:'Contracts', compliance:'Compliance', settings:'Settings', cycle:'Pay cycle'};
   function setupTabs(){
     var btns=document.querySelectorAll('.side .navbtn');
     btns.forEach(function(b){
@@ -2015,7 +2162,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         btns.forEach(function(x){x.classList.remove('on');});
         b.classList.add('on');
         document.getElementById('pageTitle').textContent = TAB_TITLES[b.dataset.tab]||'';
-        ['dashboard','cycle','employees','attendance','roster','payroll','advances','ratecard','invoicing','contracts','compliance','summary','settings'].forEach(function(t){
+        ['dashboard','cycle','employees','attendance','roster','payroll','advances','ratecard','invoicing','contracts','compliance','summary','history','settings'].forEach(function(t){
           document.getElementById('tab-'+t).style.display = (t===b.dataset.tab)?'':'none';
         });
         document.body.classList.remove('menu');
@@ -2023,6 +2170,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         if(b.dataset.tab==='payroll'){ renderPayroll(); }   // so changes made in Attendance show up when the tab is opened
         if(b.dataset.tab==='dashboard'){ applyDashView(true); }
         if(b.dataset.tab==='summary'){ renderSummary(); }
+        if(b.dataset.tab==='history'){ openHistory(); }
         refreshSiteLinks();
       });
     });
@@ -2474,6 +2622,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     box.querySelectorAll('[data-siteloc]').forEach(function(b){ b.addEventListener('click', function(){ openSiteLoc(b.dataset.siteloc); }); });
     applyDashView();
     var sb=document.getElementById('tabs-summary'); if(sb) sb.style.display=canPay()?'':'none';
+    var hb=document.getElementById('tabs-history'); if(hb) hb.style.display=(me&&me.isOwner)?'':'none';
   }
 
   function escapeHtml(s){ var d=document.createElement('div'); d.textContent=s||''; return d.innerHTML; }

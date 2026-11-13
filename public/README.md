@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-Under the name at the top of the left menu a small line reads, for example, "Version: 13 Nov 2026, build 32". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+Under the name at the top of the left menu a small line reads, for example, "Version: 13 Nov 2026, build 34". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -975,7 +975,7 @@ Different clients get different services, so the SAC code (and the description o
 
 
 ## One version line
-The page used to show two version lines: an old one under the name ("Build 5 Nov 2026 · 44", which was never updated) and the real one at the bottom of the menu. The old one is removed. There is now a single line, **under "Public Force" at the top of the left menu**, such as "Version: 13 Nov 2026, build 32". It is the line to check after an upload (press Ctrl + Shift + R first): if it shows an older build, the new file is not live yet.
+The page used to show two version lines: an old one under the name ("Build 5 Nov 2026 · 44", which was never updated) and the real one at the bottom of the menu. The old one is removed. There is now a single line, **under "Public Force" at the top of the left menu**, such as "Version: 13 Nov 2026, build 34". It is the line to check after an upload (press Ctrl + Shift + R first): if it shows an older build, the new file is not live yet.
 
 
 ## Paying the bonus at the year end (bonus ledger)
@@ -1092,3 +1092,16 @@ The Dashboard has **Today** and **This month** (the choice is remembered on this
 - **Sites today**, worst first, with the number required (the roster requirement, or the contract's posts), the number on duty and who is away, and a **map of today** (green fully staffed today, amber short, red nobody on duty, grey no requirement).
 - **Needs you today**: nobody on duty at a site, a short site (and who is away), the payroll still to calculate or approve, overdue invoices (Follow up opens the overdue panel), invoices in draft, filings due within a week or late, and company licences that are expired or about to expire. Each item has a button that takes you there.
 - **This month** is the Dashboard as before (overview, trends, site map by posting, By site, pay cycle, attention).
+
+
+### Small corrections (build 33)
+The **Monthly summary** menu item now has its own icon in the looks that show icons, the five tiles of **Today** sit in one row, and the two cards below them line up with each other.
+
+
+## Change log and deleted items (History, administrator only)
+A menu item **History** (administrator only) has two tabs.
+- **Change log:** every time somebody saves a change, the tool writes one line: **who, when, what, and the field with its before and after** (for example "dueDate: 2026-12-31 -> 2026-12-15"). It covers employees (pay and the rest), attendance (the person and the day, such as "day 5: P -> A"), invoices, payments received, clients (GST exempt and so on), contracts, rate cards, advances, payroll runs (approval), bonus payments and settings. Internal bookkeeping (Document ID records, email stamps) and fields that are only "not set" against "empty" are left out. Search by a person, an invoice number, a client or a field; filter by kind (created, changed, deleted, restored) and period; **Download (CSV)**. It starts from the day this was switched on, **is kept for 13 months** (older lines are cleared when the History is opened), and **cannot be edited**.
+- **Deleted items:** when an **employee, invoice, payment, client, contract, rate card or advance** is deleted, a full copy is kept for **30 days**. **Restore** puts it back exactly as it was (same id, same number, same pay), and the restore is itself logged; **Delete for good** removes it at once (it asks first). An item past its 30 days is removed when the History is opened. An **invoice whose number has been used since** is not restored: the message says which invoice has the number. An **employee whose code is now another person's** is not restored either. The payments of a deleted invoice are not deleted with it, so they are attached again when the invoice is restored.
+- It is recorded at one point in the page where everything is saved, so it covers every screen. A failure of the log never stops the work being saved. Both the log and the bin are in the backup.
+- **Run `supabase/accounts_role.sql` once** in the Supabase SQL Editor (as for payments): nobody can edit a change log line, and only an administrator can delete from the log or the bin. The History is **hidden from other roles in the page, but the database still lets any signed-in person read it** (the same as the other records); tell me if that must be locked too.
+- Not recorded: who only looked at something, and changes made before this was switched on.
