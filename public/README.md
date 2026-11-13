@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-Under the name at the top of the left menu a small line reads, for example, "Version: 10 Nov 2026, build 31". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+Under the name at the top of the left menu a small line reads, for example, "Version: 13 Nov 2026, build 32". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -975,7 +975,7 @@ Different clients get different services, so the SAC code (and the description o
 
 
 ## One version line
-The page used to show two version lines: an old one under the name ("Build 5 Nov 2026 · 44", which was never updated) and the real one at the bottom of the menu. The old one is removed. There is now a single line, **under "Public Force" at the top of the left menu**, such as "Version: 10 Nov 2026, build 31". It is the line to check after an upload (press Ctrl + Shift + R first): if it shows an older build, the new file is not live yet.
+The page used to show two version lines: an old one under the name ("Build 5 Nov 2026 · 44", which was never updated) and the real one at the bottom of the menu. The old one is removed. There is now a single line, **under "Public Force" at the top of the left menu**, such as "Version: 13 Nov 2026, build 32". It is the line to check after an upload (press Ctrl + Shift + R first): if it shows an older build, the new file is not live yet.
 
 
 ## Paying the bonus at the year end (bonus ledger)
@@ -1062,3 +1062,33 @@ For a client marked **GST exempt** (the client's window), an invoice now has **n
 
 ### Search results: clicking them works in every look (correction)
 The search results were shown, but a click on them did not always reach them. In the **Horizon** look the top bar clips what drops out of it, so most of the list could not be reached, and in the **Register** look the layers of the map on the Dashboard lay over the list. The list is now placed on the page itself, directly under the search box, above everything else and inside the screen, also on a phone, and the map keeps its layers inside its own card. Choosing a result opens that person, client, invoice, contract or rate card, or takes you to the site's row on the Dashboard, which is highlighted and brought into view.
+
+
+## Recording payments received (collections and TDS)
+Each issued invoice has a **Payment** button (Accounts and the administrator). The window shows the invoice total, what was received, the TDS deducted and the **balance**, and a list of the payments with **Remove**. To record a payment: the **date received**, the **amount received**, the **TDS deducted by the client** (the box says what TDS would be at the rate in Settings on the amount before GST), how it was paid and the reference (UTR or cheque number). **Fill in the balance** puts what is left, less the TDS typed. A payment of more than the balance asks first.
+- The amount received and the TDS both reduce the balance. When nothing is left the invoice becomes **paid** (and its stored status too, with the date paid); remove the last payment and it goes back to **sent**. An invoice with a part payment is **part paid**, or **overdue** if its due date has passed, and the list shows "received ... + TDS ... · balance ...". The status filter has **Part paid**.
+- Invoicing shows **Collected this month** and **TDS deducted this year** (financial year). **Outstanding, the overdue figures, the ageing, the Dashboard trends, the search and the Monthly summary now use the balance**, not the invoice total. The Monthly summary has **Collected in the month** with the TDS.
+- **Drafts are no longer counted as outstanding** (they have not been issued).
+- An invoice **marked paid before payments were recorded** has no payment on record: it stays paid with a nil balance, is not in the collected figures, and its window lets you record when it was paid.
+- Payments are kept in the collection `invoicePayments` and are part of the backup. **Run `supabase/accounts_role.sql` once** in the Supabase SQL Editor: it lets only Accounts and the administrator write payments.
+
+## Following up overdue invoices
+**Invoicing, Overdue by client** (Accounts and the administrator) lists each client with overdue invoices by age (1 to 30, 31 to 60, 61 to 90, over 90 days), the total and the **last reminder** (date and which one).
+- **Statement (PDF):** the statement of account of the client: the unpaid invoices with total, received and balance and the days late, the payments of the last six months, the ageing, and your bank details to pay to. **Download all statements (ZIP)** makes one for every client with something unpaid.
+- **Send reminder:** an email to the client with the statement attached (and, if ticked, a copy of each overdue invoice). The wording is the **1st reminder**, then the **2nd**, then the **final** reminder (which asks for payment within 7 days); the count starts again if the last reminder is more than 60 days old. Choose another one in the window, and edit the text freely. The greeting uses the client's contact name. Every reminder is recorded (who, when, which invoices, the amount) and the invoices show "Reminded" in the list.
+- **Remind everyone overdue:** one email for each ticked client, each worded as its next reminder, with a progress line; clients without an email address are marked and left out.
+- It uses the same email service as invoices: where it is not connected, the window says so, and the statement can still be downloaded.
+
+## Wage revision arrears
+**Invoicing, Wage revision arrears** (Accounts and the administrator). When the minimum wages go up: update the rate cards (Rate Card, Update wages from the minimum wages table), then choose the date the new wages start and the first and last month to correct, and press **Work out the difference**. Every issued invoice made from a contract in those months is calculated again, from the same attendance and the present rate cards, in the same way as **Generate lines**, and the window shows what was billed, what it should be, and the **difference to bill** (you can change it). Tick the invoices and **Create the supplementary invoices as drafts**: one draft for each client, with a line for each month and invoice ("Difference for October 2026 due to the revision of minimum wages from 01-10-2026 (invoice ...)"), no service charge added on top (it is already in the difference), GST as on the invoice (none for an exempt client), the next number of the series. Check and issue them like any invoice.
+- The corrected invoices are marked **billed in ...**, so the same invoice is not billed twice, and the supplementary invoices are never corrected again.
+- If the **man-days** now differ from the invoice (attendance changed since), the row is not ticked and the figures say so: the difference then contains that change as well.
+- A start date part way through a month is worked out for the **whole month** at the new rates (the window warns): change the first month's difference by hand.
+- A rate **lower** than what was billed would need a **credit note**, which is not made here. Invoices with typed amounts, or not made from a contract, are not checked (they are listed).
+
+## The Today view of the Dashboard
+The Dashboard has **Today** and **This month** (the choice is remembered on this device). **Today** shows:
+- **On duty today** (present or half day, out of those expected), **absent or on leave**, **sites short today**, the number on a **weekly off or holiday**, and for Accounts and the administrator the **overdue invoices**. It is worked out from the attendance marks and the weekly offs, and **a day with no mark counts as present**: it is as good as the marking, so mark an absence the day it happens. Opening the Dashboard or pressing **Refresh** reads the marks again from the database.
+- **Sites today**, worst first, with the number required (the roster requirement, or the contract's posts), the number on duty and who is away, and a **map of today** (green fully staffed today, amber short, red nobody on duty, grey no requirement).
+- **Needs you today**: nobody on duty at a site, a short site (and who is away), the payroll still to calculate or approve, overdue invoices (Follow up opens the overdue panel), invoices in draft, filings due within a week or late, and company licences that are expired or about to expire. Each item has a button that takes you there.
+- **This month** is the Dashboard as before (overview, trends, site map by posting, By site, pay cycle, attention).

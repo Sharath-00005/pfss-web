@@ -183,6 +183,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 .looksel{flex:none;display:flex;align-items:center;gap:8px}
 /* the map keeps its own layers inside its card */
 #siteMap{position:relative;z-index:0;isolation:isolate}
+.td-grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:1rem}@media(max-width:900px){.td-grid{grid-template-columns:1fr}}
+.td-need{display:flex;justify-content:space-between;align-items:center;gap:.6rem;padding:.55rem 0;border-bottom:1px solid var(--line2);font-size:.9rem}
 .gsearch{position:relative;flex:0 1 380px;min-width:160px}
 .gsearch input{width:100%;padding:9px 12px;border:1px solid var(--line);border-radius:10px;background:var(--panel);color:var(--ink);font:inherit;font-size:14px}
 .gsearch input:focus{outline:2px solid var(--brand);outline-offset:1px;background:var(--surface)}
@@ -383,7 +385,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 <body>
 <div class="appshell">
   <nav class="side" id="sideNav">
-    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="buildTag" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Version: 10 Nov 2026, build 31</small></div></div>
+    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="buildTag" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Version: 13 Nov 2026, build 32</small></div></div>
     <div class="grp">Menu</div>
     <button class="navbtn on" id="tabs-dashboard" data-tab="dashboard">Dashboard</button>
     <button class="navbtn" id="tabs-cycle" data-tab="cycle">Pay cycle</button>
@@ -414,6 +416,28 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 
   <!-- DASHBOARD -->
   <section id="tab-dashboard">
+    <div class="row" id="dashSwitch" style="gap:.5rem;margin-bottom:.8rem"><button class="btn small" id="dashBtnToday" type="button">Today</button><button class="btn small ghost" id="dashBtnMonth" type="button">This month</button></div>
+    <div id="dashTodayBox">
+      <div class="card">
+        <div class="row" style="justify-content:space-between;align-items:center"><h2 style="margin:0">Today <span class="muted" id="tdDate" style="font-weight:400;font-size:.95rem"></span></h2><button class="btn small ghost" id="btnTdRefresh" type="button">Refresh</button></div>
+        <div class="stat-grid" id="tdStats" style="margin-top:.6rem"></div>
+        <p class="muted" id="tdNote" style="margin:.5rem 0 0;font-size:.8rem"></p>
+      </div>
+      <div class="td-grid">
+        <div class="card" id="tdMapCard">
+          <div class="row" style="justify-content:space-between;align-items:center;gap:1rem"><h2 style="margin:0">Sites today</h2><div class="muted" id="tdLegend" style="font-size:.8rem"></div></div>
+          <div id="tdMap" style="height:300px;margin-top:.6rem;border-radius:12px;overflow:hidden;background:var(--bg);position:relative;z-index:0;isolation:isolate"></div>
+          <p class="muted" id="tdMapNote" style="margin:.5rem 0 0;font-size:.8rem"></p>
+          <div id="tdSites" class="scrollx" style="margin-top:.6rem"></div>
+        </div>
+        <div class="card">
+          <h2>Needs you today</h2>
+          <div id="tdNeeds"></div>
+          <div class="row" style="gap:.4rem;margin-top:.8rem;flex-wrap:wrap"><button class="btn small ghost" data-tdgo="attendance" type="button">Mark attendance</button><button class="btn small ghost" data-tdgo="cycle" type="button">Pay cycle</button><button class="btn small ghost" data-tdgo="invoicing" type="button">Invoicing</button></div>
+        </div>
+      </div>
+    </div>
+    <div id="dashMonthBox">
     <div class="card">
       <h2>Overview</h2>
       <div class="stat-grid" id="statGrid">
@@ -445,6 +469,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     </div>
     <div class="card" id="cycleCard"></div>
   <div class="card" id="attnCard"></div>
+    </div>
   </section>
 
   <!-- EMPLOYEES -->
@@ -649,6 +674,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <div class="card">
       <div class="stat-grid">
         <div class="stat"><b id="invStatOutstanding">₹0</b><span>Outstanding (unpaid)</span></div>
+        <div class="stat"><b id="invStatCollected">₹0</b><span>Collected this month</span></div>
+        <div class="stat"><b id="invStatTds">₹0</b><span>TDS deducted this year</span></div>
         <div class="stat"><b id="invStatOverdue">0</b><span>Overdue invoices</span></div>
         <div class="stat"><b id="invStatThisMonth">₹0</b><span>Billed this month</span></div>
         <div class="stat"><b id="invStatClients">0</b><span>Active clients</span></div>
@@ -669,14 +696,23 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       <div class="empty-state" id="clientEmpty" style="display:none">No clients yet. Click "+ Add client" to start.</div>
     </div>
 
+    <div class="card" id="recvCard" style="display:none">
+      <div class="row" style="justify-content:space-between;align-items:center;gap:1rem">
+        <h2 style="margin:0">Overdue by client</h2>
+        <div class="row" style="gap:.5rem"><button class="btn ghost" id="btnStmtZip" type="button">Download all statements (ZIP)</button><button class="btn ghost" id="btnRemindAll" type="button">Remind everyone overdue</button></div>
+      </div>
+      <div class="scrollx" style="margin-top:.6rem"><table id="recvTable"><thead><tr><th>Client</th><th class="right">1 to 30 days</th><th class="right">31 to 60</th><th class="right">61 to 90</th><th class="right">Over 90</th><th class="right">Total overdue</th><th>Last reminder</th><th></th></tr></thead><tbody></tbody></table></div>
+      <p class="muted" id="recvEmpty" style="margin:.4rem 0 0;display:none">No invoice is overdue.</p>
+    </div>
+
     <div class="card">
       <div class="row" style="justify-content:space-between">
         <h2>Invoices</h2>
-        <div class="row" style="gap:.5rem"><button class="btn ghost" id="btnInvNumbers" type="button">Invoice numbers</button><button class="btn" id="btnAddInvoice">+ New invoice</button></div>
+        <div class="row" style="gap:.5rem"><button class="btn ghost" id="btnArrears" type="button" style="display:none">Wage revision arrears</button><button class="btn ghost" id="btnInvNumbers" type="button">Invoice numbers</button><button class="btn" id="btnAddInvoice">+ New invoice</button></div>
       </div>
       <div class="row">
         <div class="field"><label>Client</label><select id="invClientFilter"><option value="">All clients</option></select></div>
-        <div class="field"><label>Status</label><select id="invStatusFilter"><option value="">All statuses</option><option value="draft">Draft</option><option value="sent">Sent</option><option value="paid">Paid</option><option value="overdue">Overdue</option></select></div>
+        <div class="field"><label>Status</label><select id="invStatusFilter"><option value="">All statuses</option><option value="draft">Draft</option><option value="sent">Sent</option><option value="part paid">Part paid</option><option value="paid">Paid</option><option value="overdue">Overdue</option></select></div>
       </div>
       <div class="scrollx">
       <table id="invTable">
@@ -1465,6 +1501,77 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   </div>
 </div>
 
+<div class="modal-bg" id="ipModalBg">
+  <div class="modal" style="max-width:780px">
+    <button class="close-x" id="ipClose">&times;</button>
+    <h3 id="ipTitle">Payments</h3>
+    <div class="stat-grid" id="ipSummary" style="margin:.4rem 0 .8rem"></div>
+    <div id="ipOld" class="muted" style="margin-bottom:.4rem"></div>
+    <div id="ipHist"></div>
+    <h4 style="margin:1rem 0 .3rem">Record a payment</h4>
+    <div class="row">
+      <div class="field"><label for="ipDate">Date received *</label><input type="date" id="ipDate"></div>
+      <div class="field"><label for="ipAmt">Amount received (₹) *</label><input type="number" step="0.01" id="ipAmt"></div>
+      <div class="field"><label for="ipTds">TDS deducted by the client (₹)</label><input type="number" step="0.01" id="ipTds"><div class="muted" id="ipTdsHint" style="font-size:.78rem"></div></div>
+    </div>
+    <div class="row">
+      <div class="field"><label for="ipMode">Paid by</label><select id="ipMode"><option>NEFT</option><option>RTGS</option><option>IMPS</option><option>UPI</option><option>Cheque</option><option>Cash</option></select></div>
+      <div class="field grow"><label for="ipRef">Reference (UTR or cheque number)</label><input id="ipRef"></div>
+    </div>
+    <div class="field"><label for="ipNote">Note (optional)</label><input id="ipNote"></div>
+    <div id="ipErr" style="color:var(--bad);min-height:1.3em" role="alert"></div>
+    <div class="row" style="justify-content:space-between"><button class="btn ghost" id="btnIpFill" type="button">Fill in the balance</button><button class="btn" id="btnIpSave" type="button">Save the payment</button></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="remModalBg">
+  <div class="modal" style="max-width:760px">
+    <button class="close-x" id="remClose">&times;</button>
+    <h3 id="remTitle">Reminder</h3>
+    <div class="row">
+      <div class="field"><label for="remLevel">Which reminder</label><select id="remLevel"><option value="1">1st reminder</option><option value="2">2nd reminder</option><option value="3">Final reminder</option></select></div>
+      <div class="field grow"><label for="remFrom">From</label><select id="remFrom"></select></div>
+    </div>
+    <div class="row"><div class="field grow"><label for="remTo">To *</label><input id="remTo" type="email"></div><div class="field grow"><label for="remCc">Cc (optional)</label><input id="remCc"></div></div>
+    <div class="field"><label for="remSubject">Subject</label><input id="remSubject"></div>
+    <div class="field"><label for="remMsg">Message</label><textarea id="remMsg" rows="11"></textarea></div>
+    <div class="muted" id="remInv" style="font-size:.84rem;margin-bottom:.4rem"></div>
+    <label style="display:block;margin:.2rem 0"><input type="checkbox" id="remStmt" checked disabled style="width:auto;margin-right:.4rem">The statement of account is attached (PDF)</label>
+    <label style="display:block;margin:.2rem 0"><input type="checkbox" id="remCopies" style="width:auto;margin-right:.4rem">Also attach a copy of each overdue invoice</label>
+    <div id="remHelp" class="muted" style="display:none;margin:.4rem 0"></div>
+    <div id="remErr" style="color:var(--bad);min-height:1.3em" role="alert"></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn" id="btnRemSend" type="button">Send the reminder</button></div>
+  </div>
+</div>
+<div class="modal-bg" id="remAllModalBg">
+  <div class="modal" style="max-width:760px">
+    <button class="close-x" id="remAllClose">&times;</button>
+    <h3>Remind everyone overdue</h3>
+    <p class="muted">Each client gets one email with its statement, worded as its next reminder (1st, 2nd or final). Untick a client to leave it out. Clients without an email address cannot be reminded here.</p>
+    <div id="remAllList" class="scrollx"></div>
+    <div id="remAllMsg" class="muted" style="min-height:1.3em;margin:.4rem 0"></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn" id="btnRemAllSend" type="button">Send the reminders</button></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="arModalBg">
+  <div class="modal" style="max-width:1000px">
+    <button class="close-x" id="arClose">&times;</button>
+    <h3>Wage revision: arrears to bill</h3>
+    <p class="muted">When the minimum wages go up, invoices already issued at the old rates are short. First update the rate cards (Rate Card, <i>Update wages from the minimum wages table</i>). Then choose the months: each issued invoice made from a contract is worked out again at the present rates, and the difference is billed on a supplementary invoice, saved as a draft for you to check.</p>
+    <div class="row" style="align-items:flex-end;gap:.8rem">
+      <div class="field"><label for="arEff">New wages from (date)</label><input type="date" id="arEff"></div>
+      <div class="field"><label for="arFrom">First month to correct</label><input type="month" id="arFrom"></div>
+      <div class="field"><label for="arTo">Last month to correct</label><input type="month" id="arTo"></div>
+      <button class="btn" id="btnArWork" type="button">Work out the difference</button>
+    </div>
+    <div id="arNote" class="muted" style="margin:.5rem 0;font-size:.84rem"></div>
+    <div id="arOut" class="scrollx"></div>
+    <div id="arErr" style="color:var(--bad);min-height:1.3em" role="alert"></div>
+    <div class="row" style="justify-content:space-between;align-items:center"><span id="arTotals" class="muted"></span><button class="btn" id="btnArCreate" type="button" style="display:none">Create the supplementary invoices as drafts</button></div>
+  </div>
+</div>
+
 <div class="modal-bg" id="mailModalBg">
   <div class="modal" style="max-width:660px">
     <button class="close-x" id="mailModalClose">&times;</button>
@@ -1912,7 +2019,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         document.body.classList.remove('menu');
         if(b.dataset.tab==='cycle'){ renderCycle(); }
         if(b.dataset.tab==='payroll'){ renderPayroll(); }   // so changes made in Attendance show up when the tab is opened
-        if(b.dataset.tab==='dashboard'){ drawSiteMap(); renderTrends(); }
+        if(b.dataset.tab==='dashboard'){ applyDashView(true); }
         if(b.dataset.tab==='summary'){ renderSummary(); }
         refreshSiteLinks();
       });
@@ -1996,14 +2103,14 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     });
   })();
   // ---- the status of each site, for the colour of its pin and its row
-  function siteStatusData(){
+  function siteStatusData(onDuty){
     var today=new Date().toISOString().slice(0,10), req=(state.settings&&state.settings.siteRequirements)||{}, out={};
     allSites().forEach(function(site){
-      var deployed=state.employees.filter(function(e){ return e.active!==false && e.site===site; }).length, cs=contracts.filter(function(k){ return k.site===site; });
+      var deployed=onDuty?(onDuty[site]||0):state.employees.filter(function(e){ return e.active!==false && e.site===site; }).length, cs=contracts.filter(function(k){ return k.site===site; });
       var r=req[site]||{}, need=(Number(r.day)||0)+(Number(r.night)||0);
       if(!need) need=cs.reduce(function(t,k){ return t+(k.positions||[]).reduce(function(a,x){ return a+(Number(x.count)||0); },0); },0);
       var cids={}, names={}; cs.forEach(function(k){ cids[k.clientId]=1; var c=clients.find(function(x){ return x.id===k.clientId; }); if(c&&c.name) names[c.name]=1; });
-      var overdue=invoices.filter(function(i){ return cids[i.clientId] && i.status!=='paid' && i.dueDate && i.dueDate<today; }).reduce(function(t,i){ return t+invShownTotal(i); },0);
+      var overdue=invoices.filter(function(i){ return cids[i.clientId] && invBalance(i)>0.5 && i.dueDate && i.dueDate<today; }).reduce(function(t,i){ return t+invBalance(i); },0);
       var st=!need?'unknown':(deployed===0?'none':(deployed<need?'short':'ok'));
       out[site]={site:site, deployed:deployed, need:need, status:st, color:SITE_COLORS[st], clients:Object.keys(names), overdue:overdue};
     });
@@ -2022,28 +2129,102 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     }).catch(function(e){ leafletP=null; throw e; });
     return leafletP;
   }
-  function drawSiteMap(){
-    var card=document.getElementById('siteMapCard'); if(!card) return;
+  var mapObjs={};
+  function drawSiteMap(){ drawSiteMapInto({cardId:'siteMapCard', mapId:'siteMap', legendId:'siteMapLegend', noteId:'siteMapNote', inBox:'dashMonthBox'}); }
+  // a map of the sites: the Dashboard's month map, or the map of today (who is on duty, c.onDuty)
+  function drawSiteMapInto(c){
+    var card=document.getElementById(c.cardId); if(!card) return;
     var allowed=!!(me && me.canEdit) && allSites().length>0; card.style.display=allowed?'':'none'; if(!allowed) return;
     var dash=document.getElementById('tab-dashboard'); if(dash && dash.style.display==='none') return;
-    var data=siteStatusData(), located=allSites().filter(function(s){ var l=siteLocOf(s); return l && l.lat!=null; }), el=document.getElementById('siteMap'), note=document.getElementById('siteMapNote');
-    document.getElementById('siteMapLegend').innerHTML=[['ok','Fully staffed'],['short','Short of staff'],['none','Nobody deployed'],['unknown','No requirement set']].map(function(x){ return siteDot(SITE_COLORS[x[0]])+x[1]; }).join(' &nbsp; ')+' &nbsp; <span style="border:2px solid #222;border-radius:50%;display:inline-block;width:.7rem;height:.7rem;vertical-align:-2px"></span> client has an overdue invoice';
-    var missing=allSites().filter(function(s){ return !(siteLocOf(s)&&siteLocOf(s).lat!=null); });
-    note.textContent=missing.length?(missing.length+' site'+(missing.length>1?'s have':' has')+' no pin yet: '+missing.slice(0,6).join(', ')+(missing.length>6?', ...':'')+'. Use "Set location" in the table below.'):'';
-    if(!located.length){ if(siteMapObj){ siteMapObj.remove(); siteMapObj=null; } el.innerHTML='<p class="muted" style="padding:1rem">No site has a location yet. Use "Set location" in the table below: paste a Google Maps link, coordinates, or press "Use my location" at the site.</p>'; return; }
+    var inb=document.getElementById(c.inBox); if(inb && inb.style.display==='none') return;
+    var data=siteStatusData(c.onDuty), located=allSites().filter(function(x){ var l=siteLocOf(x); return l && l.lat!=null; }), el=document.getElementById(c.mapId), note=document.getElementById(c.noteId), tx=c.onDuty?SITE_TODAY_TEXT:SITE_STATUS_TEXT;
+    document.getElementById(c.legendId).innerHTML=[['ok',tx.ok],['short',tx.short],['none',tx.none],['unknown',tx.unknown]].map(function(x){ return siteDot(SITE_COLORS[x[0]])+x[1]; }).join(' &nbsp; ')+(c.onDuty?'':' &nbsp; <span style="border:2px solid #222;border-radius:50%;display:inline-block;width:.7rem;height:.7rem;vertical-align:-2px"></span> client has an overdue invoice');
+    var missing=allSites().filter(function(x){ return !(siteLocOf(x)&&siteLocOf(x).lat!=null); });
+    note.textContent=missing.length?(missing.length+' site'+(missing.length>1?'s have':' has')+' no pin yet: '+missing.slice(0,6).join(', ')+(missing.length>6?', ...':'')+'. Use "Set location" in the By site table (This month).'):'';
+    if(!located.length){ if(mapObjs[c.mapId]){ mapObjs[c.mapId].remove(); mapObjs[c.mapId]=null; } el.innerHTML='<p class="muted" style="padding:1rem">No site has a location yet. Use "Set location" in the By site table (This month): paste a Google Maps link, coordinates, or press "Use my location" at the site.</p>'; return; }
     ensureLeaflet().then(function(L){
-      if(siteMapObj){ siteMapObj.remove(); siteMapObj=null; } el.innerHTML=''; var map=siteMapObj=L.map(el,{scrollWheelZoom:false}), pts=[];
-      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19, referrerPolicy:'strict-origin-when-cross-origin', attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}   /* OpenStreetMap asks for a referrer: only the site's address is sent */).addTo(map);
+      if(mapObjs[c.mapId]){ mapObjs[c.mapId].remove(); mapObjs[c.mapId]=null; } el.innerHTML=''; var map=mapObjs[c.mapId]=L.map(el,{scrollWheelZoom:false}), pts=[];
+      L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19, referrerPolicy:'strict-origin-when-cross-origin', attribution:'&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'}).addTo(map);   /* OpenStreetMap asks for a referrer: only the site's address is sent */
       located.forEach(function(site){
-        var loc=siteLocOf(site), d=data[site], ring=d.overdue>0;
+        var loc=siteLocOf(site), d=data[site], ring=(!c.onDuty)&&d.overdue>0;
         var m=L.circleMarker([loc.lat,loc.lng],{radius:10, color:ring?'#111':'#fff', weight:ring?4:2, fillColor:d.color, fillOpacity:.95}).addTo(map);
-        m.bindPopup('<b>'+escapeHtml(site)+'</b><br>'+(d.clients.length?escapeHtml(d.clients.join(', '))+'<br>':'')+(loc.address?escapeHtml(loc.address)+'<br>':'')+siteDot(d.color)+SITE_STATUS_TEXT[d.status]+(d.need?': '+d.deployed+' of '+d.need:' ('+d.deployed+' deployed)')+(ring?'<br>Overdue invoices of the client: '+fmtMoney(d.overdue):'')+'<br><a href="'+siteDirUrl(loc)+'" target="_blank" rel="noopener">Directions</a> &middot; <a href="'+siteMapUrl(loc)+'" target="_blank" rel="noopener">Open in Google Maps</a>');
+        m.bindPopup('<b>'+escapeHtml(site)+'</b><br>'+(d.clients.length?escapeHtml(d.clients.join(', '))+'<br>':'')+(loc.address?escapeHtml(loc.address)+'<br>':'')+siteDot(d.color)+tx[d.status]+(d.need?': '+d.deployed+' of '+d.need+(c.onDuty?' on duty today':''):' ('+d.deployed+(c.onDuty?' on duty today)':' deployed)'))+(ring?'<br>Overdue invoices of the client: '+fmtMoney(d.overdue):'')+'<br><a href="'+siteDirUrl(loc)+'" target="_blank" rel="noopener">Directions</a> &middot; <a href="'+siteMapUrl(loc)+'" target="_blank" rel="noopener">Open in Google Maps</a>');
         pts.push([loc.lat,loc.lng]);
       });
       if(pts.length===1) map.setView(pts[0],15); else map.fitBounds(pts,{padding:[30,30],maxZoom:16});
       setTimeout(function(){ try{ map.invalidateSize(); }catch(e){} },200);
-    }).catch(function(){ el.innerHTML='<p class="muted" style="padding:1rem">The map could not be loaded here: it needs internet access to the map libraries and to OpenStreetMap. The table below still has every site, with its Map and Directions links.</p>'; });
+    }).catch(function(){ el.innerHTML='<p class="muted" style="padding:1rem">The map could not be loaded here: it needs internet access to the map libraries and to OpenStreetMap. The table still has every site, with its Map and Directions links.</p>'; });
   }
+
+  /* ---------- the Today view of the Dashboard: who is on duty now, which sites are short, and what needs you ---------- */
+  var SITE_TODAY_TEXT={ok:'Fully staffed today', short:'Short today', none:'Nobody on duty', unknown:'No requirement set'};
+  var tdCache=null;
+  async function todayData(force){
+    var today=xToday(); if(!force && tdCache && tdCache.date===today && (Date.now()-tdCache.at)<45000) return tdCache.v;
+    var ym=today.slice(0,7), dn=Number(today.slice(8)), emps=state.employees.filter(function(e){ return e.active!==false && (!e.doj||e.doj<=today) && (!e.dol||e.dol>=today); }), rows=[];
+    for(var i=0;i<emps.length;i+=10){
+      await Promise.all(emps.slice(i,i+10).map(async function(e){
+        delete state.attendance[e.id+'_'+ym.replace('-','')];   // read the marks again: somebody else may have changed them since this was last loaded
+        var doc=await getAttendanceDoc(e.id,ym), att=attendanceMarks(e,ym,(doc&&doc.days)||{},(doc&&doc.duty)||{}), mk=att.marks[dn-1], off=att.off[dn-1];
+        rows.push({e:e, site:e.site||'Unassigned', st:mk==='-'?'out':(off?'off':(mk==='A'?'absent':(mk==='L'?'leave':(mk==='H'?'half':'present'))))});
+      }));
+    }
+    rows=rows.filter(function(r){ return r.st!=='out'; });
+    var by={}, onMap={}, T={expected:0,on:0,absent:0,leave:0,off:0};
+    rows.forEach(function(r){ var o=by[r.site]||(by[r.site]={site:r.site,expected:0,on:0,absent:[],leave:[],off:0});
+      if(r.st==='off'){ o.off++; T.off++; } else { o.expected++; T.expected++; if(r.st==='present'||r.st==='half'){ o.on++; T.on++; } else if(r.st==='absent'){ o.absent.push(r.e.name); T.absent++; } else { o.leave.push(r.e.name); T.leave++; } } });
+    Object.keys(by).forEach(function(k){ onMap[k]=by[k].on; });
+    var v={date:today, by:by, onMap:onMap, T:T}; tdCache={date:today, at:Date.now(), v:v}; return v;
+  }
+  function dashView(){ var v=''; try{ v=localStorage.getItem('pfssDashView')||''; }catch(e){} return v==='month'?'month':'today'; }
+  function applyDashView(fresh){
+    var v=dashView(), t=document.getElementById('dashTodayBox'), m=document.getElementById('dashMonthBox'); if(!t||!m) return;
+    t.style.display=v==='today'?'':'none'; m.style.display=v==='month'?'':'none';
+    document.getElementById('dashBtnToday').className='btn small'+(v==='today'?'':' ghost'); document.getElementById('dashBtnMonth').className='btn small'+(v==='month'?'':' ghost');
+    if(v==='today') renderToday(!!fresh); else { drawSiteMap(); renderTrends(); }
+  }
+  function setDashView(v){ try{ localStorage.setItem('pfssDashView',v); }catch(e){} applyDashView(); }
+  async function renderToday(force){
+    var box=document.getElementById('dashTodayBox'); if(!box || box.style.display==='none') return;
+    var dash=document.getElementById('tab-dashboard'); if(dash && dash.style.display==='none') return;
+    var d; try{ d=await todayData(force); }catch(e){ document.getElementById('tdNote').textContent='Could not read today\'s attendance.'; return; }
+    box=document.getElementById('dashTodayBox'); if(!box || box.style.display==='none') return;
+    var T=d.T, sd=siteStatusData(d.onMap), el=function(i){ return document.getElementById(i); }, may=canPay();
+    var dt=new Date(d.date+'T00:00:00'); el('tdDate').textContent=dt.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+    var shortN=0, noneN=0; Object.keys(sd).forEach(function(k){ if(sd[k].status==='short') shortN++; else if(sd[k].status==='none') noneN++; });
+    var st=function(v,l,c){ return '<div class="stat"><b'+(c?' style="color:'+c+'"':'')+'>'+v+'</b><span>'+l+'</span></div>'; };
+    var ag=may?ageingData():null;
+    el('tdStats').innerHTML=st(T.on+' / '+T.expected,'On duty today')+st(T.absent+T.leave,'Absent or on leave',(T.absent+T.leave)?'var(--warn)':'')+st(shortN+noneN,'Sites short today',(shortN+noneN)?'var(--bad)':'')+st(T.off,'Weekly off or holiday')+(may?st(fmtMoney(ag.overdue),'Overdue invoices',ag.overdue>0?'var(--bad)':''):'');
+    el('tdNote').textContent='Worked out from the attendance marks. A day with no mark counts as present, so the figures are as good as the marking: mark absences the day they happen.';
+    // the sites, worst first
+    var rank={none:0,short:1,unknown:2,ok:3}, rows=Object.keys(sd).map(function(k){ return sd[k]; }).sort(function(a,b){ return rank[a.status]-rank[b.status] || a.site.localeCompare(b.site); });
+    el('tdSites').innerHTML='<table><thead><tr><th>Site</th><th class="right">Required</th><th class="right">On duty</th><th>Absent or on leave</th></tr></thead><tbody>'+rows.map(function(x){ var b=d.by[x.site]||{absent:[],leave:[]}, who=b.absent.concat(b.leave);
+      return '<tr><td>'+siteDot(x.color)+escapeHtml(x.site)+'</td><td class="right">'+(x.need||'<span class="muted">-</span>')+'</td><td class="right"><b>'+x.deployed+'</b></td><td class="muted" style="font-size:.84rem">'+(who.length?escapeHtml(who.slice(0,4).join(', '))+(who.length>4?' +'+(who.length-4):''):'-')+'</td></tr>'; }).join('')+'</tbody></table>';
+    drawSiteMapInto({cardId:'tdMapCard', mapId:'tdMap', legendId:'tdLegend', noteId:'tdMapNote', inBox:'dashTodayBox', onDuty:d.onMap});
+    if(!(me&&me.canEdit)){ el('tdMapCard').style.display=''; el('tdMap').style.display='none'; el('tdLegend').style.display='none'; } else { el('tdMap').style.display=''; el('tdLegend').style.display=''; }
+    // what needs you
+    var items=[], today=d.date, ymc=cycMonth(), run=cycRun(ymc);
+    if(may){
+      if(!run || !run.calculatedAt) items.push({lv:'warn',t:'Calculate the payroll of '+xMonthLabel(ymc),go:'cycle',b:'Open'});
+      else if(run.status!=='approved') items.push({lv:'warn',t:'Approve the payroll of '+xMonthLabel(ymc)+' (calculated, not approved)',go:'cycle',b:'Open'});
+    }
+    Object.keys(sd).filter(function(k){ return sd[k].status==='none'; }).forEach(function(k){ items.push({lv:'bad',t:k+': nobody on duty today (needs '+sd[k].need+')',go:'attendance',b:'Attendance'}); });
+    Object.keys(sd).filter(function(k){ return sd[k].status==='short'; }).forEach(function(k){ var b=d.by[k]||{absent:[],leave:[]}; items.push({lv:'warn',t:k+': '+sd[k].deployed+' of '+sd[k].need+' on duty'+((b.absent.length+b.leave.length)?' ('+b.absent.concat(b.leave).slice(0,3).join(', ')+' away)':''),go:'attendance',b:'Attendance'}); });
+    if(may){
+      if(ag.overdueN) items.push({lv:'warn',t:ag.overdueN+' invoice'+(ag.overdueN>1?'s are':' is')+' overdue, '+fmtMoney(ag.overdue)+' in all: send reminders',go:'invoicing',b:'Follow up',focus:'recvCard'});
+      var drafts=invoices.filter(function(i){ return i.status==='draft'; }).length; if(drafts) items.push({lv:'info',t:drafts+' invoice'+(drafts>1?'s are':' is')+' still in draft',go:'invoicing',b:'Open'});
+    }
+    xAllTasks([xAddMonth(thisMonth(),-1),thisMonth()]).filter(function(t){ return !t.done && t.d<=7; }).sort(function(a,b){ return a.d-b.d; }).slice(0,4).forEach(function(t){ var bd=taskBadge(t); items.push({lv:t.d<0?'bad':'warn',t:t.t+' ('+bd[0].toLowerCase()+')',go:'compliance',b:'Open'}); });
+    licences.forEach(function(l){ var ls=licStatus(l); if(ls[1]==='bad'||ls[1]==='warn') items.push({lv:ls[1]==='bad'?'bad':'warn',t:(l.name||l.type||'Licence')+': '+ls[0].toLowerCase(),go:'compliance',b:'Open'}); });
+    var col={bad:'var(--bad)',warn:'var(--warn)',info:'var(--info)'}, lab={bad:'now',warn:'today',info:'soon'}, ord={bad:0,warn:1,info:2}; items.sort(function(a,b){ return ord[a.lv]-ord[b.lv]; });
+    el('tdNeeds').innerHTML=items.length?items.slice(0,10).map(function(x,i){ return '<div class="td-need"><span>'+escapeHtml(x.t)+'</span><span style="white-space:nowrap"><span class="tag '+(x.lv==='bad'?'bad':(x.lv==='warn'?'warn':'info'))+'" style="margin-right:.4rem">'+lab[x.lv]+'</span><button class="btn small ghost" data-tdgo="'+x.go+'"'+(x.focus?' data-tdfocus="'+x.focus+'"':'')+' type="button">'+escapeHtml(x.b)+'</button></span></div>'; }).join('')+(items.length>10?'<div class="muted" style="font-size:.82rem;padding-top:.4rem">and '+(items.length-10)+' more</div>':''):'<p class="muted" style="margin:0">Nothing needs you today.</p>';
+  }
+  (function(){
+    var b=document.getElementById('dashBtnToday'); if(!b) return;
+    b.addEventListener('click', function(){ setDashView('today'); }); document.getElementById('dashBtnMonth').addEventListener('click', function(){ setDashView('month'); });
+    document.getElementById('btnTdRefresh').addEventListener('click', function(){ renderToday(true); });
+    document.getElementById('dashTodayBox').addEventListener('click', function(ev){ var g=ev.target.closest('[data-tdgo]'); if(!g) return; var tb=document.getElementById('tabs-'+g.dataset.tdgo); if(tb) tb.click(); if(g.dataset.tdfocus) setTimeout(function(){ var f=document.getElementById(g.dataset.tdfocus); if(f) f.scrollIntoView({block:'start',behavior:'smooth'}); },300); });
+  })();
 
   /* ---------- search everything ---------- */
   var gsItems=[], gsIdx=-1;
@@ -2068,7 +2249,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     });
     invoices.forEach(function(i){
       var sc=Math.max(hit(i.invoiceNo)*3,hit(i.clientName),hit(i.month),hit(i.month?xMonthLabel(i.month):''),(d.length>=4&&String(Math.round(invShownTotal(i))).indexOf(d)>-1)?1:0); if(!sc) return;
-      add('Invoices',sc,(i.invoiceNo||'Invoice')+(i.clientName?'  \u2022  '+i.clientName:''),[i.month?xMonthLabel(i.month):'',fmtMoney(invShownTotal(i)),i.status].filter(Boolean).join(' \u00b7 '),function(){ gsGo('invoicing'); openInvoiceModal(i.id); });
+      add('Invoices',sc,(i.invoiceNo||'Invoice')+(i.clientName?'  \u2022  '+i.clientName:''),[i.month?xMonthLabel(i.month):'',fmtMoney(invShownTotal(i)),invEffStatus(i)].filter(Boolean).join(' \u00b7 '),function(){ gsGo('invoicing'); openInvoiceModal(i.id); });
     });
     contracts.forEach(function(k){
       var cn=(clients.find(function(c){ return c.id===k.clientId; })||{}).name||'', sc=Math.max(hit(k.title)*2,hit(k.site),hit(cn)); if(!sc) return;
@@ -2154,7 +2335,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   function ageingData(){
     var today=new Date().toISOString().slice(0,10), b=[{k:'Not yet due',n:0,v:0,c:'var(--ok)'},{k:'1 to 30 days',n:0,v:0,c:'var(--info)'},{k:'31 to 60 days',n:0,v:0,c:'var(--warn)'},{k:'61 to 90 days',n:0,v:0,c:'var(--bad)'},{k:'Over 90 days',n:0,v:0,c:'var(--bad)'}], byClient={};
     invoices.forEach(function(i){
-      if(i.status==='paid' || i.status==='draft') return; var amt=invShownTotal(i), late=(i.dueDate&&i.dueDate<today)?Math.round((new Date(today)-new Date(i.dueDate))/86400000):0;
+      if(invBalance(i)<=0.5) return; var amt=invBalance(i), late=(i.dueDate&&i.dueDate<today)?Math.round((new Date(today)-new Date(i.dueDate))/86400000):0;
       var k=late<=0?0:(late<=30?1:(late<=60?2:(late<=90?3:4))); b[k].n++; b[k].v+=amt;
       if(late>0){ var c=byClient[i.clientId]||(byClient[i.clientId]={id:i.clientId,name:i.clientName||((clients.find(function(x){ return x.id===i.clientId; })||{}).name)||'Client',v:0,n:0,oldest:0}); c.v+=amt; c.n++; if(late>c.oldest) c.oldest=late; }
     });
@@ -2184,6 +2365,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var inv=invoices.filter(function(i){ return i.month===ym && i.status!=='draft'; }), gst=inv.reduce(function(t,i){ return t+invShownGst(i); },0), invTotal=inv.reduce(function(t,i){ return t+invShownTotal(i); },0);
     var first=ym+'-01', last=ym+'-'+String(daysInMonth(ym)).padStart(2,'0'), pm=xAddMonth(ym,-1);
     var joined=state.employees.filter(function(e){ return e.doj && e.doj>=first && e.doj<=last; }).length, left=state.employees.filter(function(e){ return e.dol && e.dol>=first && e.dol<=last; }).length;
+    var pays=Object.keys(state.invPay||{}).map(function(k){ return state.invPay[k]; }).filter(function(p){ return String(p.date).slice(0,7)===ym; }), collected=pays.reduce(function(t,p){ return t+(Number(p.amount)||0); },0), tdsM=pays.reduce(function(t,p){ return t+(Number(p.tds)||0); },0);
     var ag=ageingData(), sd=siteStatusData(), short=[], none=[]; Object.keys(sd).forEach(function(k){ var x=sd[k]; if(x.status==='short') short.push(x); else if(x.status==='none') none.push(x); });
     var alerts=[];
     if(!prof.anyPayroll) alerts.push({lv:'bad',t:'No payroll has been calculated for '+xMonthLabel(ym)+', so the cost and profit figures are not real yet.'});
@@ -2194,7 +2376,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     if(ag.overdueN) alerts.push({lv:'warn',t:ag.overdueN+' invoice'+(ag.overdueN>1?'s are':' is')+' overdue, '+fmtMoney(ag.overdue)+' in all; the largest is '+ag.clients[0].name+' ('+fmtMoney(ag.clients[0].v)+', oldest '+ag.clients[0].oldest+' days).'});
     if(none.length) alerts.push({lv:'bad',t:'Nobody is deployed at '+none.map(function(x){ return x.site+' (needs '+x.need+')'; }).join(', ')+'.'});
     if(short.length) alerts.push({lv:'warn',t:'Short of staff: '+short.map(function(x){ return x.site+' ('+x.deployed+' of '+x.need+')'; }).join(', ')+'.'});
-    return {ym:ym, prof:prof, prev:prev, prevYm:pm, runs:runs, tot:tot, bonusM:bonusM, bonusY:bonusY, fy:fy, inv:inv, invN:inv.length, gst:gst, invTotal:invTotal, head:{start:headcountAt(pm), end:headcountAt(ym), joined:joined, left:left}, ag:ag, short:short, none:none, alerts:alerts, today:today};
+    return {ym:ym, prof:prof, prev:prev, prevYm:pm, runs:runs, tot:tot, bonusM:bonusM, bonusY:bonusY, fy:fy, inv:inv, invN:inv.length, gst:gst, invTotal:invTotal, head:{start:headcountAt(pm), end:headcountAt(ym), joined:joined, left:left}, collected:collected, tdsM:tdsM, payN:pays.length, ag:ag, short:short, none:none, alerts:alerts, today:today};
   }
   function sumChange(now, before){ if(!(before>0)) return ''; var p=(now-before)/before*100; return (p>=0?'+':'')+(Math.round(p*10)/10)+'% on '+'last month'; }
   function renderSummary(){
@@ -2207,6 +2389,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       '<div class="sum-kpi"><b style="color:'+(t.profit<0?'var(--bad)':'inherit')+'">'+money(t.profit)+'</b><span>Profit ('+profitPct(t.margin)+')</span><br><em class="muted">'+(d.prev.total.margin!==null?'last month '+profitPct(d.prev.total.margin):'')+'</em></div>'+
       '<div class="sum-kpi"><b>'+d.head.end+'</b><span>People at the end of the month</span><br><em class="muted">'+d.head.joined+' joined &middot; '+d.head.left+' left &middot; '+d.head.start+' at the start</em></div>'+
       '<div class="sum-kpi"><b>'+money(d.tot.net)+'</b><span>Net pay'+(d.runs.length?'':' (no payroll yet)')+'</span><br><em class="muted">gross '+money(d.tot.gross)+' &middot; PF '+money(d.tot.pf+d.tot.pfEr)+' &middot; ESI '+money(d.tot.esi+d.tot.esiEr)+'</em></div>'+
+      '<div class="sum-kpi"><b>'+money(d.collected)+'</b><span>Collected in '+escapeHtml(xMonthLabel(ym))+'</span><br><em class="muted">'+d.payN+' payment'+(d.payN===1?'':'s')+' &middot; TDS deducted '+money(d.tdsM)+'</em></div>'+
       '<div class="sum-kpi"><b>'+money(d.ag.total)+'</b><span>Unpaid invoices today</span><br><em class="muted">'+money(d.ag.overdue)+' overdue ('+d.ag.overdueN+')</em></div>'+
       '</div></div>';
     h+='<div class="card"><h2>Needs attention</h2>'+(d.alerts.length?'<ul style="margin:.2rem 0 0 1.1rem;padding:0;line-height:1.6">'+d.alerts.map(function(a){ return '<li><span style="color:'+(a.lv==='bad'?'var(--bad)':'var(--warn)')+';font-weight:700">'+(a.lv==='bad'?'Fix':'Check')+'</span> '+escapeHtml(a.t)+'</li>'; }).join('')+'</ul>':'<p class="muted" style="margin:0">Nothing needs attention for '+escapeHtml(xMonthLabel(ym))+'.</p>')+'</div>';
@@ -2215,7 +2398,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       '<tr><td>People on the payroll</td><td class="right">'+d.tot.n+'</td></tr><tr><td>Gross pay</td><td class="right">'+money(d.tot.gross)+'</td></tr><tr><td>Deductions: PF, ESI, professional tax, advances and others</td><td class="right">'+money(d.tot.gross-d.tot.net)+'</td></tr><tr><td><b>Net pay</b></td><td class="right"><b>'+money(d.tot.net)+'</b></td></tr>'+
       '<tr><td>Employer PF and ESI</td><td class="right">'+money(d.tot.pfEr+d.tot.esiEr)+'</td></tr><tr><td>Bonus accrued this month ('+fyLabel(d.fy)+' so far '+money(d.bonusY)+')</td><td class="right">'+money(d.bonusM)+'</td></tr>'+
       d.runs.map(function(m){ return '<tr><td>Payroll of '+escapeHtml(m.name)+'</td><td class="right"><span class="tag '+(m.run.status==='approved'?'ok':'warn')+'">'+escapeHtml(m.run.status)+'</span></td></tr>'; }).join('')+'</tbody></table></div></div>';
-    h+='<div class="card"><h2>Unpaid invoices today</h2>'+(d.ag.total>0?'<div class="scrollx"><table><thead><tr><th>Age past the due date</th><th class="right">Invoices</th><th class="right">Amount</th></tr></thead><tbody>'+d.ag.buckets.map(function(x){ return '<tr><td>'+x.k+'</td><td class="right">'+x.n+'</td><td class="right">'+money(x.v)+'</td></tr>'; }).join('')+'</tbody><tfoot><tr><td>Total</td><td class="right">'+d.ag.buckets.reduce(function(a,x){ return a+x.n; },0)+'</td><td class="right">'+money(d.ag.total)+'</td></tr></tfoot></table></div>'+(d.ag.clients.length?'<p style="margin:.7rem 0 .2rem"><b>Overdue by client</b></p><div class="scrollx"><table><tbody>'+d.ag.clients.slice(0,5).map(function(c){ return '<tr><td>'+escapeHtml(c.name)+'</td><td class="right">'+c.n+' invoice'+(c.n>1?'s':'')+'</td><td class="right">oldest '+c.oldest+' days</td><td class="right">'+money(c.v)+'</td></tr>'; }).join('')+'</tbody></table></div>':''):'<p class="muted" style="margin:0">No unpaid invoices.</p>')+'<p class="muted" style="margin:.6rem 0 0;font-size:.8rem">As of today. The system records whether an invoice is paid but not the date or the amount, so what was collected in a particular month is not shown.</p></div>';
+    h+='<div class="card"><h2>Unpaid invoices today</h2>'+(d.ag.total>0?'<div class="scrollx"><table><thead><tr><th>Age past the due date</th><th class="right">Invoices</th><th class="right">Amount</th></tr></thead><tbody>'+d.ag.buckets.map(function(x){ return '<tr><td>'+x.k+'</td><td class="right">'+x.n+'</td><td class="right">'+money(x.v)+'</td></tr>'; }).join('')+'</tbody><tfoot><tr><td>Total</td><td class="right">'+d.ag.buckets.reduce(function(a,x){ return a+x.n; },0)+'</td><td class="right">'+money(d.ag.total)+'</td></tr></tfoot></table></div>'+(d.ag.clients.length?'<p style="margin:.7rem 0 .2rem"><b>Overdue by client</b></p><div class="scrollx"><table><tbody>'+d.ag.clients.slice(0,5).map(function(c){ return '<tr><td>'+escapeHtml(c.name)+'</td><td class="right">'+c.n+' invoice'+(c.n>1?'s':'')+'</td><td class="right">oldest '+c.oldest+' days</td><td class="right">'+money(c.v)+'</td></tr>'; }).join('')+'</tbody></table></div>':''):'<p class="muted" style="margin:0">No unpaid invoices.</p>')+'<p class="muted" style="margin:.6rem 0 0;font-size:.8rem">As of today. Payments are shown from the day they started to be recorded (Invoicing, Payment): an invoice marked paid before that has no payment on record, so it is not in the collected figure.</p></div>';
     h+='<div class="card"><h2>Cover at the sites</h2>'+((d.short.length||d.none.length)?'<div class="scrollx"><table><thead><tr><th>Site</th><th class="right">Deployed</th><th class="right">Required</th></tr></thead><tbody>'+d.none.concat(d.short).map(function(x){ return '<tr><td>'+siteDot(x.color)+escapeHtml(x.site)+'</td><td class="right">'+x.deployed+'</td><td class="right">'+x.need+'</td></tr>'; }).join('')+'</tbody></table></div>':'<p class="muted" style="margin:0">Every site with a requirement has the people it needs.</p>')+'</div>';
     out.innerHTML=h;
   }
@@ -2223,7 +2406,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var pb=pdfNew(false), ML=36, CW=pb.W-72, MR=ML+CW, LIMIT=pb.H-78, C=PDFC, y=pdfHead(pb), t=d.prof.total;
     function need(h){ if(y+h>LIMIT){ y=pdfHead(pb); } }
     y+=14; pb.text(pb.W/2,y,'Monthly summary',16,{bold:true,align:'center'}); y+=17; pb.text(pb.W/2,y,xMonthLabel(d.ym),11,{bold:true,align:'center',color:C.goldDk}); y+=13; pb.text(pb.W/2,y,'Prepared on '+pdfDate(xToday())+(me&&(me.name||me.email)?' by '+(me.name||me.email):''),8.2,{align:'center',color:C.mute}); y+=16;
-    var kp=[['Billed, before GST',pdfMoney(t.invoiced),d.invN+' invoice'+(d.invN===1?'':'s')+', GST '+pdfMoney(d.gst)],['Staff and other costs',pdfMoney(t.payroll+t.other),'pay plus employer PF and ESI'],['Profit',pdfMoney(t.profit),'margin '+(t.margin===null?'-':(Math.round(t.margin*10)/10)+'%')],['People at month end',String(d.head.end),d.head.joined+' joined, '+d.head.left+' left'],['Net pay',pdfMoney(d.tot.net),'gross '+pdfMoney(d.tot.gross)],['Unpaid invoices today',pdfMoney(d.ag.total),pdfMoney(d.ag.overdue)+' overdue']], bw=(CW-16)/3;
+    var kp=[['Billed, before GST',pdfMoney(t.invoiced),d.invN+' invoice'+(d.invN===1?'':'s')+', GST '+pdfMoney(d.gst)],['Staff and other costs',pdfMoney(t.payroll+t.other),'pay plus employer PF and ESI'],['Profit',pdfMoney(t.profit),'margin '+(t.margin===null?'-':(Math.round(t.margin*10)/10)+'%')],['People at month end',String(d.head.end),d.head.joined+' joined, '+d.head.left+' left'],['Net pay',pdfMoney(d.tot.net),'gross '+pdfMoney(d.tot.gross)],['Collected in the month',pdfMoney(d.collected),d.payN+' payment'+(d.payN===1?'':'s')+', TDS '+pdfMoney(d.tdsM)]], bw=(CW-16)/3;
     kp.forEach(function(k,i){ var x=ML+(i%3)*(bw+8), yy=y+Math.floor(i/3)*56; pb.rect(x,yy,bw,50,{fill:C.paper}); pb.text(x+8,yy+14,k[0],7.6,{color:C.mute}); pb.text(x+8,yy+31,k[1],13,{bold:true}); pb.text(x+8,yy+43,pdfFit(pb,k[2],bw-14,7.2,false),7.2,{color:C.mute}); });
     y+=118;
     function head(txt){ need(40); pb.text(ML,y,txt,10.5,{bold:true,color:C.goldDk}); y+=5; pb.line(ML,y,MR,y,0.6,C.goldDk); y+=14; }
@@ -2243,7 +2426,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     y+=18; head('Unpaid invoices today');
     if(d.ag.total>0){ d.ag.buckets.forEach(function(x){ need(15); pb.text(ML,y+10,x.k,8.8); pb.text(MR-110,y+10,x.n+' invoice'+(x.n===1?'':'s'),8.8,{align:'right'}); pb.text(MR,y+10,pdfMoney(x.v),8.8,{align:'right',bold:true}); y+=15; pb.line(ML,y,MR,y,0.3,C.line); }); need(15); pb.text(ML,y+10,'Total',8.8,{bold:true}); pb.text(MR,y+10,pdfMoney(d.ag.total),8.8,{align:'right',bold:true}); y+=18;
       d.ag.clients.slice(0,5).forEach(function(c){ need(14); pb.text(ML,y+9,'Overdue: '+pdfFit(pb,c.name,CW-230,8.4,false),8.4,{color:C.mute}); pb.text(MR-80,y+9,'oldest '+c.oldest+' days',8.4,{align:'right',color:C.mute}); pb.text(MR,y+9,pdfMoney(c.v),8.4,{align:'right'}); y+=13; });
-      need(24); pb.wrap('As of the date of this summary. Payment dates are not recorded in the system, so what was collected in the month is not shown.',CW,7.4,false).forEach(function(l){ pb.text(ML,y+9,l,7.4,{color:C.mute}); y+=10; });
+      need(24); pb.wrap('As of the date of this summary. Collected is what was recorded as received in the month; invoices marked paid before payments were recorded are not in it.',CW,7.4,false).forEach(function(l){ pb.text(ML,y+9,l,7.4,{color:C.mute}); y+=10; });
     } else { pb.text(ML,y+9,'No unpaid invoices.',8.8,{color:C.mute}); y+=16; }
     if(d.short.length||d.none.length){ y+=18; head('Cover at the sites'); d.none.concat(d.short).forEach(function(x){ need(15); pb.text(ML,y+10,x.site,8.8); pb.text(MR,y+10,x.deployed+' deployed, '+x.need+' required',8.8,{align:'right',bold:true}); y+=15; pb.line(ML,y,MR,y,0.3,C.line); }); }
     pdfFoot(pb,'Computer-generated summary');
@@ -2287,7 +2470,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     html += '</tbody></table>';
     var box=document.getElementById('siteBreakdown'); box.innerHTML = Object.keys(names).length? html : '<p class="muted">No employees yet.</p>';
     box.querySelectorAll('[data-siteloc]').forEach(function(b){ b.addEventListener('click', function(){ openSiteLoc(b.dataset.siteloc); }); });
-    drawSiteMap(); renderTrends();
+    applyDashView();
     var sb=document.getElementById('tabs-summary'); if(sb) sb.style.display=canPay()?'':'none';
   }
 
@@ -3033,7 +3216,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     if(!res.ok){ var err=new Error(out.error||('Server error '+res.status)); err.status=res.status; throw err; }
     return out;
   }
-  function invOverdue(inv){ var today=new Date().toISOString().slice(0,10); return !!(inv.status!=='paid' && inv.dueDate && inv.dueDate<today); }
+  function invOverdue(inv){ var today=new Date().toISOString().slice(0,10); return !!(invBalance(inv)>0.5 && inv.dueDate && inv.dueDate<today); }
   // extra documents that go with the invoice or the billing pack
   var MAIL_EXTRA_MAX=10, MAIL_FILE_BYTES=10000000, MAIL_TOTAL_BYTES=15000000, MAIL_EXTS=['pdf','jpg','jpeg','png','doc','docx','xls','xlsx','csv','txt'];
   // the older way (files sent inside the request) keeps its small limits: it is used only when the storage step has not been done yet
@@ -6450,19 +6633,331 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     }catch(e){ toast('Invoices unavailable.'); }
   }
 
+  /* ---------- payments received against invoices (amount, TDS, date), and the balance of each invoice ---------- */
+  function ipM2(x){ return Math.round((Number(x)||0)*100)/100; }
+  function invPaymentsOf(invId){
+    return Object.keys(state.invPay||{}).map(function(k){ return state.invPay[k]; }).filter(function(p){ return p.invoiceId===invId; }).sort(function(a,b){ return a.date<b.date?-1:(a.date>b.date?1:((a.at||0)-(b.at||0))); });
+  }
+  function invReceived(inv){ return ipM2(invPaymentsOf(inv.id).reduce(function(t,p){ return t+(Number(p.amount)||0); },0)); }
+  function invTdsOf(inv){ return ipM2(invPaymentsOf(inv.id).reduce(function(t,p){ return t+(Number(p.tds)||0); },0)); }
+  // what is still to be received: nothing for a draft (not issued) or an invoice marked paid before payments were recorded
+  function invBalance(inv){
+    if(!inv || inv.status==='draft') return 0;
+    var ps=invPaymentsOf(inv.id); if(inv.status==='paid' && !ps.length) return 0;
+    return Math.max(0, ipM2(invShownTotal(inv)-invReceived(inv)-invTdsOf(inv)));
+  }
+  function invEffStatus(inv){
+    if(!inv) return '';
+    if(inv.status==='draft') return 'draft';
+    var bal=invBalance(inv), ps=invPaymentsOf(inv.id), today=new Date().toISOString().slice(0,10);
+    if(bal<=0.5) return (inv.status==='paid'||ps.length)?'paid':inv.status;
+    if(inv.dueDate && inv.dueDate<today) return 'overdue';
+    if(ps.length) return 'part paid';
+    return inv.status;
+  }
+  var ipInv=null;
+  function openInvPay(invId){
+    if(!canPay()){ toast('Only Accounts or an administrator can record payments.'); return; }
+    var inv=invoices.find(function(x){ return x.id===invId; }); if(!inv) return; ipInv=inv; renderInvPay(true); document.getElementById('ipModalBg').classList.add('show');
+  }
+  function renderInvPay(reset){
+    var inv=ipInv=invoices.find(function(x){ return x.id===(ipInv&&ipInv.id); })||ipInv, el=function(i){ return document.getElementById(i); };
+    var tot=invShownTotal(inv), rec=invReceived(inv), tds=invTdsOf(inv), bal=invBalance(inv), ps=invPaymentsOf(inv.id), old=(inv.status==='paid' && !ps.length);
+    el('ipTitle').textContent='Payments, invoice '+(inv.invoiceNo||'')+' · '+(inv.clientName||'');
+    var st=function(v,l,c){ return '<div class="stat"><b'+(c?' style="color:'+c+'"':'')+'>'+fmtMoney(v)+'</b><span>'+l+'</span></div>'; };
+    el('ipSummary').innerHTML=st(tot,'Invoice total')+st(rec,'Received')+st(tds,'TDS deducted')+st(bal,'Balance',bal>0.5?'var(--bad)':'var(--ok)');
+    el('ipOld').textContent=old?'This invoice was marked paid before payments were recorded, so it has no payment on record. Record when it was paid if you want it in the collections figures.':'';
+    el('ipHist').innerHTML=ps.length?('<table><thead><tr><th>Date</th><th class="right">Received</th><th class="right">TDS</th><th>Paid by</th><th>Reference</th><th></th></tr></thead><tbody>'+ps.map(function(p){ return '<tr><td>'+escapeHtml(pdfDate(p.date))+'</td><td class="right">'+bonusM2(p.amount)+'</td><td class="right">'+(p.tds?bonusM2(p.tds):'-')+'</td><td>'+escapeHtml(p.mode||'')+'</td><td>'+escapeHtml([p.ref,p.note].filter(Boolean).join(' · '))+'</td><td><button class="btn small danger" data-iprem="'+escapeHtml(p.id)+'" type="button" aria-label="Remove this payment">Remove</button></td></tr>'; }).join('')+'</tbody></table>'):'<p class="muted" style="margin:0">No payment recorded yet.</p>';
+    if(reset){
+      el('ipErr').textContent=''; el('ipDate').value=xToday(); el('ipAmt').value=(bal>0.5?bal:(old?tot:'')); el('ipTds').value=''; el('ipMode').value='NEFT'; el('ipRef').value=''; el('ipNote').value='';
+    }
+    var tp=(state.settings&&state.settings.costing&&state.settings.costing.tdsPct!=null)?Number(state.settings.costing.tdsPct):1, sub=Number(invoiceModelFromSaved(inv).subtotal)||0, want=ipM2(sub*tp/100);
+    el('ipTdsHint').textContent=tp>0?('TDS at '+tp+'% of '+fmtMoney(sub)+' (before GST) is '+fmtMoney(want)+(tds?'; '+fmtMoney(tds)+' recorded so far':'')+'.'):'';
+  }
+  async function syncInvPaidStatus(inv){
+    // keep the stored status in step: paid when nothing is left, back to sent if a payment was taken away
+    var bal=invBalance(Object.assign({},inv,{status:inv.status==='paid'?'sent':inv.status})), ps=invPaymentsOf(inv.id), upd=null;
+    if(inv.status!=='draft'){
+      if(ps.length && bal<=0.5 && inv.status!=='paid') upd={status:'paid', paidOn:ps[ps.length-1].date};
+      else if(bal>0.5 && inv.status==='paid') upd={status:'sent', paidOn:''};
+    }
+    if(upd && db){ try{ await db.doc('invoices/'+inv.id).update(upd); Object.assign(inv,upd); }catch(e){} }
+  }
+  async function saveInvPay(){
+    var el=function(i){ return document.getElementById(i); }, err=el('ipErr'); err.textContent='';
+    if(!db){ err.textContent='Storage is not available, so nothing was saved.'; return; }
+    var inv=ipInv; if(!inv) return; var date=el('ipDate').value, amt=ipM2(el('ipAmt').value), tds=ipM2(el('ipTds').value);
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){ err.textContent='Choose the date received.'; return; }
+    if(!(amt>0) && !(tds>0)){ err.textContent='Enter the amount received, or the TDS deducted.'; return; }
+    var bal=invBalance(inv)+((inv.status==='paid'&&!invPaymentsOf(inv.id).length)?ipM2(invShownTotal(inv)):0);
+    if(amt+tds>bal+0.5 && !confirm('This is '+fmtMoney(amt+tds-bal)+' more than the balance of '+fmtMoney(bal)+'. Record it anyway?')) return;
+    var btn=el('btnIpSave'); btn.disabled=true;
+    var id='ip'+Date.now().toString(36)+Math.random().toString(36).slice(2,6), doc={id:id, invoiceId:inv.id, invoiceNo:inv.invoiceNo||'', clientId:inv.clientId||'', date:date, amount:amt, tds:tds, mode:el('ipMode').value, ref:el('ipRef').value.trim(), note:el('ipNote').value.trim(), by:(me&&(me.name||me.email))||'', at:Date.now()};
+    try{ await db.doc('invoicePayments/'+id).set(doc); state.invPay=state.invPay||{}; state.invPay[id]=doc; await syncInvPaidStatus(inv); toast('Payment recorded.'); renderInvPay(true); renderInvoicesTable(); renderInvoiceStats(); }
+    catch(e){ err.textContent=(e&&e.code==='42501')?'Only Accounts or an administrator can record payments.':'Could not save the payment.'; }
+    btn.disabled=false;
+  }
+  async function removeInvPay(payId){
+    if(!canPay() || !ipInv || !confirm('Remove this payment from the record?')) return;
+    try{ await db.doc('invoicePayments/'+payId).delete(); if(state.invPay) delete state.invPay[payId]; await syncInvPaidStatus(ipInv); toast('Payment removed.'); renderInvPay(true); renderInvoicesTable(); renderInvoiceStats(); }
+    catch(e){ toast('Could not remove the payment.'); }
+  }
+  (function(){
+    var c=document.getElementById('ipClose'); if(!c) return;
+    c.addEventListener('click', function(){ document.getElementById('ipModalBg').classList.remove('show'); });
+    document.getElementById('btnIpSave').addEventListener('click', saveInvPay);
+    document.getElementById('btnIpFill').addEventListener('click', function(){ var inv=ipInv; if(!inv) return; var bal=invBalance(inv), t=ipM2(document.getElementById('ipTds').value); document.getElementById('ipAmt').value=Math.max(0,ipM2(bal-t)); });
+    document.getElementById('ipHist').addEventListener('click', function(ev){ var b=ev.target.closest('[data-iprem]'); if(b) removeInvPay(b.dataset.iprem); });
+  })();
+
+  /* ---------- following up overdue invoices: a statement for each client, reminders, and a record of what was sent ---------- */
+  function ageIdx(late){ return late<=0?0:(late<=30?1:(late<=60?2:(late<=90?3:4))); }
+  function lateDays(inv){ var today=new Date().toISOString().slice(0,10); return (inv.dueDate && inv.dueDate<today)?Math.round((new Date(today)-new Date(inv.dueDate))/86400000):0; }
+  function remindersOf(clientId){ return Object.keys(state.reminders||{}).map(function(k){ return state.reminders[k]; }).filter(function(r){ return r.clientId===clientId; }).sort(function(a,b){ return (a.sentAt||0)-(b.sentAt||0); }); }
+  // the next reminder: the 1st, then the 2nd, then the final one; the count starts again when the last reminder is more than 60 days old
+  function remNextLevel(clientId){
+    var rs=remindersOf(clientId), last=rs[rs.length-1]; if(!last || (Date.now()-(last.sentAt||0))>60*86400000) return 1;
+    return Math.min(3,rs.filter(function(r){ return (Date.now()-(r.sentAt||0))<=60*86400000; }).length+1);
+  }
+  var LEVEL_TXT={1:'1st reminder',2:'2nd reminder',3:'Final reminder'};
+  // all the invoices of a client with something left to receive
+  function stmtData(clientId){
+    var c=clients.find(function(x){ return x.id===clientId; })||{}, today=new Date().toISOString().slice(0,10);
+    var open=invoices.filter(function(i){ return i.clientId===clientId && invBalance(i)>0.5; }).map(function(i){ return {inv:i, no:i.invoiceNo||'', date:i.invoiceDate||'', month:i.month||'', due:i.dueDate||'', total:invShownTotal(i), recd:ipM2(invReceived(i)+invTdsOf(i)), bal:invBalance(i), late:lateDays(i)}; }).sort(function(a,b){ return (a.due||'9999')<(b.due||'9999')?-1:1; });
+    var b=[0,0,0,0,0]; open.forEach(function(x){ b[ageIdx(x.late)]+=x.bal; });
+    var ids={}; invoices.forEach(function(i){ if(i.clientId===clientId) ids[i.id]=i; });
+    var cut=new Date(Date.now()-180*86400000).toISOString().slice(0,10);
+    var pays=Object.keys(state.invPay||{}).map(function(k){ return state.invPay[k]; }).filter(function(p){ return ids[p.invoiceId] && p.date>=cut; }).sort(function(a,b){ return a.date<b.date?1:-1; });
+    return {client:c, today:today, open:open, total:ipM2(open.reduce(function(t,x){ return t+x.bal; },0)), overdue:ipM2(b.slice(1).reduce(function(t,v){ return t+v; },0)), buckets:b, pays:pays};
+  }
+  function drawStatement(pb, d){
+    var ML=36, CW=pb.W-72, MR=ML+CW, LIMIT=pb.H-78, C=PDFC, y=pdfHead(pb), cl=d.client||{}, inv=(state.settings&&state.settings.invoice)||{};
+    function need(h){ if(y+h>LIMIT){ y=pdfHead(pb); } }
+    y+=14; pb.text(pb.W/2,y,'Statement of account',15,{bold:true,align:'center'}); y+=15; pb.text(pb.W/2,y,'As of '+pdfDate(d.today),9.5,{align:'center',bold:true,color:C.goldDk}); y+=20;
+    pb.text(ML,y,'To',7.8,{color:C.mute}); y+=11; pb.text(ML,y,cl.name||'',11,{bold:true}); y+=13;
+    pb.wrap(cl.address||'',CW*0.6,8.6,false).forEach(function(l){ pb.text(ML,y,l,8.6,{color:C.mute}); y+=11; }); if(cl.gstin){ pb.text(ML,y,'GSTIN '+cl.gstin,8.6,{color:C.mute}); y+=11; } y+=8;
+    var kp=[['Total to receive',d.total],['Overdue',d.overdue],['1 to 30 days',d.buckets[1]],['31 to 60 days',d.buckets[2]],['Over 60 days',d.buckets[3]+d.buckets[4]]], bw=(CW-4*6)/5;
+    kp.forEach(function(k,i){ var x=ML+i*(bw+6); pb.rect(x,y,bw,38,{fill:C.paper}); pb.text(x+7,y+12,k[0],7.2,{color:C.mute}); pb.text(x+7,y+29,pdfMoney(k[1]),10.5,{bold:true,color:(i===1&&k[1]>0)?'#B42323':C.ink}); }); y+=52;
+    var cw=[112,58,50,58,64,64,64,53], xs=[ML]; cw.forEach(function(w,i){ xs.push(xs[i]+w); });
+    function th(){ pb.rect(ML,y,CW,16,{fill:C.ink}); ['Invoice','Date','Month','Due','Total','Received','Balance','Days late'].forEach(function(h,i){ pb.text(i>3?xs[i+1]-4:xs[i]+4,y+11,h,7.6,{bold:true,color:C.white,align:i>3?'right':'left'}); }); y+=16; }
+    need(60); pb.text(ML,y,'Unpaid invoices',10,{bold:true,color:C.goldDk}); y+=8; th();
+    d.open.forEach(function(x){ if(y+15>LIMIT){ y=pdfHead(pb); th(); } var cells=[x.no,pdfDate(x.date),x.month,x.due?pdfDate(x.due):'-',pdfMoney(x.total),x.recd?pdfMoney(x.recd):'-',pdfMoney(x.bal),x.late>0?String(x.late):'-'];
+      cells.forEach(function(v,i){ if(i>3) pb.text(xs[i+1]-4,y+10.5,v,8.4,{align:'right',bold:i===6,color:(i===7&&x.late>0)?'#B42323':C.ink}); else pb.text(xs[i]+4,y+10.5,pdfFit(pb,String(v),cw[i]-6,8.4,false),8.4); }); y+=15; pb.line(ML,y,MR,y,0.3,C.line); });
+    need(18); pb.rect(ML,y,CW,16,{fill:C.goldLt}); pb.text(ML+4,y+11,'Total to receive',8.6,{bold:true}); pb.text(xs[7]-4,y+11,pdfMoney(d.total),8.8,{bold:true,align:'right'}); y+=26;
+    if(d.pays.length){
+      need(50); pb.text(ML,y,'Payments received in the last 6 months',10,{bold:true,color:C.goldDk}); y+=10;
+      d.pays.forEach(function(p){ need(15); pb.text(ML+4,y+10,pdfDate(p.date),8.4); pb.text(ML+70,y+10,'Invoice '+(p.invoiceNo||''),8.4); pb.text(ML+230,y+10,'Received '+pdfMoney(p.amount),8.4); pb.text(ML+340,y+10,p.tds?'TDS '+pdfMoney(p.tds):'',8.4,{color:C.mute}); pb.text(MR-4,y+10,pdfFit(pb,[p.mode,p.ref].filter(Boolean).join(' '),150,8,false),8,{align:'right',color:C.mute}); y+=15; pb.line(ML,y,MR,y,0.3,C.line); }); y+=12;
+    }
+    var bank=[]; [['Account name',inv.acctName],['Bank',inv.bankName],['Account no.',inv.acctNo],['IFSC',inv.ifsc],['Branch',inv.branch],['UPI',inv.upi]].forEach(function(r){ if(r[1]) bank.push(r); });
+    if(bank.length){ need(24+bank.length*11); pb.text(ML,y,'Please pay to',10,{bold:true,color:C.goldDk}); y+=13; bank.forEach(function(r){ pb.text(ML,y,r[0],8.6,{color:C.mute}); pb.text(ML+90,y,String(r[1]),8.8,{bold:true}); y+=11; }); y+=6; }
+    need(30); pb.wrap('Please compare this with your records and tell us if any item differs. Amounts received and tax deducted at source (TDS) are shown against the invoice they were credited to.',CW,8,false).forEach(function(l){ pb.text(ML,y+8,l,8,{color:C.mute}); y+=10; });
+  }
+  function buildStatementPdf(clientId, withInvoices){
+    var pb=pdfNew(false), d=stmtData(clientId); drawStatement(pb,d);
+    if(withInvoices) d.open.filter(function(x){ return x.late>0; }).forEach(function(x){ drawInvoice(pb,invoiceModelForIssue(x.inv)); });
+    pdfFoot(pb,'Computer-generated statement'); return pb.build();
+  }
+  function remMessageFor(clientId, level){
+    var d=stmtData(clientId), c=d.client, items=d.open.filter(function(x){ return x.late>0; }), rs=function(v){ return 'Rs. '+Math.round(v).toLocaleString('en-IN'); };
+    var who=String(c.contact||'').trim().split(/\s+/)[0], hi='Dear '+(who&&!/\(/.test(c.contact||'')?who:'Sir/Madam')+',';
+    var lines=items.map(function(x){ return '  - Invoice '+x.no+(x.month?' ('+xMonthLabel(x.month)+')':'')+': '+rs(x.bal)+' due on '+(x.due?pdfDate(x.due):'-')+', '+x.late+' days overdue'; }).join('\n');
+    var open={1:'We hope you are well. Our records show that the following '+(items.length>1?'invoices are':'invoice is')+' overdue:',2:'This is a second reminder. The following '+(items.length>1?'invoices remain':'invoice remains')+' unpaid, although we wrote to you earlier:',3:'This is our final reminder. The following '+(items.length>1?'invoices remain':'invoice remains')+' unpaid despite our earlier reminders:'}[level];
+    var ask={1:'A statement of account is attached. Please arrange the payment, or let us know if there is any query on the invoice'+(items.length>1?'s':'')+'.',2:'A statement of account is attached. We request you to arrange the payment at the earliest, or tell us the date by which it will be made.',3:'A statement of account is attached. We request you to clear the amount within 7 days, or to speak to us about it, so that the services can continue without interruption.'}[level];
+    var sg=pdfSignatory();
+    return hi+'\n\n'+open+'\n\n'+lines+'\n\nThe total overdue is '+rs(d.overdue)+'.\n\n'+ask+'\n\nWarm regards,\n'+sg.name+', '+sg.role+'\nPublic Force Security Services\n'+COMPANY.phone+' | '+COMPANY.email;
+  }
+  function remSubjectFor(clientId, level){ var d=stmtData(clientId); return (level===3?'Final reminder: ':(level===2?'Second reminder: ':'Reminder: '))+'overdue payment of Rs. '+Math.round(d.overdue).toLocaleString('en-IN')+' - Public Force Security Services'; }
+  // one reminder: builds the statement (and the invoice copies), sends it, and writes it to the record
+  async function sendReminder(o){
+    var d=stmtData(o.clientId), blob=buildStatementPdf(o.clientId,!!o.copies), b64=await b64Of(blob);
+    await mailApi('POST',{from:o.from,to:o.to,cc:o.cc||'',subject:o.subject,message:o.message,keepCopy:true,filename:'Statement-'+pdfName((d.client&&d.client.name)||'client')+'-'+d.today+'.pdf',pdfBase64:b64});
+    var items=d.open.filter(function(x){ return x.late>0; }), id='rm'+Date.now().toString(36)+Math.random().toString(36).slice(2,5), rec={id:id, clientId:o.clientId, clientName:(d.client&&d.client.name)||'', invoiceIds:items.map(function(x){ return x.inv.id; }), amount:d.overdue, level:o.level, sentAt:Date.now(), by:(me&&(me.name||me.email))||'', to:o.to, subject:o.subject};
+    try{ if(db){ await db.doc('reminders/'+id).set(rec); state.reminders=state.reminders||{}; state.reminders[id]=rec; for(var i=0;i<items.length;i++){ try{ await db.doc('invoices/'+items[i].inv.id).update({emailedAt:rec.sentAt, emailedTo:o.to, emailKind:'reminder'}); }catch(e){} } } }catch(e2){}
+    renderReceivables(); return rec;
+  }
+  var remClient='';
+  async function openReminder(clientId){
+    if(!canPay()){ toast('Only Accounts or an administrator can send reminders.'); return; }
+    var el=function(i){ return document.getElementById(i); }, d=stmtData(clientId), items=d.open.filter(function(x){ return x.late>0; });
+    if(!items.length){ toast('Nothing is overdue for this client.'); return; }
+    remClient=clientId; var lv=remNextLevel(clientId);
+    el('remTitle').textContent='Reminder to '+(d.client.name||''); el('remLevel').value=String(lv); el('remTo').value=d.client.email||''; el('remCc').value=''; el('remErr').textContent=''; el('remHelp').style.display='none'; el('remCopies').checked=false;
+    el('remInv').textContent=items.length+' overdue invoice'+(items.length>1?'s':'')+': '+items.map(function(x){ return x.no; }).join(', ')+'. The statement lists everything unpaid.';
+    el('remSubject').value=remSubjectFor(clientId,lv); el('remMsg').value=remMessageFor(clientId,lv); el('remFrom').innerHTML='<option value="">Loading...</option>'; el('btnRemSend').disabled=true; el('remModalBg').classList.add('show');
+    try{ var out=await mailApi('GET'), senders=out.senders||[]; el('remFrom').innerHTML=senders.map(function(s){ return '<option value="'+escapeHtml(s.email)+'">'+escapeHtml(s.email)+' ('+escapeHtml(s.label)+')</option>'; }).join(''); el('btnRemSend').disabled=false; }
+    catch(e){ el('remFrom').innerHTML='<option value="">Not available</option>'; var h=el('remHelp'); h.style.display=''; h.textContent=(e&&(e.status===0||e.status===404||/Failed to fetch|NetworkError|Load failed/i.test(String(e.message))))?'Email is not set up here yet. It works on your own site once the email service is connected. You can still download the statement.':'Email is not available right now: '+((e&&e.message)||'unknown problem')+'. You can still download the statement.'; }
+  }
+  async function sendReminderFromModal(){
+    var el=function(i){ return document.getElementById(i); }, err=el('remErr'); err.textContent='';
+    var to=el('remTo').value.trim(); if(!to){ err.textContent='Enter the client\'s email address.'; return; }
+    var btn=el('btnRemSend'), old=btn.textContent; btn.disabled=true; btn.textContent='Sending...';
+    try{ await sendReminder({clientId:remClient,from:el('remFrom').value,to:to,cc:el('remCc').value.trim(),subject:el('remSubject').value,message:el('remMsg').value,level:Number(el('remLevel').value)||1,copies:el('remCopies').checked}); toast('Reminder emailed to '+to+'.'); el('remModalBg').classList.remove('show'); }
+    catch(e){ err.textContent=(e&&e.message)||'Could not send the email.'; }
+    btn.disabled=false; btn.textContent=old;
+  }
+  async function downloadStatement(clientId){
+    var d=stmtData(clientId); if(!d.open.length){ toast('This client has nothing unpaid.'); return; }
+    await pdfSave(buildStatementPdf(clientId,false),'Statement-'+pdfName(d.client.name||'client')+'-'+d.today+'.pdf');
+  }
+  async function downloadAllStatements(){
+    var files=[], used={}, today=new Date().toISOString().slice(0,10);
+    for(var i=0;i<clients.length;i++){ var d=stmtData(clients[i].id); if(!d.open.length) continue; var buf=new Uint8Array(await buildStatementPdf(clients[i].id,false).arrayBuffer()), nm='Statement-'+pdfName(clients[i].name)+'-'+today+'.pdf'; if(used[nm]) nm=nm.replace(/\.pdf$/,'-'+(i+1)+'.pdf'); used[nm]=1; files.push({name:nm,bytes:buf}); }
+    if(!files.length){ toast('No client has anything unpaid.'); return; }
+    await pdfSave(zipStore(files),'statements-'+today+'.zip'); toast(files.length+' statement'+(files.length>1?'s':'')+' saved in one ZIP file.');
+  }
+  function renderReceivables(){
+    var card=document.getElementById('recvCard'); if(!card) return;
+    var allowed=canPay(); card.style.display=allowed?'':'none'; if(!allowed) return;
+    var tb=document.querySelector('#recvTable tbody'), rows=[];
+    clients.forEach(function(c){ var d=stmtData(c.id); if(d.overdue>0.5) rows.push(d); });
+    rows.sort(function(a,b){ return b.overdue-a.overdue; });
+    document.getElementById('recvEmpty').style.display=rows.length?'none':'';
+    document.getElementById('btnRemindAll').style.display=rows.length?'':'none';
+    tb.innerHTML=rows.map(function(d){
+      var rs=remindersOf(d.client.id), last=rs[rs.length-1], lv=remNextLevel(d.client.id), z=function(v){ return v>0.5?bonusM2(v):'<span class="muted">-</span>'; };
+      return '<tr><td><b>'+escapeHtml(d.client.name||'')+'</b></td><td class="right">'+z(d.buckets[1])+'</td><td class="right">'+z(d.buckets[2])+'</td><td class="right">'+z(d.buckets[3])+'</td><td class="right">'+z(d.buckets[4])+'</td><td class="right"><b>'+bonusM2(d.overdue)+'</b></td><td>'+(last?escapeHtml(new Date(last.sentAt).toLocaleDateString('en-GB'))+' <span class="muted">('+LEVEL_TXT[last.level]+')</span>':'<span class="muted">never</span>')+'</td><td style="white-space:nowrap"><button class="btn small" data-rcv-rem="'+escapeHtml(d.client.id)+'" type="button">Send '+(lv===1?'reminder':LEVEL_TXT[lv].toLowerCase())+'</button> <button class="btn small ghost" data-rcv-stmt="'+escapeHtml(d.client.id)+'" type="button">Statement (PDF)</button></td></tr>';
+    }).join('');
+    tb.querySelectorAll('[data-rcv-rem]').forEach(function(b){ b.addEventListener('click', function(){ openReminder(b.dataset.rcvRem); }); });
+    tb.querySelectorAll('[data-rcv-stmt]').forEach(function(b){ b.addEventListener('click', function(){ downloadStatement(b.dataset.rcvStmt); }); });
+  }
+  // everyone overdue, one email each
+  var remAllRows=[];
+  async function openRemindAll(){
+    if(!canPay()){ toast('Only Accounts or an administrator can send reminders.'); return; }
+    remAllRows=clients.map(function(c){ var d=stmtData(c.id); return d.overdue>0.5?{c:c,d:d,lv:remNextLevel(c.id)}:null; }).filter(Boolean).sort(function(a,b){ return b.d.overdue-a.d.overdue; });
+    if(!remAllRows.length){ toast('No invoice is overdue.'); return; }
+    document.getElementById('remAllList').innerHTML='<table><thead><tr><th></th><th>Client</th><th>Email</th><th>Reminder</th><th class="right">Overdue</th></tr></thead><tbody>'+remAllRows.map(function(r,i){ var em=r.c.email||''; return '<tr><td><input type="checkbox" data-ra="'+i+'" '+(em?'checked':'disabled')+' style="width:auto"></td><td><b>'+escapeHtml(r.c.name||'')+'</b></td><td>'+(em?escapeHtml(em):'<span class="tag bad">no email</span>')+'</td><td>'+LEVEL_TXT[r.lv]+'</td><td class="right">'+bonusM2(r.d.overdue)+'</td></tr>'; }).join('')+'</tbody></table>';
+    document.getElementById('remAllMsg').textContent=''; document.getElementById('btnRemAllSend').disabled=false; document.getElementById('remAllModalBg').classList.add('show');
+  }
+  async function sendRemindAll(){
+    var msg=document.getElementById('remAllMsg'), btn=document.getElementById('btnRemAllSend'), chosen=[]; document.querySelectorAll('#remAllList [data-ra]').forEach(function(c){ if(c.checked) chosen.push(remAllRows[Number(c.dataset.ra)]); });
+    if(!chosen.length){ msg.textContent='Choose at least one client.'; return; }
+    var senders; try{ senders=(await mailApi('GET')).senders||[]; }catch(e){ msg.textContent=(e&&(e.status===0||e.status===404))?'Email is not set up here yet. It works on your own site once the email service is connected.':'Email is not available right now: '+((e&&e.message)||''); return; }
+    if(!senders.length){ msg.textContent='No sending address is available.'; return; }
+    if(!confirm('Send '+chosen.length+' reminder'+(chosen.length>1?'s':'')+' now?')) return;
+    btn.disabled=true; var ok=0, failed=[];
+    for(var i=0;i<chosen.length;i++){ var r=chosen[i]; msg.textContent='Sending '+(i+1)+' of '+chosen.length+': '+(r.c.name||'')+'...';
+      try{ await sendReminder({clientId:r.c.id,from:senders[0].email,to:r.c.email,subject:remSubjectFor(r.c.id,r.lv),message:remMessageFor(r.c.id,r.lv),level:r.lv,copies:false}); ok++; }catch(e){ failed.push((r.c.name||'')+': '+((e&&e.message)||'failed')); } }
+    msg.textContent=ok+' reminder'+(ok===1?'':'s')+' sent'+(failed.length?'. Not sent: '+failed.join('; '):'.'); toast(ok+' reminder'+(ok===1?'':'s')+' emailed.'); btn.disabled=false;
+  }
+  (function(){
+    var c=document.getElementById('remClose'); if(!c) return;
+    c.addEventListener('click', function(){ document.getElementById('remModalBg').classList.remove('show'); });
+    document.getElementById('remAllClose').addEventListener('click', function(){ document.getElementById('remAllModalBg').classList.remove('show'); });
+    document.getElementById('btnRemSend').addEventListener('click', sendReminderFromModal);
+    document.getElementById('btnStmtZip').addEventListener('click', downloadAllStatements);
+    document.getElementById('btnRemindAll').addEventListener('click', openRemindAll);
+    document.getElementById('btnRemAllSend').addEventListener('click', sendRemindAll);
+    document.getElementById('remLevel').addEventListener('change', function(){ var lv=Number(this.value)||1; document.getElementById('remSubject').value=remSubjectFor(remClient,lv); document.getElementById('remMsg').value=remMessageFor(remClient,lv); });
+  })();
+
+  /* ---------- wage revision: the difference on invoices already issued, billed on a supplementary invoice ---------- */
+  var arRows=[];
+  // one issued invoice: what it should be at the present rates, and the difference (before GST), by normal and reverse-charge part
+  async function arrearsFor(inv){
+    var k=contracts.find(function(c){ return c.id===inv.contractId; });
+    if(inv.manual) return {inv:inv, skip:'The amounts were typed by hand.'};
+    if(!k) return {inv:inv, skip:'Not made from a contract.'};
+    var res=await contractLinesFor(k, inv.month, {inMonth:true});
+    if(!res.lines.length) return {inv:inv, skip:res.none?'Nobody is posted at '+(k.site||'the site')+' for that month.':'Nothing is billed for that month at the present data.'};
+    var items=res.lines.map(function(l){ return {description:l.description, qty:l.qty, rate:l.rate, amount:l.qty*l.rate, cat:l.cat}; }), svc=serviceChargeLines(items, inv.serviceChargePct||0), all=items.concat(svc), nb={normal:0,rcm:0};
+    all.forEach(function(i){ nb[i.cat==='rcm'?'rcm':'normal']+=i.amount; });
+    var m=invoiceModelFromSaved(inv), oldQty=(inv.items||[]).reduce(function(t,i){ return t+(Number(i.qty)||0); },0), newQty=res.lines.reduce(function(t,l){ return t+(Number(l.qty)||0); },0);
+    return {inv:inv, k:k, oldBase:Number(m.subtotal)||0, newBase:r2(nb.normal+nb.rcm), dNormal:r2(nb.normal-(Number(m.normalBase)||0)), dRcm:r2(nb.rcm-(Number(m.rcmBase)||0)), oldQty:r2(oldQty), newQty:r2(newQty), warns:res.warns};
+  }
+  function openArrears(){
+    if(!canPay()){ toast('Only Accounts or an administrator can create supplementary invoices.'); return; }
+    var el=function(i){ return document.getElementById(i); }, last=xAddMonth(thisMonth(),-1);
+    el('arEff').value=thisMonth()+'-01'; el('arFrom').value=last; el('arTo').value=last; el('arOut').innerHTML=''; el('arNote').textContent=''; el('arErr').textContent=''; el('arTotals').textContent=''; el('btnArCreate').style.display='none'; arRows=[];
+    el('arModalBg').classList.add('show');
+  }
+  async function arWork(){
+    var el=function(i){ return document.getElementById(i); }, from=el('arFrom').value, to=el('arTo').value; el('arErr').textContent=''; el('btnArCreate').style.display='none';
+    if(!from||!to||from>to){ el('arErr').textContent='Choose the first and the last month (the first cannot be after the last).'; return; }
+    var cand=invoices.filter(function(i){ return i.status!=='draft' && i.month>=from && i.month<=to && !i.supplementOf; }).sort(function(a,b){ return (a.clientName||'').localeCompare(b.clientName||'') || String(a.month).localeCompare(String(b.month)); });
+    if(!cand.length){ el('arOut').innerHTML='<p class="muted">No issued invoice for these months.</p>'; return; }
+    var btn=el('btnArWork'); btn.disabled=true; btn.textContent='Working it out...'; arRows=[];
+    for(var i=0;i<cand.length;i++){ arRows.push(await arrearsFor(cand[i])); }
+    btn.disabled=false; btn.textContent='Work out the difference';
+    var skipped=arRows.filter(function(r){ return r.skip; }), calc=arRows.filter(function(r){ return !r.skip; });
+    var h='<table><thead><tr><th></th><th>Client</th><th>Invoice</th><th class="right">Man-days billed</th><th class="right">Man-days now</th><th class="right">Billed (before GST)</th><th class="right">At present rates</th><th class="right">Difference to bill</th><th>Note</th></tr></thead><tbody>';
+    calc.forEach(function(r,idx){
+      var d=r2(r.dNormal+r.dRcm), done=r.inv.arrearsBilled, same=Math.abs(r.oldQty-r.newQty)<0.05, can=!done && d>=1, note='';
+      if(done) note='Already billed in '+escapeHtml(done.no||'a supplementary invoice')+'.'; else if(d<=-1) note='Lower than billed: this needs a credit note, which is not made here.'; else if(Math.abs(d)<1) note='No difference.'; else if(!same) note='The man-days differ from the invoice, so the difference also contains that change. Check it.';
+      h+='<tr><td><input type="checkbox" data-ar="'+idx+'" '+((can&&same)?'checked':'')+(can?'':' disabled')+' style="width:auto"></td><td>'+escapeHtml(r.inv.clientName||'')+'</td><td><b>'+escapeHtml(r.inv.invoiceNo||'')+'</b><br><span class="muted">'+escapeHtml(xMonthLabel(r.inv.month))+'</span></td><td class="right">'+r.oldQty+'</td><td class="right"'+(same?'':' style="color:var(--bad)"')+'>'+r.newQty+'</td><td class="right">'+bonusM2(r.oldBase)+'</td><td class="right">'+bonusM2(r.newBase)+'</td><td class="right"><input type="number" step="0.01" data-ard="'+idx+'" value="'+(can?d:'')+'"'+(can?'':' disabled')+' style="width:110px;text-align:right"></td><td class="muted" style="font-size:.82rem">'+note+'</td></tr>';
+    });
+    h+='</tbody></table>'+(skipped.length?'<p class="muted" style="margin:.5rem 0 0;font-size:.82rem">Not checked: '+skipped.map(function(r){ return escapeHtml(r.inv.invoiceNo||'')+' ('+escapeHtml(r.skip)+')'; }).join('; ')+'</p>':'');
+    if(calc.length && !calc.some(function(r){ return Math.abs(r.dNormal+r.dRcm)>=1; })) h='<div class="banner" style="margin-bottom:.5rem"><div><b>No difference found.</b> The invoices already match the present rates. If the wages have just been revised, update the rate cards first (Rate Card, <i>Update wages from the minimum wages table</i>), then work it out again.</div></div>'+h;
+    el('arOut').innerHTML=h; arRows=calc;
+    el('arNote').textContent=(el('arEff').value&&el('arEff').value.slice(8)!=='01')?'The new wages start part way through a month. The figures use the present rates for the whole month, so change the difference of the first month by hand if only some days were at the new rate.':'';
+    el('arOut').querySelectorAll('[data-ar],[data-ard]').forEach(function(x){ x.addEventListener('input', arTotals); x.addEventListener('change', arTotals); }); arTotals();
+  }
+  function arChosen(){
+    var out=[]; document.querySelectorAll('#arOut [data-ar]').forEach(function(c){ if(c.checked){ var i=Number(c.dataset.ar), r=arRows[i], inp=document.querySelector('#arOut [data-ard="'+i+'"]'), d=r2(inp&&inp.value); if(d>=1){ var tot=(r.dNormal+r.dRcm)||1; out.push({r:r, d:d, dNormal:r2(d*(r.dNormal/tot)), dRcm:r2(d-r2(d*(r.dNormal/tot)))}); } } }); return out;
+  }
+  function arTotals(){
+    var ch=arChosen(), t=ch.reduce(function(a,x){ return a+x.d; },0), clientsN={}; ch.forEach(function(x){ clientsN[x.r.inv.clientId]=1; });
+    document.getElementById('arTotals').textContent=ch.length?(ch.length+' invoice'+(ch.length>1?'s':'')+' · '+Object.keys(clientsN).length+' supplementary invoice'+(Object.keys(clientsN).length>1?'s':'')+' · '+fmtMoney(t)+' before GST'):'';
+    document.getElementById('btnArCreate').style.display=ch.length?'':'none';
+  }
+  // the data of an invoice made here, worked out as the invoice window works it out
+  function supplementData(client, items, o){
+    var normalBase=items.filter(function(i){ return i.cat!=='rcm'; }).reduce(function(t,i){ return t+i.amount; },0), subtotal=items.reduce(function(t,i){ return t+i.amount; },0), rcmBase=subtotal-normalBase;
+    var gstPct=client.gstExempt?0:(Number(o.gstPct)||0), gstAmt=normalBase*gstPct/100, total=subtotal+gstAmt, sp=supplyType(client), costing=state.settings.costing||{}, tdsPct=costing.tdsPct==null?1:Number(costing.tdsPct), tdsAmt=subtotal*tdsPct/100;
+    var d={invoiceNo:o.no, clientId:client.id, clientName:client.name, month:o.month, invoiceDate:o.date, dueDate:o.due, status:'draft', notes:o.notes, items:items, serviceChargePct:0, serviceChargeAmt:0, subtotal:Math.round(subtotal), gstPct:gstPct, gstAmt:Math.round(gstAmt), total:Math.round(total), contractId:o.contractId||'', placeOfSupply:sp.pos,
+      cgst:Math.round(sp.inter?0:gstAmt/2), sgst:Math.round(sp.inter?0:gstAmt/2), igst:Math.round(sp.inter?gstAmt:0), rcmBase:Math.round(rcmBase), rcmTax:Math.round(rcmBase*gstPct/100), tdsPct:tdsPct, tdsAmt:Math.round(tdsAmt), netReceivable:Math.round(total-tdsAmt), manual:false, manualTax:[], supplementOf:o.supplementOf, sac:(String(client.sac||'').trim()||invSac()), serviceText:(String(client.serviceText||'').trim()||INV_SVC_DEFAULT)};
+    try{ var fp=invFingerprint(invoiceModelFromSaved(d)); d.fingerprints=[{hex:fp.hex, at:new Date().toISOString(), by:(me&&(me.name||me.email))||''}]; }catch(e){}
+    return d;
+  }
+  async function arCreate(){
+    var el=function(i){ return document.getElementById(i); }, err=el('arErr'); err.textContent='';
+    if(!db){ err.textContent='Storage is not available, so nothing was saved.'; return; }
+    var ch=arChosen(); if(!ch.length){ err.textContent='Tick at least one invoice.'; return; }
+    var eff=el('arEff').value, effTxt=eff?pdfDate(eff):'the revision date', today=xToday(), by={}; ch.forEach(function(x){ (by[x.r.inv.clientId]=by[x.r.inv.clientId]||[]).push(x); });
+    var nClients=Object.keys(by).length; if(!confirm('Create '+nClients+' supplementary invoice'+(nClients>1?'s':'')+' as draft'+(nClients>1?'s':'')+' for '+fmtMoney(ch.reduce(function(t,x){ return t+x.d; },0))+' before GST?')) return;
+    var btn=el('btnArCreate'); btn.disabled=true; var fy=fyCodeOf(today), seq=Math.max(invSeq(nextInvoiceNo(today),fy),1), made=[];
+    try{
+      for(var cid in by){
+        var rows=by[cid], client=clients.find(function(c){ return c.id===cid; })||{id:cid,name:rows[0].r.inv.clientName}, items=[], months=[];
+        rows.forEach(function(x){
+          var ml=xMonthLabel(x.r.inv.month); months.push(ml);
+          if(x.dNormal>=0.5) items.push({description:'Difference for '+ml+' due to the revision of minimum wages from '+effTxt+' (invoice '+x.r.inv.invoiceNo+')', qty:1, rate:x.dNormal, amount:x.dNormal, cat:'normal'});
+          if(x.dRcm>=0.5) items.push({description:'Difference for '+ml+' due to the revision of minimum wages from '+effTxt+' (invoice '+x.r.inv.invoiceNo+', security staff, reverse charge)', qty:1, rate:x.dRcm, amount:x.dRcm, cat:'rcm'});
+        });
+        var no=invFormat(fy,seq); while(invNoProblem(no,'')){ seq++; no=invFormat(fy,seq); } seq++;
+        var k=rows[0].r.k, last=rows.map(function(x){ return x.r.inv.month; }).sort().pop(), d=supplementData(client,items,{no:no, month:last, date:today, due:xAddDays(today,Number(k&&k.terms)||0), notes:'Supplementary invoice: revision of minimum wages from '+effTxt+', for '+months.join(', ')+'.', gstPct:rows[0].r.inv.gstPct, contractId:k&&k.id, supplementOf:rows.map(function(x){ return x.r.inv.id; })});
+        var ref=await db.collection('invoices').add(d); made.push(no);
+        for(var j=0;j<rows.length;j++){ try{ await db.doc('invoices/'+rows[j].r.inv.id).update({arrearsBilled:{no:no, at:Date.now(), eff:eff||'', amount:rows[j].d}}); rows[j].r.inv.arrearsBilled={no:no}; }catch(e1){} }
+      }
+      await invBumpCounter(made[made.length-1], today);
+      toast(made.length+' supplementary invoice'+(made.length>1?'s':'')+' saved as draft: '+made.join(', ')+'.'); el('arModalBg').classList.remove('show');
+    }catch(e){ err.textContent='Could not create the invoices: '+((e&&(e.code||e.message))||'error')+(made.length?' ('+made.join(', ')+' were created.)':''); }
+    btn.disabled=false;
+  }
+  (function(){
+    var c=document.getElementById('arClose'); if(!c) return;
+    c.addEventListener('click', function(){ document.getElementById('arModalBg').classList.remove('show'); });
+    document.getElementById('btnArrears').addEventListener('click', openArrears);
+    document.getElementById('btnArWork').addEventListener('click', arWork);
+    document.getElementById('btnArCreate').addEventListener('click', arCreate);
+  })();
+
   function renderInvoiceStats(){
-    renderProfit();
+    renderProfit(); renderReceivables(); var ab=document.getElementById('btnArrears'); if(ab) ab.style.display=canPay()?'':'none';
     var outEl=document.getElementById('invStatOutstanding');
     if(!outEl) return;
-    var outstanding = invoices.filter(function(i){return i.status!=='paid';}).reduce(function(s,i){return s+invShownTotal(i);},0);
+    var outstanding = invoices.reduce(function(s,i){return s+invBalance(i);},0);
     var today = new Date().toISOString().slice(0,10);
-    var overdueCount = invoices.filter(function(i){return i.status!=='paid' && i.dueDate && i.dueDate<today;}).length;
+    var overdueCount = invoices.filter(function(i){return invBalance(i)>0.5 && i.dueDate && i.dueDate<today;}).length;
     var curYm = thisMonth();
     var thisMonthTotal = invoices.filter(function(i){return i.month===curYm;}).reduce(function(s,i){return s+invShownTotal(i);},0);
     outEl.textContent = fmtMoney(outstanding);
     document.getElementById('invStatOverdue').textContent = overdueCount;
     document.getElementById('invStatThisMonth').textContent = fmtMoney(thisMonthTotal);
     document.getElementById('invStatClients').textContent = clients.length;
+    var pays=Object.keys(state.invPay||{}).map(function(k){ return state.invPay[k]; }), fyNow=fyCodeOf(''), fyMonths=bonusFyMonths(fyNow);
+    document.getElementById('invStatCollected').textContent = fmtMoney(pays.filter(function(p){ return String(p.date).slice(0,7)===curYm; }).reduce(function(t,p){ return t+(Number(p.amount)||0); },0));
+    document.getElementById('invStatTds').textContent = fmtMoney(pays.filter(function(p){ return fyMonths.indexOf(String(p.date).slice(0,7))>-1; }).reduce(function(t,p){ return t+(Number(p.tds)||0); },0));
     renderContracts(); renderAttention(); if(typeof renderTrends==='function') renderTrends();
   }
 
@@ -6733,26 +7228,27 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var today = new Date().toISOString().slice(0,10);
     var rows = invoices.filter(function(i){
       if(clientF && i.clientId!==clientF) return false;
-      var effectiveStatus = (i.status!=='paid' && i.dueDate && i.dueDate<today) ? 'overdue' : i.status;
+      var effectiveStatus = invEffStatus(i);
       if(statusF && effectiveStatus!==statusF) return false;
       return true;
     }).sort(function(a,b){return (b.invoiceNo||'').localeCompare(a.invoiceNo||'');});
     tbody.innerHTML='';
     document.getElementById('invEmpty').style.display = rows.length? 'none':'';
     rows.forEach(function(i){
-      var effectiveStatus = (i.status!=='paid' && i.dueDate && i.dueDate<today) ? 'overdue' : i.status;
-      var tagClass = effectiveStatus==='paid' ? 'ok' : effectiveStatus==='overdue' ? 'bad' : effectiveStatus==='sent' ? 'info' : 'warn';
+      var effectiveStatus = invEffStatus(i), recd=invReceived(i), tdsd=invTdsOf(i), balI=invBalance(i);
+      var tagClass = effectiveStatus==='paid' ? 'ok' : effectiveStatus==='overdue' ? 'bad' : (effectiveStatus==='sent'||effectiveStatus==='part paid') ? 'info' : 'warn';
       var tr=document.createElement('tr');
       tr.innerHTML = '<td style="font-weight:700;color:var(--accent)">'+escapeHtml(i.invoiceNo||'—')+'</td>'+
         '<td>'+escapeHtml(i.clientName||'—')+'</td><td>'+escapeHtml(i.month||'—')+'</td><td>'+escapeHtml(i.dueDate||'—')+'</td>'+
-        '<td class="right" style="font-weight:700">'+fmtMoney(invShownTotal(i))+(invIsExempt(i)?'<div class="muted" style="font-size:.7rem;font-weight:400">GST exempt</div>':'')+'</td>'+
+        '<td class="right" style="font-weight:700">'+fmtMoney(invShownTotal(i))+(invIsExempt(i)?'<div class="muted" style="font-size:.7rem;font-weight:400">GST exempt</div>':'')+((recd||tdsd)?'<div class="muted" style="font-size:.7rem;font-weight:400">received '+fmtMoney(recd)+(tdsd?' + TDS '+fmtMoney(tdsd):'')+(balI>0.5?' &middot; balance '+fmtMoney(balI):'')+'</div>':'')+'</td>'+
         '<td><span class="tag '+tagClass+'">'+effectiveStatus+'</span>'+(i.emailedAt?'<div class="muted" style="font-size:.72rem;margin-top:.2rem">'+(i.emailKind==='reminder'?'Reminded ':'Emailed ')+new Date(i.emailedAt).toLocaleDateString('en-GB')+'</div>':'')+'</td>'+
-        '<td style="white-space:nowrap"><button class="btn small ghost" data-inv-pdf="'+i.id+'">PDF</button> <button class="btn small ghost" data-inv-pack="'+i.id+'">Billing pack</button> <button class="btn small ghost" data-inv-mail="'+i.id+'">Email</button> <button class="btn small ghost" data-inv-edit="'+i.id+'">Edit</button></td>';
+        '<td style="white-space:nowrap"><button class="btn small ghost" data-inv-pdf="'+i.id+'">PDF</button> <button class="btn small ghost" data-inv-pack="'+i.id+'">Billing pack</button> <button class="btn small ghost" data-inv-mail="'+i.id+'">Email</button> '+((canPay()&&i.status!=='draft')?'<button class="btn small ghost" data-inv-pay="'+i.id+'">Payment</button> ':'')+'<button class="btn small ghost" data-inv-edit="'+i.id+'">Edit</button></td>';
       tbody.appendChild(tr);
     });
     tbody.querySelectorAll('[data-inv-edit]').forEach(function(b){
       b.addEventListener('click', function(){ openInvoiceModal(b.dataset.invEdit); });
     });
+    tbody.querySelectorAll('[data-inv-pay]').forEach(function(b){ b.addEventListener('click', function(){ openInvPay(b.dataset.invPay); }); });
     tbody.querySelectorAll('[data-inv-pdf]').forEach(function(b){
       b.addEventListener('click', function(){ var inv=invoices.find(function(x){return x.id===b.dataset.invPdf;}); if(inv) saveInvoicePdf(invoiceModelFromSaved(inv)); });
     });
@@ -8069,15 +8565,16 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     document.getElementById('invGenNote').textContent = list.length? '' : 'No contracts for this client yet. Add one under Contracts to generate lines from attendance.';
   }
 
-  async function generateFromContract(){
-    var k=contracts.find(function(c){return c.id===document.getElementById('invContract').value;});
-    if(!k){ toast('Select a contract first.'); return; }
-    var ym=document.getElementById('invMonth').value||thisMonth(), dim=daysInMonth(ym);
-    var client=clients.find(function(c){return c.id===k.clientId;});
-    var emps=activeEmps().filter(function(e){ return e.site===k.site; });
-    if(!emps.length){ toast('No active employees are assigned to '+(k.site||'this contract\'s site')+'.'); return; }
-    document.getElementById('invClient').value=k.clientId;
-    applyClientGstDefault(false);
+  // the people who were employed in a month, also those who have left since (for a month that is over)
+  function empsEmployedIn(ym){
+    var first=ym+'-01', last=ym+'-'+String(daysInMonth(ym)).padStart(2,'0');
+    return state.employees.filter(function(e){ if(e.doj && e.doj>last) return false; return e.dol ? e.dol>=first : e.active!==false; });
+  }
+  // what a contract bills for a month: the lines, the service charge % and the warnings (no screen is touched)
+  async function contractLinesFor(k, ym, opts){
+    var dim=daysInMonth(ym), client=clients.find(function(c){return c.id===k.clientId;});
+    var emps=((opts&&opts.inMonth)?empsEmployedIn(ym):activeEmps()).filter(function(e){ return e.site===k.site; });
+    if(!emps.length) return {none:true, emps:emps, lines:[], warns:[], pct:0, rcm:false, unbilled:0};
     var prs=[]; for(var i=0;i<emps.length;i++){ prs.push(await computePayroll(emps[i], ym)); }
     var costing=state.settings.costing||{}, rc=rateCards.find(function(r){return r.id===k.rateCardId;});
     var rcm=!!(client && client.rcmSecurity===true && clientRegistered(client));
@@ -8116,6 +8613,19 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       });
     }
     var pct = k.servicePct!=null ? Number(k.servicePct) : (rc&&rc.servicePct!=null ? Number(rc.servicePct) : (costing.servicePct||0));
+    return {emps:emps, lines:lines, warns:warns, pct:pct, rcm:rcm, unbilled:unbilled};
+  }
+
+  async function generateFromContract(){
+    var k=contracts.find(function(c){return c.id===document.getElementById('invContract').value;});
+    if(!k){ toast('Select a contract first.'); return; }
+    var ym=document.getElementById('invMonth').value||thisMonth(), dim=daysInMonth(ym);
+    var client=clients.find(function(c){return c.id===k.clientId;});
+    var emps=activeEmps().filter(function(e){ return e.site===k.site; });
+    if(!emps.length){ toast('No active employees are assigned to '+(k.site||'this contract\'s site')+'.'); return; }
+    document.getElementById('invClient').value=k.clientId;
+    applyClientGstDefault(false);
+    var res=await contractLinesFor(k, ym), lines=res.lines, warns=res.warns, pct=res.pct, rcm=res.rcm, unbilled=res.unbilled; emps=res.emps;
     document.getElementById('invSvcPct').value=pct;
     if(!lines.length){ toast(warns[0]||'Nothing to bill. Check attendance and the contract\'s posts.'); document.getElementById('invGenNote').textContent=warns.join(' '); return; }
     document.getElementById('invLineItems').innerHTML='';
@@ -9988,6 +10498,15 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       db.collection('siteLocations').onSnapshot(function(snap){
         var o={}; snap.docs.forEach(function(d){ var x=d.data(); if(x && x.site) o[x.site]=x; });
         state.siteLoc=o; siteViewsRefresh();
+      }, function(){});
+      db.collection('reminders').onSnapshot(function(snap){
+        var o={}; snap.docs.forEach(function(d){ var x=d.data(); if(x && x.clientId) o[d.id]=Object.assign({id:d.id},x); });
+        state.reminders=o; if(typeof renderReceivables==='function') renderReceivables();
+      }, function(){});
+      db.collection('invoicePayments').onSnapshot(function(snap){
+        var o={}; snap.docs.forEach(function(d){ var x=d.data(); if(x && x.invoiceId) o[d.id]=Object.assign({id:d.id},x); });
+        state.invPay=o; if(typeof renderInvoicesTable==='function') renderInvoicesTable(); if(typeof renderInvoiceStats==='function') renderInvoiceStats();
+        var m=document.getElementById('ipModalBg'); if(m && m.classList.contains('show') && ipInv) renderInvPay(false);
       }, function(){});
       db.collection('bonusPayments').onSnapshot(function(snap){
         var o={}; snap.docs.forEach(function(d){ var x=d.data(); if(x && x.fy && x.empId) o[d.id]=x; });
