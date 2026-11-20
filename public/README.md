@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-Under the name at the top of the left menu a small line reads, for example, "Version: 14 Nov 2026, build 36". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+Under the name at the top of the left menu a small line reads, for example, "Version: 20 Nov 2026, build 37". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -975,7 +975,7 @@ Different clients get different services, so the SAC code (and the description o
 
 
 ## One version line
-The page used to show two version lines: an old one under the name ("Build 5 Nov 2026 · 44", which was never updated) and the real one at the bottom of the menu. The old one is removed. There is now a single line, **under "Public Force" at the top of the left menu**, such as "Version: 14 Nov 2026, build 36". It is the line to check after an upload (press Ctrl + Shift + R first): if it shows an older build, the new file is not live yet.
+The page used to show two version lines: an old one under the name ("Build 5 Nov 2026 · 44", which was never updated) and the real one at the bottom of the menu. The old one is removed. There is now a single line, **under "Public Force" at the top of the left menu**, such as "Version: 20 Nov 2026, build 37". It is the line to check after an upload (press Ctrl + Shift + R first): if it shows an older build, the new file is not live yet.
 
 
 ## Paying the bonus at the year end (bonus ledger)
@@ -1132,3 +1132,8 @@ The tool can be put on a phone's home screen, with its own icon ("PF"), and open
 
 ### Workforce gaps: counts by site and a download (build 36)
 **Compliance, Workforce gaps** already listed each employee's gaps (missing UAN, ESIC number, Aadhaar, bank details or phone; PF not switched on though compulsory; pay below the minimum wage; police verification or PSARA training pending). It now also has a **table by site** (people, how many have gaps, and the count of each kind of gap, worst site first) and **Download the gaps (CSV)**, one line for each gap (employee ID, name, role, site, gap), for a client or an inspector.
+
+
+### Install on a phone: how the site file is made (build 37)
+The install tags (manifest, theme colour, home-screen icon and title, and the service worker registration) are added to `public/index.html` **when the site file is made**, so the copy shown inside Claude has none of them. Build 36 was made without them by mistake, so it could not be installed; **build 37 has them again**, and the site file is now always made with `tools/make-site-file.py`, which adds the database scripts, the "do not index" tag and the install tags together and stops with an error if any is missing. Checked on a local web server: the manifest and the 192 and 512 pixel icons are valid, the service worker registers and keeps only the page's own files (nothing from the database or the email service), and the page opens with no signal from the saved copy (it then shows no data, because the data comes from the database each time).
+Upload together, at the top of the site: `index.html`, `manifest.webmanifest`, `sw.js`, `icon-192.png`, `icon-512.png` and `_headers`. After installing, open it once on the phone while online; to update, close the app and open it again.

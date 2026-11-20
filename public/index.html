@@ -3,6 +3,14 @@
 <head>
 <meta charset="utf-8">
 <meta name="robots" content="noindex,nofollow">
+<meta name="theme-color" content="#3B1FA8">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Public Force">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" type="image/png" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Public Force — HR, Payroll, Compliance & Billing</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -388,7 +396,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 <body>
 <div class="appshell">
   <nav class="side" id="sideNav">
-    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="buildTag" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Version: 14 Nov 2026, build 36</small></div></div>
+    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="buildTag" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Version: 20 Nov 2026, build 37</small></div></div>
     <div class="grp">Menu</div>
     <button class="navbtn on" id="tabs-dashboard" data-tab="dashboard">Dashboard</button>
     <button class="navbtn" id="tabs-cycle" data-tab="cycle">Pay cycle</button>
@@ -1886,6 +1894,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
 <script src="config.js"></script>
 <script src="pfss-backend.js"></script>
+<script>if("serviceWorker" in navigator && (location.protocol==="https:" || location.hostname==="localhost")){ window.addEventListener("load",function(){ navigator.serviceWorker.register("sw.js").catch(function(){}); }); }</script>
 <script>
 (function(){
   "use strict";
