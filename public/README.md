@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-Under the name at the top of the left menu a small line reads, for example, "Version: 13 Nov 2026, build 34". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+Under the name at the top of the left menu a small line reads, for example, "Version: 14 Nov 2026, build 36". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -975,7 +975,7 @@ Different clients get different services, so the SAC code (and the description o
 
 
 ## One version line
-The page used to show two version lines: an old one under the name ("Build 5 Nov 2026 · 44", which was never updated) and the real one at the bottom of the menu. The old one is removed. There is now a single line, **under "Public Force" at the top of the left menu**, such as "Version: 13 Nov 2026, build 34". It is the line to check after an upload (press Ctrl + Shift + R first): if it shows an older build, the new file is not live yet.
+The page used to show two version lines: an old one under the name ("Build 5 Nov 2026 · 44", which was never updated) and the real one at the bottom of the menu. The old one is removed. There is now a single line, **under "Public Force" at the top of the left menu**, such as "Version: 14 Nov 2026, build 36". It is the line to check after an upload (press Ctrl + Shift + R first): if it shows an older build, the new file is not live yet.
 
 
 ## Paying the bonus at the year end (bonus ledger)
@@ -1105,3 +1105,30 @@ A menu item **History** (administrator only) has two tabs.
 - It is recorded at one point in the page where everything is saved, so it covers every screen. A failure of the log never stops the work being saved. Both the log and the bin are in the backup.
 - **Run `supabase/accounts_role.sql` once** in the Supabase SQL Editor (as for payments): nobody can edit a change log line, and only an administrator can delete from the log or the bin. The History is **hidden from other roles in the page, but the database still lets any signed-in person read it** (the same as the other records); tell me if that must be locked too.
 - Not recorded: who only looked at something, and changes made before this was switched on.
+
+
+## Install on a phone (like an app)
+The tool can be put on a phone's home screen, with its own icon ("PF"), and opens full screen without the browser's address bar.
+- **Android (Chrome):** open the site, menu (three dots), **Install app** (or **Add to Home screen**).
+- **iPhone (Safari):** open the site, the Share button, **Add to Home Screen**.
+- It is the same tool and the same sign-in: the screens already fit a phone (menu button at the top, cards one under another, tables scroll inside their cards).
+- **It needs a signal**: the page itself opens without one (a saved copy is used), but the data comes from the database each time, so without signal there is nothing to show. There are no notifications.
+- Pages are always fetched fresh when there is a signal, so a new build is picked up at once. Files: `manifest.webmanifest`, `icon-192.png`, `icon-512.png`, `sw.js` in `public/`; upload them with `index.html` and `_headers`. The tags are added to `index.html` when the site file is made, so the copy shown inside Claude has none of this.
+- The supervisor attendance page for phones is a separate piece, not included.
+
+## PF, ESIC and professional tax payments
+**Compliance, PF, ESIC and PT payments** shows, for each of the last 6 or 12 months and for each of PF, ESIC and professional tax: what the payroll says is due, what was **paid** (amount, **challan, TRRN or CRN number**, bank reference, date), the **due date** (the 15th for PF and ESIC, the 20th for professional tax, as in the Filing calendar) and a status: **paid**, **short by ...**, **... more**, **late** (paid after the due date), or **overdue / due in n days**. **Record** (Accounts and the administrator) opens a window with the amount due ready; **Edit** changes it and **Remove this record** takes it away.
+- The PF figure is the contribution (employee plus employer shares); the administration and EDLI charges on the actual challan can make the amount paid higher, so type the challan total (a PF payment up to 6% above is still shown as paid).
+- Recording a payment **marks the matching filing as Done** in the Filing calendar and takes it off the Today list.
+- Records are in the collection `statPayments`, in the backup and in the change log. A proof file cannot be attached yet: the challan number and reference are kept.
+
+## Month lock
+**History, Month locks** (administrator): **Lock** a month once its payroll is approved and its invoices are issued; the list shows the last 14 months and whether each payroll is approved (locking a month whose payroll is not approved asks first). In a locked month **attendance, additional pay, the payroll run and issued invoices cannot be changed or deleted, by anybody**; every screen shows "<month> is locked, so this cannot be changed. An administrator can unlock it". **Still allowed:** recording payments received (and the invoice becoming paid), draft invoices, making new invoices (also for that month, for example a late or supplementary invoice), and everything in other months. **Unlock** needs a **reason**; the lock and the unlock, with the reason and who, are in the change log. After a payroll is approved the tool reminds you that the month can be locked.
+- It is enforced at the one point where the page saves, so no screen can get round it. It is **not** enforced by the database itself: someone who edits the page's own code could bypass it. Only an administrator can write a lock (the database rule is in `accounts_role.sql`).
+
+## CA pack
+**Monthly summary, Download CA pack (ZIP)** gives one ZIP for the month chosen, of CSV files that open in Excel (with the rupee sign and names right): **0 summary** (the main totals), **1 sales register** (invoices dated in the month, drafts left out: taxable value, CGST, SGST, IGST, total, TDS expected, received so far, balance, status; none for an exempt client), **2 receipts and TDS** (payments recorded in the month, with the TDS the client deducted), **3 TDS by client** (the financial year up to the month, to compare with Form 26AS), **4 payroll** (employee-wise gross, PF, ESI, professional tax, advances, net pay, employer PF and ESI), **5 PF, ESIC and PT payments** (due, paid, challan), **6 GSTR-1** (the same file as in Compliance) and a **README.txt**. Payments before payments were recorded in the tool are not in files 2 and 3. Tally import is not included.
+
+
+### Workforce gaps: counts by site and a download (build 36)
+**Compliance, Workforce gaps** already listed each employee's gaps (missing UAN, ESIC number, Aadhaar, bank details or phone; PF not switched on though compulsory; pay below the minimum wage; police verification or PSARA training pending). It now also has a **table by site** (people, how many have gaps, and the count of each kind of gap, worst site first) and **Download the gaps (CSV)**, one line for each gap (employee ID, name, role, site, gap), for a client or an inspector.
