@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-Under the name at the top of the left menu a small line reads, for example, "Version: 22 Nov 2026, build 39". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+Under the name at the top of the left menu a small line reads, for example, "Version: 22 Nov 2026, build 40". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -975,7 +975,7 @@ Different clients get different services, so the SAC code (and the description o
 
 
 ## One version line
-The page used to show two version lines: an old one under the name ("Build 5 Nov 2026 · 44", which was never updated) and the real one at the bottom of the menu. The old one is removed. There is now a single line, **under "Public Force" at the top of the left menu**, such as "Version: 22 Nov 2026, build 39". It is the line to check after an upload (press Ctrl + Shift + R first): if it shows an older build, the new file is not live yet.
+The page used to show two version lines: an old one under the name ("Build 5 Nov 2026 · 44", which was never updated) and the real one at the bottom of the menu. The old one is removed. There is now a single line, **under "Public Force" at the top of the left menu**, such as "Version: 22 Nov 2026, build 40". It is the line to check after an upload (press Ctrl + Shift + R first): if it shows an older build, the new file is not live yet.
 
 
 ## Paying the bonus at the year end (bonus ledger)
@@ -1165,3 +1165,15 @@ Once a month a job on GitHub's free scheduler reads **every record** of the data
 - If your repository is **public**, GitHub stops scheduled jobs after 60 days with no activity in the repository (uploading a new build counts as activity). A private repository is not affected. Run it by hand now and then if in doubt.
 - Photos and documents kept in Supabase **storage** (for example email attachments) are not in this backup; the data records are.
 - Checked here with stand-in database and email services: the paging through every record, the encryption (a wrong passphrase fails), the email, the date record, and the failure cases. The real scheduled run can only be checked on your GitHub, so please do step 3.
+
+
+## PF, ESIC and PT proofs: kept for each month, and sent with the invoice (build 40)
+**Where to upload:** **Compliance, "PF, ESIC and PT payments"**. Each month has a row for PF, ESIC and PT. Press **Record** (or **Edit** if the payment is already recorded) and the window now has a **Documents** space: choose the **challan** and the **payment receipt** (PDF, JPG or PNG, up to 10 MB each, up to 6 for one payment). They are uploaded when you press **Save**, and the table then shows their names (click a name to open it) with "(sent with invoices)" or "(not sent to clients)". Each file can be removed again; removing a record removes its files too.
+- **"Attach these to the invoice emails sent to clients"** is ticked for PF and ESIC and **off for PT** to begin with. Untick it for anything a client should not receive.
+- **Sending with the invoice:** when you open **Email** on an invoice, the tool adds the **PF and ESIC proofs of the month before the invoice month** (for the invoice of November, those of October) to the *Additional documents* by itself, each marked "(added automatically)", with a line saying how many were added. You can **remove any of them** before sending. The usual sentence about attached documents is in the message. If nothing was uploaded for that month, the window says so and the email can still be sent. A **payment reminder** takes none of them (they are taken off if you choose "Payment reminder" and come back for "Invoice").
+- **Per client:** the client form has **"Attach PF and ESIC proofs to invoice emails"** (ticked to begin with); untick it for a client who does not want them.
+- **Today, "Needs you today":** from the 16th of a month, if a payroll exists for the month before and its PF or ESIC proof is not uploaded, it says "PF and ESIC proofs for October 2026 are not uploaded (PF and ESIC)".
+- **Privacy:** upload the **challan and the payment receipt**. Do **not** tick "send to clients" for files that list every employee of the company with their UAN or wages (the ECR member list, the ESIC contribution list): those show the people of all your clients. Such a list can be uploaded with the tick removed, to keep it with the month's record.
+- The email limits still apply to the files together (at most 10 extra files, about 15 MB in all).
+- **Set up once:** run **`supabase/statutory_proofs.sql`** in the Supabase SQL Editor. It makes the private storage for these files: Accounts and the administrator can upload and remove; the administrator, Accounts and managers can read (managers send invoice emails). Without it the window says "run statutory_proofs.sql". The files are not in the monthly backup (the records are, with the names and places of the files).
+- Checked here with a stand-in for the storage: upload, download, removal, the automatic attach (the files passed on are byte for byte the ones uploaded), the client switch, reminders, a month with nothing uploaded, storage not set up, and the Today reminder. The real storage can only be checked on your site.

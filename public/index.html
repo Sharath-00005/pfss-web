@@ -398,7 +398,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 <body>
 <div class="appshell">
   <nav class="side" id="sideNav">
-    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="buildTag" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Version: 22 Nov 2026, build 39</small></div></div>
+    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="buildTag" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Version: 22 Nov 2026, build 40</small></div></div>
     <div class="grp">Menu</div>
     <button class="navbtn on" id="tabs-dashboard" data-tab="dashboard">Dashboard</button>
     <button class="navbtn" id="tabs-cycle" data-tab="cycle">Pay cycle</button>
@@ -1309,6 +1309,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     </div>
     <div class="row">
       <div class="field"><label><input type="checkbox" id="clGstExempt" style="width:auto;margin-right:.4rem">GST exempt</label></div>
+      <div class="field"><label><input type="checkbox" id="clProofs" checked style="width:auto;margin-right:.4rem">Attach PF and ESIC proofs to invoice emails</label></div>
       <div class="field"><label for="clSac">Default SAC code</label><input id="clSac" list="sacList" maxlength="10" placeholder="e.g. 998533" autocomplete="off"></div>
       <div class="field grow"><label for="clService">Service described on its invoices</label><input id="clService" placeholder="e.g. Housekeeping (general cleaning) services"></div>
     </div>
@@ -1615,6 +1616,11 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <div class="row"><div class="field"><label for="statAmt">Amount paid (₹) *</label><input type="number" step="1" id="statAmt"></div><div class="field"><label for="statDate">Date paid *</label><input type="date" id="statDate"></div></div>
     <div class="row"><div class="field grow"><label for="statChallan">Challan, TRRN or CRN number</label><input id="statChallan"></div><div class="field grow"><label for="statRef">Bank reference</label><input id="statRef"></div></div>
     <div class="field"><label for="statNote">Note (optional)</label><input id="statNote" placeholder="e.g. paid in two challans, interest included"></div>
+    <div class="field" id="statFilesBox"><label for="statFiles">Documents: challan, payment receipt (PDF, JPG or PNG, up to 10 MB each)</label>
+      <input type="file" id="statFiles" multiple accept=".pdf,.jpg,.jpeg,.png">
+      <div id="statFileList" style="margin-top:.4rem"></div>
+      <label class="chk" style="display:flex;gap:.45rem;align-items:center;font-size:.86rem;margin-top:.4rem"><input type="checkbox" id="statClientSafe" checked style="width:auto;min-height:0"> Attach these to the invoice emails sent to clients</label>
+      <div class="muted" id="statFileHint" style="font-size:.8rem"></div></div>
     <div id="statErr" style="color:var(--bad);min-height:1.3em" role="alert"></div>
     <div class="row" style="justify-content:space-between"><button class="btn danger ghost" id="btnStatRemove" type="button">Remove this record</button><button class="btn" id="btnStatSave" type="button">Save</button></div>
   </div>
@@ -1642,6 +1648,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <div class="field" id="mailFilesBox"><label for="mailFiles">Additional documents (optional)</label>
       <input type="file" id="mailFiles" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.csv,.txt">
       <div id="mailFileList" style="margin-top:.4rem"></div>
+      <div id="mailProofNote" class="muted" style="font-size:.84rem;margin-top:.3rem"></div>
       <div id="mailSentBox" style="display:none;margin-top:.5rem">
         <label class="chk" style="display:flex;gap:.45rem;align-items:center;font-size:.86rem"><input type="checkbox" id="mailSentOn" checked style="width:auto;min-height:0"> Mention the attached documents in the message</label>
         <textarea id="mailSent" rows="2" aria-label="Sentence about the attached documents" style="width:100%;margin-top:.25rem"></textarea>
@@ -1932,7 +1939,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 
   /* ---------- history: a change log (who changed what) and a recycle bin (deleted records are kept for 30 days) ---------- */
   var dbRaw=null;
-  var LOG_COLS={employees:1,invoices:1,invoicePayments:1,clients:1,contracts:1,rateCards:1,advances:1,payrollRuns:1,bonusPayments:1,attendance:1,settings:1,monthLocks:1,statPayments:1};
+  var LOG_COLS={statPayments:1,employees:1,invoices:1,invoicePayments:1,clients:1,contracts:1,rateCards:1,advances:1,payrollRuns:1,bonusPayments:1,attendance:1,settings:1,monthLocks:1,statPayments:1};
   var BIN_COLS={employees:'Employee',invoices:'Invoice',invoicePayments:'Payment',clients:'Client',contracts:'Contract',rateCards:'Rate card',advances:'Advance'};
   var LOG_NOISE={emailedAt:1,emailedTo:1,emailKind:1,emailedFiles:1,fingerprints:1,numberHistory:1,updatedAt:1};
   var BIN_DAYS=30, LOG_DAYS=400;
@@ -1951,6 +1958,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     if(col==='attendance'){ var eid=String(id).split('_')[0], e=(state.employees||[]).find(function(x){ return x.id===eid; }); return 'Attendance '+(e?e.name:eid)+' '+(String(id).split('_')[1]||'').replace(/^(\d{4})(\d{2})$/,'$1-$2'); }
     if(col==='monthLocks') return 'Month '+(d.ym||id)+(d.locked?' locked':' unlocked'+(d.reason?': '+d.reason:''));
     if(col==='statPayments') return ({pf:'PF',esic:'ESIC',pt:'Professional tax'}[d.kind]||'Statutory')+' payment for '+(d.ym||'')+' of '+fmtMoney(Number(d.amount)||0)+(d.challan?' (challan '+d.challan+')':'');
+    if(col==='statPayments') return String(d.kind||'').toUpperCase()+' payment '+(d.ym||id)+(d.amount?' '+fmtMoney(Number(d.amount)):'')+((d.files||[]).length?' ('+d.files.length+' document'+(d.files.length>1?'s':'')+')':'');
     if(col==='settings') return 'Settings';
     return col+'/'+id;
   }
@@ -2420,6 +2428,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     if(!(me&&me.canEdit)){ el('tdMapCard').style.display=''; el('tdMap').style.display='none'; el('tdLegend').style.display='none'; } else { el('tdMap').style.display=''; el('tdLegend').style.display=''; }
     // what needs you
     var items=[], today=d.date, ymc=cycMonth(), run=cycRun(ymc);
+    if(may && Number(today.slice(8))>=16){ var pm=xAddMonth(thisMonth(),-1), miss=['pf','esic'].filter(function(k){ var r=(state.statPay||{})[k+'_'+pm]; return !(r&&(r.files||[]).length); }); if(miss.length && statCalc(pm).has) items.push({lv:'warn',t:'PF and ESIC proofs for '+xMonthLabel(pm)+' are not uploaded ('+miss.map(function(k){ return k.toUpperCase(); }).join(' and ')+')',go:'compliance',b:'Open'}); }
     if(may){
       if(!run || !run.calculatedAt) items.push({lv:'warn',t:'Calculate the payroll of '+xMonthLabel(ymc),go:'cycle',b:'Open'});
       else if(run.status!=='approved') items.push({lv:'warn',t:'Approve the payroll of '+xMonthLabel(ymc)+' (calculated, not approved)',go:'cycle',b:'Open'});
@@ -2461,26 +2470,67 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         else if(pay){ var diff=Math.round(Number(pay.amount)-calc); chip=(Math.abs(diff)<=1||k[0]==='pf'&&diff>0&&diff<=calc*0.06)?'<span class="tag ok">paid</span>':(diff<0?'<span class="tag warn">short by '+fmtMoney(-diff)+'</span>':'<span class="tag info">'+fmtMoney(diff)+' more</span>'); if(due && pay.date>due) chip+=' <span class="tag bad">late</span>'; }
         else if(calc>0){ chip=dd<0?'<span class="tag bad">overdue '+(-dd)+'d</span>':(dd<=7?'<span class="tag warn">due in '+dd+'d</span>':'<span class="tag info">due in '+dd+'d</span>'); }
         else chip='<span class="tag mute">nothing due</span>';
-        h+='<tr>'+(ki===0?'<td rowspan="3"><b>'+escapeHtml(xMonthLabel(ym))+'</b><br><span class="muted" style="font-size:.78rem">'+(c.has?(c.approved?'payroll approved':'payroll not approved'):'')+'</span></td>':'')+'<td>'+k[1]+'</td><td class="right">'+(c.has?bonusM2(calc):'-')+'</td><td class="right">'+(pay?'<b>'+bonusM2(pay.amount)+'</b>':'-')+'</td><td class="muted" style="font-size:.84rem">'+escapeHtml(pay?[pay.challan,pay.ref].filter(Boolean).join(' · '):'')+'</td><td>'+(pay?escapeHtml(pdfDate(pay.date)):'-')+'</td><td>'+(due?escapeHtml(pdfDate(due)):'-')+'</td><td>'+chip+'</td><td>'+(may&&(c.has||pay)?'<button class="btn small'+(pay?' ghost':'')+'" data-act="statRec" data-kind="'+k[0]+'" data-ym="'+ym+'" type="button">'+(pay?'Edit':'Record')+'</button>':'')+'</td></tr>'; }); });
+        h+='<tr>'+(ki===0?'<td rowspan="3"><b>'+escapeHtml(xMonthLabel(ym))+'</b><br><span class="muted" style="font-size:.78rem">'+(c.has?(c.approved?'payroll approved':'payroll not approved'):'')+'</span></td>':'')+'<td>'+k[1]+'</td><td class="right">'+(c.has?bonusM2(calc):'-')+'</td><td class="right">'+(pay?'<b>'+bonusM2(pay.amount)+'</b>':'-')+'</td><td class="muted" style="font-size:.84rem">'+escapeHtml(pay?[pay.challan,pay.ref].filter(Boolean).join(' · '):'')+statFilesHtml(pay)+'</td><td>'+(pay?escapeHtml(pdfDate(pay.date)):'-')+'</td><td>'+(due?escapeHtml(pdfDate(due)):'-')+'</td><td>'+chip+'</td><td>'+(may&&(c.has||pay)?'<button class="btn small'+(pay?' ghost':'')+'" data-act="statRec" data-kind="'+k[0]+'" data-ym="'+ym+'" type="button">'+(pay?'Edit':'Record')+'</button>':'')+'</td></tr>'; }); });
     return h+'</tbody></table></div>';
   }
+  /* ---------- proofs of PF, ESIC and PT payments (challan, receipt): kept for each month, and sent to clients with the invoice ---------- */
+  var STAT_BUCKET='statutory-proofs', STAT_FILE_BYTES=10000000, STAT_EXTS=['pdf','jpg','jpeg','png'], statCurFiles=[], statNewFiles=[], statRemoved=[];
+  async function statHdr(){
+    var A=window.pfssAuth; if(!A){ var e0=new Error('Uploading works on your own site, not in this preview.'); e0.noStorage=true; throw e0; }
+    var tok=await A.token(); if(!tok) throw new Error('Please sign in again.');
+    return {base:String(A.url||'').replace(/\/+$/,'')+'/storage/v1', hdr:{apikey:A.anonKey, Authorization:'Bearer '+tok}};
+  }
+  function statSegs(path){ return String(path).split('/').map(encodeURIComponent).join('/'); }
+  async function statUploadOne(file, kind, ym){
+    var h=await statHdr(), ext=mailFileExt(file.name), safe=file.name.replace(/[^A-Za-z0-9._-]+/g,'_').replace(/\.{2,}/g,'.').slice(-80), path=ym+'/'+kind+'-'+Date.now()+'-'+Math.random().toString(36).slice(2,7)+'-'+safe, up;
+    try{ up=await fetch(h.base+'/object/'+STAT_BUCKET+'/'+statSegs(path),{method:'POST',headers:Object.assign({'Content-Type':MAIL_MIME[ext]||'application/octet-stream','x-upsert':'false'},h.hdr),body:file}); }
+    catch(e){ throw new Error('Could not upload '+file.name+'. Please check the internet connection.'); }
+    if(!up.ok){ var j={}; try{ j=await up.json(); }catch(e){} throw new Error((up.status===404||up.status===400||up.status===403)?'The storage for these files is not set up yet: ask the administrator to run statutory_proofs.sql in Supabase (see the README).':('Could not upload '+file.name+(j.message?' ('+j.message+')':'')+'.')); }
+    return {name:file.name, path:path, type:MAIL_MIME[ext]||'', size:file.size};
+  }
+  async function statDownloadBlob(f){ var h=await statHdr(), r=await fetch(h.base+'/object/authenticated/'+STAT_BUCKET+'/'+statSegs(f.path),{headers:h.hdr}); if(!r.ok) throw new Error('Could not read '+f.name+' ('+r.status+').'); return await r.blob(); }
+  async function statDeleteFiles(list){ try{ var paths=(list||[]).map(function(f){ return f.path; }).filter(Boolean); if(!paths.length) return; var h=await statHdr(); await fetch(h.base+'/object/'+STAT_BUCKET,{method:'DELETE',headers:Object.assign({'Content-Type':'application/json'},h.hdr),body:JSON.stringify({prefixes:paths})}); }catch(e){} }
+  function statRenderFiles(){
+    var box=document.getElementById('statFileList'); if(!box) return;
+    var rows=statCurFiles.map(function(f,i){ return {n:f.name,s:f.size,k:'old',i:i}; }).concat(statNewFiles.map(function(f,i){ return {n:f.name,s:f.size,k:'new',i:i}; }));
+    box.innerHTML=rows.length?rows.map(function(x){ return '<div style="display:flex;align-items:center;gap:.6rem;padding:.2rem 0;border-bottom:1px solid var(--line)"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(x.n)+(x.k==='new'?' <span class="muted">(uploaded when you save)</span>':'')+'</span><span class="muted">'+mailSizeText(x.s)+'</span><button class="btn small ghost" type="button" data-statfdel="'+x.k+':'+x.i+'">Remove</button></div>'; }).join(''):'<div class="muted" style="font-size:.84rem">No document yet.</div>';
+  }
+  function statAddFiles(files){
+    var msgs=[]; Array.prototype.slice.call(files||[]).forEach(function(f){ var ext=mailFileExt(f.name);
+      if(STAT_EXTS.indexOf(ext)<0) msgs.push(f.name+': use a PDF, JPG or PNG.'); else if(!f.size) msgs.push(f.name+' is empty.'); else if(f.size>STAT_FILE_BYTES) msgs.push(f.name+' is larger than 10 MB.'); else if(statCurFiles.length+statNewFiles.length>=6) msgs.push('At most 6 documents for one payment.'); else statNewFiles.push(f); });
+    document.getElementById('statFileHint').textContent=msgs.join(' '); statRenderFiles();
+  }
+  function statFilesHtml(pay){
+    var fs=(pay&&pay.files)||[]; if(!fs.length) return '';
+    return '<div style="font-size:.78rem;margin-top:.15rem">'+fs.map(function(f,i){ return '<span role="button" tabindex="0" style="color:var(--brand);text-decoration:underline;cursor:pointer" data-act="statFile" data-key="'+escapeHtml(pay.kind+'_'+pay.ym)+'" data-i="'+i+'">'+escapeHtml(f.name)+'</span>'; }).join(' &middot; ')+(pay.clientSafe===false?' <span class="muted">(not sent to clients)</span>':' <span class="muted">(sent with invoices)</span>')+'</div>';
+  }
+  async function statOpenFile(key,i){ try{ var f=((state.statPay||{})[key]||{}).files[i]; await pdfSave(await statDownloadBlob(f),f.name); }catch(e){ toast((e&&e.message)||'Could not open the file.'); } }
+  (function(){
+    var f=document.getElementById('statFiles'); if(!f) return;
+    f.addEventListener('change', function(){ statAddFiles(f.files); f.value=''; });
+    document.getElementById('statFileList').addEventListener('click', function(ev){ var b=ev.target.closest('[data-statfdel]'); if(!b) return; var p=b.dataset.statfdel.split(':'), i=Number(p[1]); if(p[0]==='new') statNewFiles.splice(i,1); else statRemoved=statRemoved.concat(statCurFiles.splice(i,1)); statRenderFiles(); });
+  })();
   function openStatRec(kind,ym){
     if(!canPay()){ toast('Only Accounts or an administrator can record these payments.'); return; }
     var el=function(i){ return document.getElementById(i); }, c=statCalc(ym), pay=statPaymentOf(kind,ym), nm=STAT_KINDS.filter(function(k){ return k[0]===kind; })[0][1];
     statCur={kind:kind,ym:ym}; el('statTitle').textContent=nm+' for '+xMonthLabel(ym); el('statCalc').textContent='The payroll says '+fmtMoney(c[kind])+' is due'+(statDue(ym,kind)?' by '+pdfDate(statDue(ym,kind)):'')+'.';
-    el('statAmt').value=pay?pay.amount:(c[kind]||''); el('statDate').value=pay?pay.date:xToday(); el('statChallan').value=pay?(pay.challan||''):''; el('statRef').value=pay?(pay.ref||''):''; el('statNote').value=pay?(pay.note||''):''; el('statErr').textContent=''; el('btnStatRemove').style.display=pay?'':'none'; el('statModalBg').classList.add('show');
+    el('statAmt').value=pay?pay.amount:(c[kind]||''); el('statDate').value=pay?pay.date:xToday(); el('statChallan').value=pay?(pay.challan||''):''; el('statRef').value=pay?(pay.ref||''):''; el('statNote').value=pay?(pay.note||''):''; el('statErr').textContent=''; statCurFiles=((pay&&pay.files)||[]).slice(); statNewFiles=[]; statRemoved=[]; el('statFiles').value=''; el('statFileHint').textContent=''; el('statClientSafe').checked=(pay&&pay.clientSafe!==undefined)?pay.clientSafe!==false:(kind!=='pt'); statRenderFiles(); el('btnStatRemove').style.display=pay?'':'none'; el('statModalBg').classList.add('show');
   }
   async function saveStatRec(){
     var el=function(i){ return document.getElementById(i); }, err=el('statErr'); err.textContent=''; if(!db){ err.textContent='Storage is not available.'; return; }
     var amt=Math.round(Number(el('statAmt').value)||0), date=el('statDate').value; if(!(amt>0)){ err.textContent='Enter the amount paid.'; return; } if(!/^\d{4}-\d{2}-\d{2}$/.test(date)){ err.textContent='Choose the date paid.'; return; }
     var d={kind:statCur.kind, ym:statCur.ym, amount:amt, date:date, challan:el('statChallan').value.trim(), ref:el('statRef').value.trim(), note:el('statNote').value.trim(), by:(me&&(me.name||me.email))||'', at:Date.now()};
-    try{ await db.doc('statPayments/'+statCur.kind+'_'+statCur.ym).set(d); state.statPay=state.statPay||{}; state.statPay[statCur.kind+'_'+statCur.ym]=d; el('statModalBg').classList.remove('show'); toast('Payment recorded.'); renderCompliance(); }
+    var btnS=el('btnStatSave'); btnS.disabled=true;
+    try{ var up=[]; for(var u=0;u<statNewFiles.length;u++){ btnS.textContent='Uploading '+(u+1)+' of '+statNewFiles.length+'...'; up.push(await statUploadOne(statNewFiles[u],statCur.kind,statCur.ym)); } d.files=statCurFiles.concat(up); d.clientSafe=el('statClientSafe').checked; }
+    catch(e){ err.textContent=(e&&e.message)||'Could not upload the files.'; btnS.disabled=false; btnS.textContent='Save'; return; }
+    btnS.disabled=false; btnS.textContent='Save';
+    try{ await db.doc('statPayments/'+statCur.kind+'_'+statCur.ym).set(d); await statDeleteFiles(statRemoved); statRemoved=[]; state.statPay=state.statPay||{}; state.statPay[statCur.kind+'_'+statCur.ym]=d; el('statModalBg').classList.remove('show'); toast('Payment recorded.'); renderCompliance(); }
     catch(e){ err.textContent=(e&&e.code==='42501')?'Only Accounts or an administrator can record these payments.':'Could not save.'; }
   }
   (function(){
     var c=document.getElementById('statClose'); if(!c) return;
     c.addEventListener('click', function(){ document.getElementById('statModalBg').classList.remove('show'); }); document.getElementById('btnStatSave').addEventListener('click', saveStatRec);
-    document.getElementById('btnStatRemove').addEventListener('click', async function(){ if(!statCur||!confirm('Remove this record?')) return; try{ await db.doc('statPayments/'+statCur.kind+'_'+statCur.ym).delete(); if(state.statPay) delete state.statPay[statCur.kind+'_'+statCur.ym]; document.getElementById('statModalBg').classList.remove('show'); toast('Record removed.'); renderCompliance(); }catch(e){ toast('Could not remove it.'); } });
+    document.getElementById('btnStatRemove').addEventListener('click', async function(){ if(!statCur||!confirm('Remove this record?')) return; try{ await statDeleteFiles(((state.statPay||{})[statCur.kind+'_'+statCur.ym]||{}).files); await db.doc('statPayments/'+statCur.kind+'_'+statCur.ym).delete(); if(state.statPay) delete state.statPay[statCur.kind+'_'+statCur.ym]; document.getElementById('statModalBg').classList.remove('show'); toast('Record removed.'); renderCompliance(); }catch(e){ toast('Could not remove it.'); } });
     document.addEventListener('change', function(ev){ if(ev.target && ev.target.id==='statRange'){ statN=Number(ev.target.value)||6; renderCompliance(); } });
   })();
 
@@ -3571,11 +3621,35 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     if(!mailExtra.length || !on || !on.checked || !ta) return '';
     return String(ta.value||'').trim();
   }
+  // PF and ESIC proofs of the month before the invoice month are added to the extra documents of an invoice email (not of a payment reminder), unless the client is switched off
+  var mailProof=null;
+  function mailProofNote(t,bad){ var n=document.getElementById('mailProofNote'); if(n){ n.textContent=t||''; n.style.color=bad?'var(--bad)':''; } }
+  function mailProofWanted(){ if(!mailInv || mailKind()!=='invoice') return false; var c=clients.find(function(x){ return x.id===mailInv.clientId; })||{}; return c.attachProofs!==false; }
+  async function mailProofSync(){
+    try{
+      if(!mailInv) return;
+      if(!mailProof || mailProof.invId!==mailInv.id) mailProof={invId:mailInv.id, stage:'idle'};
+      if(!mailProofWanted()){ if(mailProof.stage==='done'){ mailExtra=mailExtra.filter(function(x){ return !x.auto; }); mailProof.stage='idle'; renderMailFiles(); mailSentFill(); mailRefreshText(); } mailProofNote(''); return; }
+      if(mailProof.stage!=='idle') return; mailProof.stage='loading';
+      var ym=xAddMonth(mailInv.month||thisMonth(),-1), label=xMonthLabel(ym), files=[];
+      ['pf','esic'].forEach(function(k){ var r=(state.statPay||{})[k+'_'+ym]; if(r && r.clientSafe!==false) (r.files||[]).forEach(function(f){ files.push({kind:k,f:f}); }); });
+      if(!files.length){ mailProof.stage='done'; mailProofNote('No PF or ESIC proof has been uploaded for '+label+' (Compliance, PF, ESIC and PT payments), so none is attached.'); return; }
+      mailProofNote('Adding the PF and ESIC proofs for '+label+'...'); var added=0, skipped=0;
+      for(var i=0;i<files.length;i++){
+        if(mailExtra.length>=MAIL_EXTRA_MAX){ skipped++; continue; }
+        var blob=await statDownloadBlob(files[i].f); if(!mailInv || mailProof.invId!==mailInv.id || !mailProofWanted()){ mailProof.stage='idle'; return; }
+        mailExtra.push({name:files[i].kind.toUpperCase()+'_'+ym+'_'+files[i].f.name.replace(/[^A-Za-z0-9._-]+/g,'_'), blob:blob, size:blob.size, auto:true}); added++;
+      }
+      mailProof.stage='done'; renderMailFiles(); mailSentFill(); mailRefreshText();
+      mailProofNote('PF and ESIC proofs for '+label+': '+added+' file'+(added===1?'':'s')+' added automatically. Remove any you do not want to send.'+(skipped?' '+skipped+' more could not be added (at most '+MAIL_EXTRA_MAX+' files).':''));
+    }catch(e){ if(mailProof) mailProof.stage='idle'; mailProofNote('The PF and ESIC proofs could not be added: '+((e&&e.message)||'error')+'. You can still attach files by hand.',true); }
+  }
+  (function(){ document.querySelectorAll('input[name="mailKind"]').forEach(function(r){ r.addEventListener('change', function(){ mailProofSync(); }); }); })();
   function renderMailFiles(){
     var box=document.getElementById('mailFileList'); if(!box) return;
     var sb=document.getElementById('mailSentBox'); if(sb) sb.style.display=mailExtra.length?'':'none';
     if(!mailExtra.length){ box.innerHTML=''; return; }
-    box.innerHTML=mailExtra.map(function(x,i){ return '<div style="display:flex;align-items:center;gap:.6rem;padding:.2rem 0;border-bottom:1px solid var(--line)"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(x.name)+'</span><span class="muted">'+mailSizeText(x.size)+'</span><button class="btn small ghost" type="button" data-mfdel="'+i+'">Remove</button></div>'; }).join('')+'<div class="muted" style="font-size:.8rem;margin-top:.2rem">'+mailExtra.length+' extra file'+(mailExtra.length>1?'s':'')+', '+mailSizeText(mailExtraBytes())+' in all</div>';
+    box.innerHTML=mailExtra.map(function(x,i){ return '<div style="display:flex;align-items:center;gap:.6rem;padding:.2rem 0;border-bottom:1px solid var(--line)"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(x.name)+(x.auto?' <span class="muted">(added automatically)</span>':'')+'</span><span class="muted">'+mailSizeText(x.size)+'</span><button class="btn small ghost" type="button" data-mfdel="'+i+'">Remove</button></div>'; }).join('')+'<div class="muted" style="font-size:.8rem;margin-top:.2rem">'+mailExtra.length+' extra file'+(mailExtra.length>1?'s':'')+', '+mailSizeText(mailExtraBytes())+' in all</div>';
   }
   // keep this wording for every email from now on; the month before the invoice month is saved as {month} so it moves on by itself
   async function mailSentSave(){
@@ -3702,9 +3776,9 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     el('mailRate').innerHTML='<option value="">Choose rate card</option>'+rateCards.map(function(r){ return '<option value="'+r.id+'">'+escapeHtml(rcLabelText(r))+'</option>'; }).join('');
     el('mailRate').value=(k&&k.rateCardId)||c.defaultRateCardId||c.rateCardId||'';
     el('mailTo').value=c.email||''; el('mailCc').value=''; el('mailErr').textContent=''; el('mailHelp').style.display='none';
-    mailExtra=[]; mailLineCur=''; mailSentTpl=mailSentStd(); mailSentEdited=false; el('mailSentOn').checked=true; mailSentFill(); renderMailFiles(); el('mailFiles').value=''; el('mailFileMsg').textContent=''; el('mailLineHint').style.display='none';
+    mailExtra=[]; mailProof=null; mailProofNote(''); mailLineCur=''; mailSentTpl=mailSentStd(); mailSentEdited=false; el('mailSentOn').checked=true; mailSentFill(); renderMailFiles(); el('mailFiles').value=''; el('mailFileMsg').textContent=''; el('mailLineHint').style.display='none';
     el('mailFrom').innerHTML='<option value="">Loading...</option>'; el('btnMailSend').disabled=true;
-    mailRefreshText(); el('mailModalBg').classList.add('show');
+    mailRefreshText(); mailProofSync(); el('mailModalBg').classList.add('show');
     try{
       var out=await mailApi('GET'), senders=out.senders||[];
       el('mailFrom').innerHTML=senders.map(function(s){ return '<option value="'+escapeHtml(s.email)+'">'+escapeHtml(s.email)+' ('+escapeHtml(s.label)+')</option>'; }).join('');
@@ -7474,6 +7548,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     }).join('');
     rcSel.value = c?(c.defaultRateCardId||''):'';
     document.getElementById('clGstExempt').checked = c? !!c.gstExempt : false;
+    document.getElementById('clProofs').checked = c? c.attachProofs!==false : true;
     document.getElementById('clManual').checked = c? c.manualInvoices===true : false;
     document.getElementById('clSac').value = c? (c.sac||'') : ''; document.getElementById('clService').value = c? (c.serviceText||'') : ''; document.getElementById('clService').dataset.auto='';
     document.getElementById('clRcm').checked = c? c.rcmSecurity===true : false;
@@ -7496,6 +7571,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       address:document.getElementById('clAddress').value.trim(),
       defaultRateCardId:document.getElementById('clRateCard').value,
       gstExempt:document.getElementById('clGstExempt').checked,
+      attachProofs:document.getElementById('clProofs').checked,
       manualInvoices:document.getElementById('clManual').checked,
       sac:document.getElementById('clSac').value.trim(), serviceText:document.getElementById('clService').value.trim(),
       rcmSecurity:document.getElementById('clRcm').checked,
@@ -8783,6 +8859,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       if(t.dataset.act==='bonusFill') bonusFill();
       if(t.dataset.act==='gapsCsv') gapsCsv();
       if(t.dataset.act==='statRec') openStatRec(t.dataset.kind,t.dataset.ym);
+      if(t.dataset.act==='statFile') statOpenFile(t.dataset.key,Number(t.dataset.i));
       if(t.dataset.act==='bonusPay') openBonusPay({emp:t.dataset.emp});
       if(t.dataset.act==='bonusHist') openBonusPay({emp:t.dataset.emp});
       if(t.dataset.act==='bonusPayAll') openBonusPay({all:true});
