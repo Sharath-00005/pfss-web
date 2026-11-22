@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-Under the name at the top of the left menu a small line reads, for example, "Version: 20 Nov 2026, build 38". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+Under the name at the top of the left menu a small line reads, for example, "Version: 22 Nov 2026, build 39". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -975,7 +975,7 @@ Different clients get different services, so the SAC code (and the description o
 
 
 ## One version line
-The page used to show two version lines: an old one under the name ("Build 5 Nov 2026 · 44", which was never updated) and the real one at the bottom of the menu. The old one is removed. There is now a single line, **under "Public Force" at the top of the left menu**, such as "Version: 20 Nov 2026, build 38". It is the line to check after an upload (press Ctrl + Shift + R first): if it shows an older build, the new file is not live yet.
+The page used to show two version lines: an old one under the name ("Build 5 Nov 2026 · 44", which was never updated) and the real one at the bottom of the menu. The old one is removed. There is now a single line, **under "Public Force" at the top of the left menu**, such as "Version: 22 Nov 2026, build 39". It is the line to check after an upload (press Ctrl + Shift + R first): if it shows an older build, the new file is not live yet.
 
 
 ## Paying the bonus at the year end (bonus ledger)
@@ -1141,3 +1141,27 @@ Upload together, at the top of the site: `index.html`, `manifest.webmanifest`, `
 
 ### Phone layout fixes (build 38)
 On a phone some screens were **wider than the screen**, so parts overlapped or ran off the edge: the two cards under the tiles of the Dashboard's **Today** view (the map legend and the list would not shrink) and the top row of **Payroll** (month, site and sort boxes did not wrap). On a phone, boxes and button rows now wrap, cards and windows never exceed the screen, the trends columns shrink on a very small phone, and the Today legend wraps. Checked on screens 320, 360, 390 and 430 pixels wide: the Dashboard (Today and This month), every tab, and the windows for a new invoice, wage revision arrears, remind everyone and a new employee. Wide tables still scroll sideways inside their own box. The installed app now uses the **standard iPhone status bar** (the clock and battery sit above the page and cannot overlap it); build 37 used a see-through one.
+
+
+## Automatic monthly backup (build 39)
+Once a month a job on GitHub's free scheduler reads **every record** of the database, packs it exactly like the tool's own **Backup** button (format 1), **encrypts it with your passphrase** (AES-256), and **emails the file** to you. A second encrypted copy stays in GitHub for 90 days. It runs at 3:00 a.m. on the 2nd of each month, and you can also run it by hand.
+
+**Set it up once (about 15 minutes)**
+1. In your GitHub repository add two files (Add file, Create new file, and type the path with the slashes): `backup/monthly-backup.mjs` and `.github/workflows/monthly-backup.yml` (their contents are in the `backup` and `.github/workflows` folders of this package).
+2. In GitHub open **Settings, Secrets and variables, Actions, New repository secret** and add:
+   - `SUPABASE_URL`: your project address (Supabase, Project Settings, API, Project URL).
+   - `SUPABASE_SERVICE_KEY`: Supabase, Project Settings, API, the **service_role** key. It is very powerful: keep it only here, never in the site or in an email.
+   - `RESEND_API_KEY`: the same email key your email service uses.
+   - `BACKUP_TO`: where to send it (one or more addresses, separated by a comma), for example your own mailbox.
+   - `BACKUP_FROM` (optional): the sending address; default `accounts@publicforcesecurity.com` (it must be one your email service may send from).
+   - `BACKUP_PASSPHRASE`: a long phrase of at least 12 characters. **Write it down and keep it in two safe places: without it no backup can be opened.**
+3. **Test it now:** GitHub, **Actions, Monthly backup, Run workflow**. In a minute or two you should get the email with a file ending `.json.gz.enc`. If the run fails, GitHub shows the reason (and emails you); a missing secret is named in the message.
+4. **Test the restore once**, on your computer: open `tools/open-backup.html` (double-click it), choose the `.enc` file, type the passphrase, and save the `.json` it gives you. In the tool, **Settings, Restore** reads that file. Nothing is sent anywhere by this page.
+
+**What you should know**
+- The tool shows **"Last automatic monthly backup: date (records)"** in Settings, and the Dashboard warns if neither an automatic nor a manual backup is under 30 days old (40 days when the automatic one is in use).
+- The backup holds Aadhaar, bank and pay details, so it is **encrypted**: the email can be read by anyone with access to the mailbox, but the file cannot be opened without the passphrase.
+- A file over about 28 MB is not emailed: you get a notice, and the file is in GitHub, Actions, the latest run, Artifacts.
+- If your repository is **public**, GitHub stops scheduled jobs after 60 days with no activity in the repository (uploading a new build counts as activity). A private repository is not affected. Run it by hand now and then if in doubt.
+- Photos and documents kept in Supabase **storage** (for example email attachments) are not in this backup; the data records are.
+- Checked here with stand-in database and email services: the paging through every record, the encryption (a wrong passphrase fails), the email, the date record, and the failure cases. The real scheduled run can only be checked on your GitHub, so please do step 3.

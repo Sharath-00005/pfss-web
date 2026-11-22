@@ -398,7 +398,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 <body>
 <div class="appshell">
   <nav class="side" id="sideNav">
-    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="buildTag" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Version: 20 Nov 2026, build 38</small></div></div>
+    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="buildTag" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Version: 22 Nov 2026, build 39</small></div></div>
     <div class="grp">Menu</div>
     <button class="navbtn on" id="tabs-dashboard" data-tab="dashboard">Dashboard</button>
     <button class="navbtn" id="tabs-cycle" data-tab="cycle">Pay cycle</button>
@@ -2763,7 +2763,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     html += '</tbody></table>';
     var box=document.getElementById('siteBreakdown'); box.innerHTML = Object.keys(names).length? html : '<p class="muted">No employees yet.</p>';
     box.querySelectorAll('[data-siteloc]').forEach(function(b){ b.addEventListener('click', function(){ openSiteLoc(b.dataset.siteloc); }); });
-    applyDashView();
+    applyDashView(); loadAutoBackup();
     var sb=document.getElementById('tabs-summary'); if(sb) sb.style.display=canPay()?'':'none';
     var hb=document.getElementById('tabs-history'); if(hb) hb.style.display=(me&&me.isOwner)?'':'none';
   }
@@ -3452,9 +3452,13 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
   }
   function backupInfoText(){
     var s=state.settings||{}, d=s.lastBackup||{}, f=s.lastFilesBackup||{}, fmt=function(t){ return new Date(t).toLocaleDateString('en-GB'); };
-    return (d.at?'Last data backup: '+fmt(d.at)+(d.records?' ('+Number(d.records).toLocaleString('en-IN')+' records)':'')+'.':'No data backup has been made yet.')+' '+
+    var ab=state.autoBackup||{}, autoTxt=ab.at?'Last automatic monthly backup: '+fmt(ab.at)+(ab.records?' ('+Number(ab.records).toLocaleString('en-IN')+' records)':'')+(ab.emailed===false?', too large to email: it is in GitHub':', emailed')+'. ':'';
+    return autoTxt+(d.at?'Last data backup by hand: '+fmt(d.at)+(d.records?' ('+Number(d.records).toLocaleString('en-IN')+' records)':'')+'.':(ab.at?'':'No data backup has been made yet.'))+' '+
            (f.at?'Last files backup: '+fmt(f.at)+(f.files?' ('+f.files+' files)':'')+'.':'No files backup has been made yet.');
   }
+  // the date of the last automatic monthly backup (written by the backup job), for the administrator
+  var autoBackupLoaded=false;
+  async function loadAutoBackup(){ try{ if(autoBackupLoaded || !dbRaw || !(me&&me.isOwner)) return; autoBackupLoaded=true; var d=await histPeek(dbRaw.doc('backupLog/auto')); state.autoBackup=d||null; renderBackupInfo(); if(typeof renderAttention==='function') renderAttention(); }catch(e){} }
   function renderBackupInfo(){ var el=document.getElementById('backupInfo'); if(el) el.textContent=backupInfoText(); }
   async function backupRemember(key,val){ state.settings[key]=val; try{ if(db) await db.doc('settings/config').set(state.settings); }catch(e){} renderBackupInfo(); }
   async function backupData(){
@@ -8841,9 +8845,9 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     licences.forEach(function(l){ var s=licStatus(l); if(s[1]==='bad'||s[1]==='warn') a.push({k:s[1],t:l.name+': '+s[0].toLowerCase(),go:'compliance:licences'}); });
     invoices.forEach(function(i){ if(i.status!=='paid' && i.dueDate && i.dueDate<today) a.push({k:'bad',t:'Invoice '+(i.invoiceNo||'')+' overdue by '+(-xDays(i.dueDate))+' days',go:'invoicing'}); });
     if(me && me.isOwner){
-      var lb=(state.settings&&state.settings.lastBackup)||{}, lbDays=lb.at?Math.floor((Date.now()-lb.at)/86400000):null;
+      var lb=(state.settings&&state.settings.lastBackup)||{}, ab=state.autoBackup||{}, lbAt=Math.max(Number(lb.at)||0,Number(ab.at)||0), lbDays=lbAt?Math.floor((Date.now()-lbAt)/86400000):null;   // a backup by hand or the automatic monthly one
       if(lbDays===null) a.push({k:'warn',t:'No backup has been made yet',go:'settings'});
-      else if(lbDays>30) a.push({k:'warn',t:'The last backup was '+lbDays+' days ago',go:'settings'});
+      else if(lbDays>(ab.at?40:30)) a.push({k:'warn',t:'The last backup was '+lbDays+' days ago'+(ab.at?' (the automatic monthly backup did not run: check GitHub, Actions)':''),go:'settings'});
     }
     var g=activeEmps().filter(function(e){return empGaps(e).length;}).length;
     if(g) a.push({k:'warn',t:g+' employee'+(g>1?'s have':' has')+' compliance gaps',go:'compliance:workforce'});
