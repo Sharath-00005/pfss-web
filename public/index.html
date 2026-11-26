@@ -398,7 +398,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 <body>
 <div class="appshell">
   <nav class="side" id="sideNav">
-    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="buildTag" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Version: 23 Nov 2026, build 41</small></div></div>
+    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="buildTag" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Version: 23 Nov 2026, build 42</small></div></div>
     <div class="grp">Menu</div>
     <button class="navbtn on" id="tabs-dashboard" data-tab="dashboard">Dashboard</button>
     <button class="navbtn" id="tabs-cycle" data-tab="cycle">Pay cycle</button>
@@ -1639,6 +1639,10 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <div class="field"><label for="rcMailName">Client or company name (for the greeting)</label><input id="rcMailName" placeholder="e.g. Avio Helitronics"></div>
     <div class="field"><label for="rcMailSubject">Subject</label><input id="rcMailSubject"></div>
     <div class="field"><label for="rcMailMsg">Message</label><textarea id="rcMailMsg" rows="12"></textarea></div>
+    <div class="field" id="rcMailFilesBox"><label for="rcMailFiles">Additional documents (optional)</label>
+      <input type="file" id="rcMailFiles" multiple accept=".pdf,.jpg,.jpeg,.png,.doc,.docx,.xls,.xlsx,.csv,.txt">
+      <div id="rcMailFileList" style="margin-top:.4rem"></div>
+      <div class="muted" id="rcMailFileHint" style="font-size:.8rem;margin-top:.2rem"></div></div>
     <label style="display:flex;gap:.45rem;align-items:center;margin:.2rem 0"><input type="checkbox" id="rcMailCopy" checked style="width:auto;min-height:0"> Send a copy to the sending address</label>
     <div id="rcMailHelp" class="muted" style="display:none;margin:.4rem 0"></div>
     <div id="rcMailErr" style="color:var(--bad);min-height:1.3em" role="alert"></div>
@@ -6725,25 +6729,55 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 
   /* ---------- email a rate card and the company profile from here (the same wording and the same email service as the phone app) ---------- */
   var rcm={edited:false, attachMax:1, ready:false}, RCM_PROFILE_FILE='PFSS-Company-Profile.pdf';
+  var rcmExtra=[];   // {name, size, blob}: extra documents for this email
+  function rcmMaxFiles(){ return MAIL_EXTRA_MAX-(rcmMode()==='both'?1:0); }   // the company profile counts as one of the extra files
+  function rcmBytes(){ return rcmExtra.reduce(function(t,x){ return t+x.size; },0); }
+  function rcmAttLine(){
+    var n=rcmExtra.map(function(x){ return x.name; }); if(!n.length) return '';
+    return 'I have also attached '+(n.length>1?n.slice(0,-1).join(', ')+' and '+n[n.length-1]:n[0])+'.\n\n';
+  }
+  function rcmRenderFiles(msgs){
+    var box=document.getElementById('rcMailFileList'), hint=document.getElementById('rcMailFileHint'), room=rcmMaxFiles()-rcmExtra.length;
+    box.innerHTML=rcmExtra.map(function(x,i){ return '<div style="display:flex;align-items:center;gap:.6rem;padding:.2rem 0;border-bottom:1px solid var(--line)"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">'+escapeHtml(x.name)+'</span><span class="muted">'+mailSizeText(x.size)+'</span><button class="btn small ghost" type="button" data-rcmdel="'+i+'">Remove</button></div>'; }).join('');
+    hint.textContent=(msgs&&msgs.length?msgs.join(' ')+' ':'')+(room<0?'There are '+(-room)+' too many files for this choice: remove some, or choose "Rate card only".':'Up to '+rcmMaxFiles()+' files here'+(rcmMode()==='both'?' (the company profile counts as one of the '+MAIL_EXTRA_MAX+')':'')+', '+Math.round(MAIL_FILE_BYTES/1000000)+' MB each and '+Math.round(MAIL_TOTAL_BYTES/1000000)+' MB together: PDF, JPG, PNG, Word, Excel, CSV or text.');
+    document.getElementById('rcMailFileHint').style.color=room<0?'var(--bad)':'';
+  }
+  async function rcmAddFiles(files){
+    var msgs=[]; files=Array.prototype.slice.call(files||[]);
+    for(var i=0;i<files.length;i++){
+      var f=files[i], ext=mailFileExt(f.name);
+      if(MAIL_EXTS.indexOf(ext)<0){ msgs.push(f.name+': this kind of file cannot be attached. Use PDF, JPG, PNG, Word, Excel, CSV or text.'); continue; }
+      if(rcmExtra.length>=rcmMaxFiles()){ msgs.push('Only '+rcmMaxFiles()+' files can be added here, so '+(files.length-i>1?'the rest were':f.name+' was')+' not added.'); break; }
+      if(!f.size){ msgs.push(f.name+' is empty.'); continue; }
+      var blob=f, name=f.name;
+      if((ext==='jpg'||ext==='jpeg'||ext==='png') && f.size>600000){ var sm=await mailShrinkImage(f); if(sm && sm.size<f.size){ blob=sm; name=name.replace(/\.[^.]+$/,'')+'.jpg'; } }
+      if(blob.size>MAIL_FILE_BYTES){ msgs.push(f.name+' is too large ('+mailSizeText(f.size)+'). The limit is about '+Math.round(MAIL_FILE_BYTES/1000000)+' MB for each file.'); continue; }
+      if(rcmBytes()+blob.size>MAIL_TOTAL_BYTES){ msgs.push(f.name+' was not added: the files would be over '+Math.round(MAIL_TOTAL_BYTES/1000000)+' MB in all.'); continue; }
+      if(!(await mailContentOk(blob, mailFileExt(name)))){ msgs.push(f.name+' is not really a '+mailFileExt(name).toUpperCase()+' file: its content does not match its name, so it was not added.'); continue; }
+      rcmExtra.push({name:name, size:blob.size, blob:blob});
+    }
+    rcmRefresh(false); rcmRenderFiles(msgs); return msgs;   // refresh the message first, then show what was refused
+  }
   function rcmMode(){ var r=document.querySelector('input[name="rcMailMode"]:checked'); return r?r.value:'both'; }
   function rcmCard(){ var id=document.getElementById('rcMailCard').value; return rateCards.find(function(c){ return c.id===id; })||null; }
   function rcmSenderLabel(email){ var lp=String(email||'').split('@')[0].toLowerCase(); return lp==='accounts'?'Accounts Team':(lp==='hr'?'HR Team':'Public Force Security Services'); }
   function rcmSubject(){ return rcmMode()==='profile'?'Company profile - Public Force Security Services':'Rate card - '+((rcmCard()||{}).name||'Security services')+' | Public Force Security Services'; }
   function rcmMessage(from){
     var name=document.getElementById('rcMailName').value.trim(), hi='Dear '+(name?name+' Team':'Sir/Madam')+',\n\n', sign='\n\nWarm regards,\n'+rcmSenderLabel(from)+'\nPublic Force Security Services', call='We would be happy to discuss your requirements or arrange a site visit. Please reply to this email or call us on 99860 20293.';
-    if(rcmMode()==='profile') return hi+'Thank you for your interest in Public Force Security Services. Please find attached our company profile.\n\nWe provide security services, manpower outsourcing and housekeeping and facility services PAN-India, with a geo-tracking attendance app for our guards, so every check-in is recorded with its time and place.\n\n'+call+sign;
+    if(rcmMode()==='profile') return hi+'Thank you for your interest in Public Force Security Services. Please find attached our company profile.\n\nWe provide security services, manpower outsourcing and housekeeping and facility services PAN-India, with a geo-tracking attendance app for our guards, so every check-in is recorded with its time and place.\n\n'+rcmAttLine()+call+sign;
     var card=rcmCard()||{roles:[]}, roles=card.roles||[], ka=(card.format==='ka'), cs=(card.format==='costsheet'||ka);
     var lines=roles.map(function(r){ var c=computeRole(card,r); return '  '+r.roleName+(cs?' ('+(r.dutyText?r.dutyText+' duty':r.dutyHrs+' hrs duty')+')':'')+': Rs. '+fmt2(ka?c.total:c.grandTotal).replace('\u20b9',''); }).join('\n');
     return hi+'Thank you for your interest in Public Force Security Services. Please find attached our rate card ('+(card.name||'wage break-up')+') for security manpower services. We provide security services, manpower outsourcing and housekeeping and facility services PAN-India.\n\n'+
       (ka?'Total monthly invoice amount per person (service charge and GST @ '+card.gstPct+'% included):\n':'Grand total per person per month (service charge included):\n')+lines+'\n\n'+(ka?'':'GST @ '+card.gstPct+'% is charged additionally as applicable.\n\n')+
       (ka&&card.billBasis==='perday'?'Billing is per day: the amounts above are for '+(card.days||26)+' days, and each day paid is billed at 1/'+(card.days||26)+' of them.\n\n':'')+
-      (rcmMode()==='both'?'I have also attached our company profile, which tells you more about who we are and how we work.\n\n':'')+call+sign;
+      (rcmMode()==='both'?'I have also attached our company profile, which tells you more about who we are and how we work.\n\n':'')+rcmAttLine()+call+sign;
   }
   function rcmRefresh(force){
     var el=function(i){ return document.getElementById(i); }, mode=rcmMode(), card=rcmCard();
     el('rcMailCardBox').style.display=mode==='profile'?'none':''; el('rcMailTitle').textContent=mode==='profile'?'Email the company profile':'Email the rate card';
     el('rcMailInfo').textContent=(card&&card.format!=='ka')?'This is an older rate card structure; the PDF is made as it is.':'';
     if(force || !rcm.edited){ el('rcMailSubject').value=rcmSubject(); el('rcMailMsg').value=rcmMessage(el('rcMailFrom').value); }
+    rcmRenderFiles();
     var needsUpdate=(mode==='both' && rcm.ready && rcm.attachMax<2), h=el('rcMailHelp');
     if(needsUpdate){ h.style.display=''; h.textContent='The email service needs an update before it can attach the company profile to a rate card (see the README). Choose "Rate card only" or "Company profile only" for now.'; } else if(rcm.ready){ h.style.display='none'; }
   }
@@ -6753,7 +6787,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var card=cardId?rateCards.find(function(c){ return c.id===cardId; }):null; if(card) sel.value=card.id;
     document.querySelector('input[name="rcMailMode"][value="'+(cardId?'both':'profile')+'"]').checked=true;
     if(!cardId && !rateCards.length) document.querySelector('input[name="rcMailMode"][value="profile"]').checked=true;
-    rcm.edited=false; rcm.ready=false; rcm.attachMax=1; var cc=rcmCard();
+    rcm.edited=false; rcm.ready=false; rcm.attachMax=1; rcmExtra=[]; el('rcMailFiles').value=''; var cc=rcmCard();
     el('rcMailTo').value=(cc&&cc.clientEmail)||''; el('rcMailCc').value=''; el('rcMailName').value=(cc&&cc.clientName)||''; el('rcMailErr').textContent=''; el('rcMailHelp').style.display='none';
     el('rcMailFrom').innerHTML='<option value="">Loading...</option>'; el('btnRcMailSend').disabled=true; el('btnRcMailSend').textContent='Send email'; rcmRefresh(true); el('rcMailModalBg').classList.add('show');
     try{
@@ -6771,6 +6805,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     var to=el('rcMailTo').value.trim(), mode=rcmMode(), card=rcmCard(); if(!to){ err.textContent='Enter the client\'s email address.'; return; }
     if(mode!=='profile' && !card){ err.textContent='Choose the rate card.'; return; }
     if(mode==='both' && rcm.attachMax<2){ err.textContent='The email service needs an update before it can attach the company profile (see the README). Choose "Rate card only" or "Company profile only".'; return; }
+    if(rcmExtra.length>rcmMaxFiles()){ err.textContent='There are too many files for this choice: remove '+(rcmExtra.length-rcmMaxFiles())+', or choose "Rate card only".'; return; }
     var btn=el('btnRcMailSend'); btn.disabled=true;
     try{
       var body={from:el('rcMailFrom').value, to:to, cc:el('rcMailCc').value.trim(), subject:el('rcMailSubject').value, message:el('rcMailMsg').value, keepCopy:el('rcMailCopy').checked};
@@ -6780,8 +6815,12 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         body.filename='rate-card-'+pdfName(card.name||'untitled')+'.pdf'; body.pdfBase64=await b64Of(buildRateCardPdf(card,roles,computed,{computerGenerated:true, date:pdfDate(xToday())}));
         if(mode==='both'){ btn.textContent='Preparing the company profile...'; body.extra=[{filename:RCM_PROFILE_FILE, pdfBase64:await b64Of(buildCompanyProfilePdf(profileData()))}]; }
       }
+      var nx=rcmExtra.length;
+      if(nx){ var saved=mailExtra; mailExtra=rcmExtra; var prep; try{ prep=await mailPrepareExtras(btn); } finally{ mailExtra=saved; }
+        if(prep.extraUrls) body.extraUrls=prep.extraUrls; if(prep.extra) body.extra=(body.extra||[]).concat(prep.extra);
+        if((body.extra||[]).length>4) throw new Error('Without the storage for email files, at most 4 extra files can be sent (the company profile counts as one). Remove some files, or ask the administrator to run email_attachments.sql in Supabase (see the README).'); }
       btn.textContent='Sending...'; await mailApi('POST',body);
-      toast((mode==='profile'?'Company profile sent to ':'Email sent to ')+to+(body.extra?', with the company profile.':'.')); el('rcMailModalBg').classList.remove('show');
+      toast((mode==='profile'?'Company profile sent to ':'Email sent to ')+to+(mode==='both'?', with the company profile':'')+(nx?(mode==='both'?' and ':', with ')+nx+' more file'+(nx>1?'s':''):'')+'.'); el('rcMailModalBg').classList.remove('show');
     }catch(e){ err.textContent=(e&&e.message)||'Could not send the email.'; }
     btn.disabled=false; btn.textContent='Send email';
   }
@@ -6795,6 +6834,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     document.getElementById('rcMailFrom').addEventListener('change', function(){ rcmRefresh(false); });
     document.getElementById('rcMailName').addEventListener('input', function(){ rcmRefresh(false); });
     document.getElementById('rcMailMsg').addEventListener('input', function(){ rcm.edited=true; });
+    document.getElementById('rcMailFiles').addEventListener('change', async function(){ var f=this.files; await rcmAddFiles(f); this.value=''; });
+    document.getElementById('rcMailFileList').addEventListener('click', function(ev){ var b=ev.target.closest('[data-rcmdel]'); if(!b) return; rcmExtra.splice(Number(b.dataset.rcmdel),1); rcmRenderFiles(); rcmRefresh(false); });
   })();
 
   function setupRateCardUI(){
