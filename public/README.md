@@ -685,7 +685,7 @@ A company holiday has a **red heading that reads HOL** above the day number, and
 
 
 ## Version line in the menu
-Under the name at the top of the left menu a small line reads, for example, "Version: 22 Nov 2026, build 40". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
+Under the name at the top of the left menu a small line reads, for example, "Version: 23 Nov 2026, build 41". After you upload a new `index.html`, press Ctrl + Shift + R and check this line, so you know the new file is the one being shown. If it still shows an older build, the new file has not been deployed yet (check the Deployments tab of the Cloudflare project) or the browser is showing a saved copy.
 
 
 ## Pushing a payroll through when there are errors
@@ -975,7 +975,7 @@ Different clients get different services, so the SAC code (and the description o
 
 
 ## One version line
-The page used to show two version lines: an old one under the name ("Build 5 Nov 2026 · 44", which was never updated) and the real one at the bottom of the menu. The old one is removed. There is now a single line, **under "Public Force" at the top of the left menu**, such as "Version: 22 Nov 2026, build 40". It is the line to check after an upload (press Ctrl + Shift + R first): if it shows an older build, the new file is not live yet.
+The page used to show two version lines: an old one under the name ("Build 5 Nov 2026 · 44", which was never updated) and the real one at the bottom of the menu. The old one is removed. There is now a single line, **under "Public Force" at the top of the left menu**, such as "Version: 23 Nov 2026, build 41". It is the line to check after an upload (press Ctrl + Shift + R first): if it shows an older build, the new file is not live yet.
 
 
 ## Paying the bonus at the year end (bonus ledger)
@@ -1177,3 +1177,14 @@ Once a month a job on GitHub's free scheduler reads **every record** of the data
 - The email limits still apply to the files together (at most 10 extra files, about 15 MB in all).
 - **Set up once:** run **`supabase/statutory_proofs.sql`** in the Supabase SQL Editor. It makes the private storage for these files: Accounts and the administrator can upload and remove; the administrator, Accounts and managers can read (managers send invoice emails). Without it the window says "run statutory_proofs.sql". The files are not in the monthly backup (the records are, with the names and places of the files).
 - Checked here with a stand-in for the storage: upload, download, removal, the automatic attach (the files passed on are byte for byte the ones uploaded), the client switch, reminders, a month with nothing uploaded, storage not set up, and the Today reminder. The real storage can only be checked on your site.
+
+
+## Email a rate card and the company profile from the main app (build 41)
+Until now only the **phone rate card app** could email a rate card. The **Rate Card** tab of the main app now has:
+- **Email** on every saved rate card, and **Email the company profile** at the top (for a prospect, with no rate card).
+- A window with **what to send**: *Rate card and company profile*, *Rate card only*, or *Company profile only*. Then **From** (the addresses the email service allows, starting with info@), **To**, **Cc**, the **client or company name** (used in the greeting), **Subject** and **Message**.
+- The **subject and message are the same as in the phone app**: the greeting, the rate card name, the **total monthly invoice amount per person** (with GST included for the new structure; GST extra for older ones), the per-day billing sentence where it applies, the sentence about the attached company profile, the phone number 99860 20293, and the signature (*Accounts Team* if you send from accounts@, *HR Team* from hr@, otherwise *Public Force Security Services*). The client's name and email are filled in from the card if the phone app saved them. You can edit the message; once you type in it, it is not overwritten.
+- The **rate card PDF is the computer-generated version without a signature**, as in the phone app. The **company profile** is the 5-page PDF made from Settings, Company profile (brochure), so keep those details up to date.
+- **Send a copy to the sending address** is ticked to begin with. Only administrators and managers can send, as in the phone app.
+- It uses the **same email service** as the invoice emails and the phone app: nothing new to install. If the service has not had the update that allows two attachments, the window says so for "Rate card and company profile" and does not send half an email; the other two choices still work.
+- Checked here with a stand-in for the email service: the request carries the rate card PDF (with the same amount as the message), the profile as the second attachment, the right subject and sender; "rate card only" and "profile only" send one attachment; a missing address is refused; and where email is not connected the window says so.

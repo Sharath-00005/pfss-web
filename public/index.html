@@ -398,7 +398,7 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
 <body>
 <div class="appshell">
   <nav class="side" id="sideNav">
-    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="buildTag" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Version: 22 Nov 2026, build 40</small></div></div>
+    <div class="brand"><div class="mark">PF</div><div><b>Public Force</b><small>HR, payroll &amp; billing</small><small id="buildTag" style="display:block;opacity:.7;font-size:.66rem;margin-top:1px">Version: 23 Nov 2026, build 41</small></div></div>
     <div class="grp">Menu</div>
     <button class="navbtn on" id="tabs-dashboard" data-tab="dashboard">Dashboard</button>
     <button class="navbtn" id="tabs-cycle" data-tab="cycle">Pay cycle</button>
@@ -670,7 +670,8 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
     <div class="card">
       <div class="row" style="justify-content:space-between">
         <h2>Client rate cards</h2>
-        <div class="row" style="gap:.5rem"><button class="btn ghost" id="btnRcRefreshWages" type="button" title="Use after the minimum wages table in Compliance has been updated">Update wages from the minimum wages table</button><button class="btn" id="btnAddRc">+ New rate card</button></div>
+        <div class="row" style="gap:.5rem"><button class="btn ghost" id="btnRcRefreshWages" type="button" title="Use after the minimum wages table in Compliance has been updated">Update wages from the minimum wages table</button><button class="btn" id="btnAddRc">+ New rate card</button>
+        <button class="btn ghost" id="btnProfileMail" type="button">Email the company profile</button></div>
       </div>
       <p class="muted">For quoting new clients, not a recurring task — create one rate card per client/site when you first price the job, and reuse or copy it for future quotes. Shows cost-to-company per person, per month, based on state minimum wages plus statutory employer costs and your service margin.</p>
       <div class="scrollx">
@@ -1623,6 +1624,25 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
       <div class="muted" id="statFileHint" style="font-size:.8rem"></div></div>
     <div id="statErr" style="color:var(--bad);min-height:1.3em" role="alert"></div>
     <div class="row" style="justify-content:space-between"><button class="btn danger ghost" id="btnStatRemove" type="button">Remove this record</button><button class="btn" id="btnStatSave" type="button">Save</button></div>
+  </div>
+</div>
+
+<div class="modal-bg" id="rcMailModalBg">
+  <div class="modal" style="max-width:740px">
+    <button class="close-x" id="rcMailClose">&times;</button>
+    <h3 id="rcMailTitle">Email the rate card</h3>
+    <div class="field"><label>What to send</label>
+      <div class="row" style="gap:1rem;flex-wrap:wrap"><label style="display:flex;gap:.4rem;align-items:center"><input type="radio" name="rcMailMode" value="both" checked style="width:auto;min-height:0"> Rate card and company profile</label><label style="display:flex;gap:.4rem;align-items:center"><input type="radio" name="rcMailMode" value="card" style="width:auto;min-height:0"> Rate card only</label><label style="display:flex;gap:.4rem;align-items:center"><input type="radio" name="rcMailMode" value="profile" style="width:auto;min-height:0"> Company profile only</label></div></div>
+    <div class="field" id="rcMailCardBox"><label for="rcMailCard">Rate card</label><select id="rcMailCard"></select><div class="muted" id="rcMailInfo" style="font-size:.82rem;margin-top:.2rem"></div></div>
+    <div class="field"><label for="rcMailFrom">From</label><select id="rcMailFrom"></select></div>
+    <div class="row"><div class="field grow"><label for="rcMailTo">To *</label><input id="rcMailTo" type="email" placeholder="name@company.com" autocomplete="off"></div><div class="field grow"><label for="rcMailCc">Cc (optional)</label><input id="rcMailCc"></div></div>
+    <div class="field"><label for="rcMailName">Client or company name (for the greeting)</label><input id="rcMailName" placeholder="e.g. Avio Helitronics"></div>
+    <div class="field"><label for="rcMailSubject">Subject</label><input id="rcMailSubject"></div>
+    <div class="field"><label for="rcMailMsg">Message</label><textarea id="rcMailMsg" rows="12"></textarea></div>
+    <label style="display:flex;gap:.45rem;align-items:center;margin:.2rem 0"><input type="checkbox" id="rcMailCopy" checked style="width:auto;min-height:0"> Send a copy to the sending address</label>
+    <div id="rcMailHelp" class="muted" style="display:none;margin:.4rem 0"></div>
+    <div id="rcMailErr" style="color:var(--bad);min-height:1.3em" role="alert"></div>
+    <div class="row" style="justify-content:flex-end"><button class="btn" id="btnRcMailSend" type="button">Send email</button></div>
   </div>
 </div>
 
@@ -6694,13 +6714,88 @@ tfoot td{font-weight:700;border-top:2px solid var(--ink);border-bottom:0}
         '<td>'+(rc.hours||8)+'h x '+(rc.days||26)+'d</td>'+
         '<td>'+names+'</td>'+
         '<td class="right">'+totals+'</td>'+
-        '<td><button class="btn small ghost" data-rc-edit="'+rc.id+'">Edit</button></td>';
+        '<td style="white-space:nowrap"><button class="btn small ghost" data-rc-edit="'+rc.id+'">Edit</button> <button class="btn small ghost" data-rc-mail="'+rc.id+'">Email</button></td>';
       tbody.appendChild(tr);
     });
     tbody.querySelectorAll('[data-rc-edit]').forEach(function(b){
       b.addEventListener('click', function(){ openRcModal(b.dataset.rcEdit); });
     });
+    tbody.querySelectorAll('[data-rc-mail]').forEach(function(b){ b.addEventListener('click', function(){ openRcMail(b.dataset.rcMail); }); });
   }
+
+  /* ---------- email a rate card and the company profile from here (the same wording and the same email service as the phone app) ---------- */
+  var rcm={edited:false, attachMax:1, ready:false}, RCM_PROFILE_FILE='PFSS-Company-Profile.pdf';
+  function rcmMode(){ var r=document.querySelector('input[name="rcMailMode"]:checked'); return r?r.value:'both'; }
+  function rcmCard(){ var id=document.getElementById('rcMailCard').value; return rateCards.find(function(c){ return c.id===id; })||null; }
+  function rcmSenderLabel(email){ var lp=String(email||'').split('@')[0].toLowerCase(); return lp==='accounts'?'Accounts Team':(lp==='hr'?'HR Team':'Public Force Security Services'); }
+  function rcmSubject(){ return rcmMode()==='profile'?'Company profile - Public Force Security Services':'Rate card - '+((rcmCard()||{}).name||'Security services')+' | Public Force Security Services'; }
+  function rcmMessage(from){
+    var name=document.getElementById('rcMailName').value.trim(), hi='Dear '+(name?name+' Team':'Sir/Madam')+',\n\n', sign='\n\nWarm regards,\n'+rcmSenderLabel(from)+'\nPublic Force Security Services', call='We would be happy to discuss your requirements or arrange a site visit. Please reply to this email or call us on 99860 20293.';
+    if(rcmMode()==='profile') return hi+'Thank you for your interest in Public Force Security Services. Please find attached our company profile.\n\nWe provide security services, manpower outsourcing and housekeeping and facility services PAN-India, with a geo-tracking attendance app for our guards, so every check-in is recorded with its time and place.\n\n'+call+sign;
+    var card=rcmCard()||{roles:[]}, roles=card.roles||[], ka=(card.format==='ka'), cs=(card.format==='costsheet'||ka);
+    var lines=roles.map(function(r){ var c=computeRole(card,r); return '  '+r.roleName+(cs?' ('+(r.dutyText?r.dutyText+' duty':r.dutyHrs+' hrs duty')+')':'')+': Rs. '+fmt2(ka?c.total:c.grandTotal).replace('\u20b9',''); }).join('\n');
+    return hi+'Thank you for your interest in Public Force Security Services. Please find attached our rate card ('+(card.name||'wage break-up')+') for security manpower services. We provide security services, manpower outsourcing and housekeeping and facility services PAN-India.\n\n'+
+      (ka?'Total monthly invoice amount per person (service charge and GST @ '+card.gstPct+'% included):\n':'Grand total per person per month (service charge included):\n')+lines+'\n\n'+(ka?'':'GST @ '+card.gstPct+'% is charged additionally as applicable.\n\n')+
+      (ka&&card.billBasis==='perday'?'Billing is per day: the amounts above are for '+(card.days||26)+' days, and each day paid is billed at 1/'+(card.days||26)+' of them.\n\n':'')+
+      (rcmMode()==='both'?'I have also attached our company profile, which tells you more about who we are and how we work.\n\n':'')+call+sign;
+  }
+  function rcmRefresh(force){
+    var el=function(i){ return document.getElementById(i); }, mode=rcmMode(), card=rcmCard();
+    el('rcMailCardBox').style.display=mode==='profile'?'none':''; el('rcMailTitle').textContent=mode==='profile'?'Email the company profile':'Email the rate card';
+    el('rcMailInfo').textContent=(card&&card.format!=='ka')?'This is an older rate card structure; the PDF is made as it is.':'';
+    if(force || !rcm.edited){ el('rcMailSubject').value=rcmSubject(); el('rcMailMsg').value=rcmMessage(el('rcMailFrom').value); }
+    var needsUpdate=(mode==='both' && rcm.ready && rcm.attachMax<2), h=el('rcMailHelp');
+    if(needsUpdate){ h.style.display=''; h.textContent='The email service needs an update before it can attach the company profile to a rate card (see the README). Choose "Rate card only" or "Company profile only" for now.'; } else if(rcm.ready){ h.style.display='none'; }
+  }
+  async function openRcMail(cardId){
+    var el=function(i){ return document.getElementById(i); }, sel=el('rcMailCard');
+    sel.innerHTML=rateCards.slice().sort(function(a,b){ return (a.name||'').localeCompare(b.name||''); }).map(function(c){ return '<option value="'+escapeHtml(c.id)+'">'+escapeHtml(c.name||'Untitled')+'</option>'; }).join('');
+    var card=cardId?rateCards.find(function(c){ return c.id===cardId; }):null; if(card) sel.value=card.id;
+    document.querySelector('input[name="rcMailMode"][value="'+(cardId?'both':'profile')+'"]').checked=true;
+    if(!cardId && !rateCards.length) document.querySelector('input[name="rcMailMode"][value="profile"]').checked=true;
+    rcm.edited=false; rcm.ready=false; rcm.attachMax=1; var cc=rcmCard();
+    el('rcMailTo').value=(cc&&cc.clientEmail)||''; el('rcMailCc').value=''; el('rcMailName').value=(cc&&cc.clientName)||''; el('rcMailErr').textContent=''; el('rcMailHelp').style.display='none';
+    el('rcMailFrom').innerHTML='<option value="">Loading...</option>'; el('btnRcMailSend').disabled=true; el('btnRcMailSend').textContent='Send email'; rcmRefresh(true); el('rcMailModalBg').classList.add('show');
+    try{
+      var out=await mailApi('GET'), senders=out.senders||[]; rcm.attachMax=Number(out.maxAttachments)||1; rcm.ready=true;
+      el('rcMailFrom').innerHTML=senders.map(function(x){ return '<option value="'+escapeHtml(x.email)+'">'+escapeHtml(x.email)+' ('+escapeHtml(x.label)+')</option>'; }).join('');
+      var info=senders.find(function(x){ return /^info@/i.test(x.email); }); if(info) el('rcMailFrom').value=info.email;
+      el('btnRcMailSend').disabled=!senders.length; rcmRefresh(false);
+    }catch(e){
+      el('rcMailFrom').innerHTML='<option value="">Not available</option>'; var h=el('rcMailHelp'); h.style.display='';
+      h.textContent=(e&&e.status===403)?'Only administrators and managers can send email from the app.':((e&&(e.status===0||e.status===404||/Failed to fetch|NetworkError|Load failed|not-signed-in/i.test(String(e.message))))?'Email is not set up here yet. It works on your own site once the email service is connected.':'Email is not available right now: '+((e&&e.message)||'unknown problem')+'.');
+    }
+  }
+  async function rcmSend(){
+    var el=function(i){ return document.getElementById(i); }, err=el('rcMailErr'); err.textContent='';
+    var to=el('rcMailTo').value.trim(), mode=rcmMode(), card=rcmCard(); if(!to){ err.textContent='Enter the client\'s email address.'; return; }
+    if(mode!=='profile' && !card){ err.textContent='Choose the rate card.'; return; }
+    if(mode==='both' && rcm.attachMax<2){ err.textContent='The email service needs an update before it can attach the company profile (see the README). Choose "Rate card only" or "Company profile only".'; return; }
+    var btn=el('btnRcMailSend'); btn.disabled=true;
+    try{
+      var body={from:el('rcMailFrom').value, to:to, cc:el('rcMailCc').value.trim(), subject:el('rcMailSubject').value, message:el('rcMailMsg').value, keepCopy:el('rcMailCopy').checked};
+      if(mode==='profile'){ btn.textContent='Preparing the company profile...'; body.filename=RCM_PROFILE_FILE; body.pdfBase64=await b64Of(buildCompanyProfilePdf(profileData())); }
+      else{
+        btn.textContent='Preparing the PDF...'; var roles=card.roles||[], computed=roles.map(function(r){ return computeRole(card,r); });
+        body.filename='rate-card-'+pdfName(card.name||'untitled')+'.pdf'; body.pdfBase64=await b64Of(buildRateCardPdf(card,roles,computed,{computerGenerated:true, date:pdfDate(xToday())}));
+        if(mode==='both'){ btn.textContent='Preparing the company profile...'; body.extra=[{filename:RCM_PROFILE_FILE, pdfBase64:await b64Of(buildCompanyProfilePdf(profileData()))}]; }
+      }
+      btn.textContent='Sending...'; await mailApi('POST',body);
+      toast((mode==='profile'?'Company profile sent to ':'Email sent to ')+to+(body.extra?', with the company profile.':'.')); el('rcMailModalBg').classList.remove('show');
+    }catch(e){ err.textContent=(e&&e.message)||'Could not send the email.'; }
+    btn.disabled=false; btn.textContent='Send email';
+  }
+  (function(){
+    var c=document.getElementById('rcMailClose'); if(!c) return;
+    c.addEventListener('click', function(){ document.getElementById('rcMailModalBg').classList.remove('show'); });
+    document.getElementById('btnRcMailSend').addEventListener('click', rcmSend);
+    document.getElementById('btnProfileMail').addEventListener('click', function(){ openRcMail(null); });
+    document.querySelectorAll('input[name="rcMailMode"]').forEach(function(r){ r.addEventListener('change', function(){ rcmRefresh(true); rcm.edited=false; }); });
+    document.getElementById('rcMailCard').addEventListener('change', function(){ var cc=rcmCard(); if(cc){ document.getElementById('rcMailTo').value=cc.clientEmail||document.getElementById('rcMailTo').value; document.getElementById('rcMailName').value=cc.clientName||''; } rcm.edited=false; rcmRefresh(true); });
+    document.getElementById('rcMailFrom').addEventListener('change', function(){ rcmRefresh(false); });
+    document.getElementById('rcMailName').addEventListener('input', function(){ rcmRefresh(false); });
+    document.getElementById('rcMailMsg').addEventListener('input', function(){ rcm.edited=true; });
+  })();
 
   function setupRateCardUI(){
     document.getElementById('btnAddRc').addEventListener('click', function(){ openRcModal(null); });
